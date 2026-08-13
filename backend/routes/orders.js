@@ -1,10 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const { auth, isAdmin } = require('../middleware/auth');
+const tenantContext = require('../middleware/tenantContext');
+const { subscriptionGuard } = require('../middleware/subscriptionGuard');
 const orderController = require('../controllers/orderController');
 
-// Todas las rutas requieren autenticación
+// Todas las rutas requieren autenticación, contexto de tenant y verificación de suscripción
 router.use(auth);
+router.use(tenantContext);
+router.use(subscriptionGuard);
 
 // Cliente: crear pedido
 router.post('/', orderController.createOrder);

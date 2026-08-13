@@ -12,9 +12,10 @@ const auth = async (req, res, next) => {
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        // Obtener usuario de la base de datos
+        // Obtener usuario de la base de datos (incluye tenant_id y branch_id para multi-tenancy)
         const [users] = await db.query(
-            'SELECT id, email, first_name, last_name, phone, role, is_active FROM users WHERE id = ?',
+            `SELECT id, email, first_name, last_name, phone, role, is_active, tenant_id, branch_id 
+             FROM users WHERE id = ?`,
             [decoded.id]
         );
 
@@ -34,20 +35,65 @@ const auth = async (req, res, next) => {
     }
 };
 
-// Middleware para verificar rol de admin
+// Middleware para verificar rol de SuperAdmin (operador de la plataforma SaaS)
+const isSuperAdmin = (req, res, next) => {
+    if (req.user.role !== 'superadmin') {
+        return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de super administrador.' });
+    }
+    next();
+};
+
+// Middleware para verificar rol de admin de empresa (tenant_admin)
+const isTenantAdmin = (req, res, next) => {
+    if (req.user.role !== 'tenant_admin' && req.user.role !== 'superadmin') {
+        return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de administrador de empresa.' });
+    }
+    next();
+};
+
+// Middleware para verificar rol de admin (compatible con el sistema anterior + nuevos roles)
 const isAdmin = (req, res, next) => {
-    if (req.user.role !== 'admin') {
+    const adminRoles = ['admin', 'tenant_admin', 'branch_manager', 'superadmin'];
+    if (!adminRoles.includes(req.user.role)) {
         return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de administrador.' });
+    }
+    next();
+};
+
+// Middleware para gerente de sucursal o superior
+const isBranchManagerOrAbove = (req, res, next) => {
+    const allowed = ['tenant_admin', 'branch_manager', 'superadmin'];
+    if (!allowed.includes(req.user.role)) {
+        return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de gerente o superior.' });
+    }
+    next();
+};
+
+// Middleware para verificar que es staff (no cliente)
+const isStaff = (req, res, next) => {
+    const staffRoles = ['superadmin', 'tenant_admin', 'branch_manager', 'technician', 'cashier', 'admin'];
+    if (!staffRoles.includes(req.user.role)) {
+        return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de empleado.' });
     }
     next();
 };
 
 // Middleware para verificar rol de técnico o admin
 const isTechnicianOrAdmin = (req, res, next) => {
-    if (req.user.role !== 'technician' && req.user.role !== 'admin') {
+    const allowed = ['technician', 'admin', 'tenant_admin', 'branch_manager', 'superadmin'];
+    if (!allowed.includes(req.user.role)) {
         return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de técnico o administrador.' });
     }
     next();
 };
 
-module.exports = { auth, isAdmin, isTechnicianOrAdmin };
+module.exports = { 
+    auth, 
+    isAdmin, 
+    isSuperAdmin, 
+    isTenantAdmin, 
+    isBranchManagerOrAbove, 
+    isStaff, 
+    isTechnicianOrAdmin 
+};
+

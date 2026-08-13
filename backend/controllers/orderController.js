@@ -1,17 +1,17 @@
 const db = require('../config/database');
 
-// Generar número de venta (VTA-WEB-...)
-const generateSaleNumber = () => {
+// Generar número de venta prefixado
+const generateSaleNumber = (branchCode = 'VTA') => {
     const date = new Date();
     const y = date.getFullYear().toString().slice(-2);
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     const rand = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `VTA-${y}${m}${d}-${rand}`;
+    return `${branchCode}-${y}${m}${d}-${rand}`;
 };
 
 // =====================================================
-// Crear venta pendiente (checkout del cliente en tienda)
+// Crear venta pendiente (checkout del cliente en tienda - SaaS & Multi-Branch Scoped)
 // =====================================================
 exports.createOrder = async (req, res) => {
     const connection = await db.getConnection();
@@ -20,6 +20,8 @@ exports.createOrder = async (req, res) => {
 
         const { items, notes } = req.body;
         const customerId = req.user.id;
+        const tenantId = req.user.tenant_id;
+        const branchId = req.user.branch_id; // Clientes tienen branch_id directo en la tabla users
 
         if (!items || items.length === 0) {
             return res.status(400).json({ message: 'El pedido debe tener al menos un ítem.' });
@@ -34,16 +36,21 @@ exports.createOrder = async (req, res) => {
             }
 
             if (item.item_type === 'product' && item.product_id) {
-                // Verificar stock
+                // Verificar stock por sucursal
                 const [products] = await connection.query(
-                    'SELECT id, name, sale_price, stock FROM products WHERE id = ? AND is_active = TRUE',
-                    [item.product_id]
+                    `SELECT p.id, p.name, p.sale_price, COALESCE(bi.stock, 0) as stock 
+                     FROM products p
+                     LEFT JOIN branch_inventory bi ON p.id = bi.product_id AND bi.branch_id = ?
+                     WHERE p.id = ? AND p.tenant_id = ? AND p.is_active = TRUE`,
+                    [branchId, item.product_id, tenantId]
                 );
                 if (products.length === 0) {
-                    return res.status(400).json({ message: `Producto no encontrado: ${item.product_id}` });
+                    await connection.rollback();
+                    return res.status(400).json({ message: `Producto no encontrado o no pertenece a tu sucursal.` });
                 }
                 const product = products[0];
                 if (product.stock < item.quantity) {
+                    await connection.rollback();
                     return res.status(400).json({
                         message: `Stock insuficiente para "${product.name}". Disponible: ${product.stock}`
                     });
@@ -61,11 +68,12 @@ exports.createOrder = async (req, res) => {
             } else if (item.item_type === 'service' && item.service_id) {
                 // Verificar servicio
                 const [services] = await connection.query(
-                    'SELECT id, name, base_price FROM services_catalog WHERE id = ? AND is_active = TRUE',
-                    [item.service_id]
+                    'SELECT id, name, base_price FROM services_catalog WHERE id = ? AND tenant_id = ? AND is_active = TRUE',
+                    [item.service_id, tenantId]
                 );
                 if (services.length === 0) {
-                    return res.status(400).json({ message: `Servicio no encontrado: ${item.service_id}` });
+                    await connection.rollback();
+                    return res.status(400).json({ message: `Servicio no encontrado o no pertenece a tu sucursal.` });
                 }
                 const service = services[0];
                 const itemTotal = service.base_price * item.quantity;
@@ -79,17 +87,22 @@ exports.createOrder = async (req, res) => {
                     total: itemTotal
                 });
             } else {
+                await connection.rollback();
                 return res.status(400).json({ message: 'Cada ítem debe ser un producto o servicio válido.' });
             }
         }
 
-        const saleNumber = generateSaleNumber();
+        // Obtener código de la sucursal
+        const [branchInfo] = await connection.query('SELECT code FROM branches WHERE id = ?', [branchId]);
+        const branchPrefix = branchInfo.length > 0 ? branchInfo[0].code : 'WEB';
+
+        const saleNumber = generateSaleNumber(branchPrefix);
 
         // Insertar en tabla sales con status 'pending' y cashier_id = NULL
         const [saleResult] = await connection.query(
-            `INSERT INTO sales (sale_number, customer_id, cashier_id, subtotal, discount, total, payment_method, amount_received, change_amount, status, notes)
-             VALUES (?, ?, NULL, ?, 0, ?, 'cash', 0, 0, 'pending', ?)`,
-            [saleNumber, customerId, subtotal, subtotal, notes || 'Pedido creado por el cliente en línea']
+            `INSERT INTO sales (tenant_id, branch_id, sale_number, customer_id, cashier_id, subtotal, discount, total, payment_method, amount_received, change_amount, status, notes)
+             VALUES (?, ?, ?, ?, NULL, ?, 0, ?, 'cash', 0, 0, 'pending', ?)`,
+            [tenantId, branchId, saleNumber, customerId, subtotal, subtotal, notes || 'Pedido creado por el cliente en línea']
         );
 
         const saleId = saleResult.insertId;
@@ -123,13 +136,15 @@ exports.createOrder = async (req, res) => {
 };
 
 // =====================================================
-// Obtener ventas pendientes/completadas de clientes
+// Obtener ventas pendientes/completadas de clientes (SaaS Scoped)
 // =====================================================
 exports.getOrders = async (req, res) => {
     try {
         const { page = 1, limit = 20, status, date_from, date_to, search } = req.query;
         const offset = (page - 1) * limit;
-        const isAdmin = req.user.role === 'admin';
+        const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.tenantCtx.branchId;
+        const isStaffUser = req.user.role !== 'client';
 
         let query = `
             SELECT s.*,
@@ -141,11 +156,16 @@ exports.getOrders = async (req, res) => {
                 (SELECT COUNT(*) FROM sale_items WHERE sale_id = s.id) as item_count
             FROM sales s
             LEFT JOIN users u ON s.customer_id = u.id
-            WHERE 1=1
+            WHERE s.tenant_id = ?
         `;
-        const params = [];
+        const params = [tenantId];
 
-        if (!isAdmin) {
+        if (branchId) {
+            query += ' AND s.branch_id = ?';
+            params.push(branchId);
+        }
+
+        if (!isStaffUser) {
             // El cliente solo ve sus compras/pedidos
             query += ' AND s.customer_id = ?';
             params.push(req.user.id);
@@ -194,12 +214,13 @@ exports.getOrders = async (req, res) => {
 };
 
 // =====================================================
-// Obtener detalle de venta/pedido
+// Obtener detalle de venta/pedido (SaaS Scoped)
 // =====================================================
 exports.getOrderById = async (req, res) => {
     try {
         const { id } = req.params;
-        const isAdmin = req.user.role === 'admin';
+        const tenantId = req.tenantCtx.tenantId;
+        const isStaffUser = req.user.role !== 'client';
 
         let query = `
             SELECT s.*,
@@ -210,11 +231,11 @@ exports.getOrderById = async (req, res) => {
                 u.phone as customer_phone
             FROM sales s
             LEFT JOIN users u ON s.customer_id = u.id
-            WHERE s.id = ?
+            WHERE s.id = ? AND s.tenant_id = ?
         `;
-        const params = [id];
+        const params = [id, tenantId];
 
-        if (!isAdmin) {
+        if (!isStaffUser) {
             query += ' AND s.customer_id = ?';
             params.push(req.user.id);
         }
@@ -243,19 +264,24 @@ exports.getOrderById = async (req, res) => {
 };
 
 // =====================================================
-// Cambiar estado (reutilizado o cancelado)
+// Cambiar estado (SaaS & Multi-Branch Scoped)
 // =====================================================
 exports.updateOrderStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.tenantCtx.branchId;
 
         const validStatuses = ['completed', 'cancelled', 'refunded', 'pending'];
         if (!validStatuses.includes(status)) {
             return res.status(400).json({ message: 'Estado inválido.' });
         }
 
-        await db.query('UPDATE sales SET status = ? WHERE id = ?', [status, id]);
+        const [result] = await db.query('UPDATE sales SET status = ? WHERE id = ? AND tenant_id = ? AND branch_id = ?', [status, id, tenantId, branchId]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Pedido no encontrado o no pertenece a tu sucursal.' });
+        }
         res.json({ message: 'Estado del pedido actualizado.' });
     } catch (error) {
         console.error('[ORDERS/SALES] Error al actualizar estado:', error);
@@ -264,17 +290,24 @@ exports.updateOrderStatus = async (req, res) => {
 };
 
 // =====================================================
-// Cancelar pedido
+// Cancelar pedido (SaaS & Multi-Branch Scoped)
 // =====================================================
 exports.cancelOrder = async (req, res) => {
     try {
         const { id } = req.params;
-        const isStaff = req.user.role === 'admin' || req.user.role === 'technician';
+        const tenantId = req.user.tenant_id;
+        const branchId = req.user.branch_id;
+        const isStaffUser = req.user.role !== 'client';
 
-        let query = 'SELECT * FROM sales WHERE id = ?';
-        const params = [id];
+        let query = 'SELECT * FROM sales WHERE id = ? AND tenant_id = ?';
+        const params = [id, tenantId];
 
-        if (!isStaff) {
+        if (branchId) {
+            query += ' AND branch_id = ?';
+            params.push(branchId);
+        }
+
+        if (!isStaffUser) {
             query += ' AND customer_id = ?';
             params.push(req.user.id);
         }
@@ -287,11 +320,11 @@ exports.cancelOrder = async (req, res) => {
 
         const sale = sales[0];
 
-        if (sale.status !== 'pending' && !isStaff) {
+        if (sale.status !== 'pending' && !isStaffUser) {
             return res.status(400).json({ message: 'Solo puedes cancelar pedidos pendientes.' });
         }
 
-        await db.query("UPDATE sales SET status = 'cancelled' WHERE id = ?", [id]);
+        await db.query("UPDATE sales SET status = 'cancelled' WHERE id = ? AND tenant_id = ?", [id, tenantId]);
         res.json({ message: 'Pedido cancelado exitosamente.' });
     } catch (error) {
         console.error('[ORDERS/SALES] Error al cancelar:', error);
@@ -310,6 +343,8 @@ exports.updateOrder = async (req, res) => {
         const { id } = req.params;
         const { items, notes } = req.body;
         const customerId = req.user.id;
+        const tenantId = req.user.tenant_id;
+        const branchId = req.user.branch_id;
 
         if (!items || items.length === 0) {
             return res.status(400).json({ message: 'El pedido debe tener al menos un ítem.' });
@@ -317,16 +352,18 @@ exports.updateOrder = async (req, res) => {
 
         // Buscar pedido y verificar que pertenece al cliente y está pendiente
         const [sales] = await connection.query(
-            'SELECT * FROM sales WHERE id = ? AND customer_id = ?',
-            [id, customerId]
+            'SELECT * FROM sales WHERE id = ? AND customer_id = ? AND tenant_id = ? AND branch_id = ?',
+            [id, customerId, tenantId, branchId]
         );
 
         if (sales.length === 0) {
+            await connection.rollback();
             return res.status(404).json({ message: 'Pedido no encontrado.' });
         }
 
         const sale = sales[0];
         if (sale.status !== 'pending') {
+            await connection.rollback();
             return res.status(400).json({ message: 'Solo puedes editar pedidos en estado pendiente.' });
         }
 
@@ -336,19 +373,25 @@ exports.updateOrder = async (req, res) => {
         // Validar los nuevos ítems
         for (const item of items) {
             if (!item.item_type || !item.quantity || item.quantity < 1) {
+                await connection.rollback();
                 return res.status(400).json({ message: 'Cada ítem debe tener tipo y cantidad válidos.' });
             }
 
             if (item.item_type === 'product' && item.product_id) {
                 const [products] = await connection.query(
-                    'SELECT id, name, sale_price, stock FROM products WHERE id = ? AND is_active = TRUE',
-                    [item.product_id]
+                    `SELECT p.id, p.name, p.sale_price, COALESCE(bi.stock, 0) as stock 
+                     FROM products p
+                     LEFT JOIN branch_inventory bi ON p.id = bi.product_id AND bi.branch_id = ?
+                     WHERE p.id = ? AND p.tenant_id = ? AND p.is_active = TRUE`,
+                    [branchId, item.product_id, tenantId]
                 );
                 if (products.length === 0) {
-                    return res.status(400).json({ message: `Producto no encontrado: ${item.product_id}` });
+                    await connection.rollback();
+                    return res.status(400).json({ message: `Producto no encontrado o no pertenece a tu sucursal.` });
                 }
                 const product = products[0];
                 if (product.stock < item.quantity) {
+                    await connection.rollback();
                     return res.status(400).json({
                         message: `Stock insuficiente para "${product.name}". Disponible: ${product.stock}`
                     });
@@ -365,11 +408,12 @@ exports.updateOrder = async (req, res) => {
                 });
             } else if (item.item_type === 'service' && item.service_id) {
                 const [services] = await connection.query(
-                    'SELECT id, name, base_price FROM services_catalog WHERE id = ? AND is_active = TRUE',
-                    [item.service_id]
+                    'SELECT id, name, base_price FROM services_catalog WHERE id = ? AND tenant_id = ? AND is_active = TRUE',
+                    [item.service_id, tenantId]
                 );
                 if (services.length === 0) {
-                    return res.status(400).json({ message: `Servicio no encontrado: ${item.service_id}` });
+                    await connection.rollback();
+                    return res.status(400).json({ message: `Servicio no encontrado o no pertenece a tu sucursal.` });
                 }
                 const service = services[0];
                 const itemTotal = service.base_price * item.quantity;
@@ -383,6 +427,7 @@ exports.updateOrder = async (req, res) => {
                     total: itemTotal
                 });
             } else {
+                await connection.rollback();
                 return res.status(400).json({ message: 'Cada ítem debe ser un producto o servicio válido.' });
             }
         }
@@ -391,8 +436,8 @@ exports.updateOrder = async (req, res) => {
         await connection.query(
             `UPDATE sales 
              SET subtotal = ?, total = ?, notes = ?
-             WHERE id = ?`,
-            [subtotal, subtotal, notes || sale.notes, id]
+             WHERE id = ? AND tenant_id = ? AND branch_id = ?`,
+            [subtotal, subtotal, notes || sale.notes, id, tenantId, branchId]
         );
 
         // Eliminar ítems antiguos
@@ -419,12 +464,16 @@ exports.updateOrder = async (req, res) => {
 };
 
 // =====================================================
-// Estadísticas simplificadas
+// Estadísticas simplificadas (SaaS Scoped)
 // =====================================================
 exports.getOrderStats = async (req, res) => {
     try {
+        const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.tenantCtx.branchId;
+
         const [pending] = await db.query(
-            "SELECT COUNT(*) as count FROM sales WHERE status = 'pending'"
+            "SELECT COUNT(*) as count FROM sales WHERE status = 'pending' AND tenant_id = ? AND branch_id = ?",
+            [tenantId, branchId]
         );
         res.json({
             pendingCount: pending[0].count,

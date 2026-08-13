@@ -64,6 +64,14 @@ app.use('/api/search', require('./routes/search'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/orders', require('./routes/orders'));
 
+// Rutas SaaS Multi-Tenant
+app.use('/api/tenants', require('./routes/tenants'));
+app.use('/api/branches', require('./routes/branches'));
+app.use('/api/transfers', require('./routes/transfers'));
+app.use('/api/billing', require('./routes/billing'));
+
+
+
 // Ruta de salud
 app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'SysTeck API funcionando correctamente' });

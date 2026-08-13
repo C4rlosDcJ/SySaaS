@@ -17,6 +17,8 @@ module.exports = async (req, res, next) => {
 
             const userId = req.user ? req.user.id : null;
             const userEmail = req.user ? req.user.email : 'System/Anonymous';
+            const tenantId = req.tenantCtx ? req.tenantCtx.tenantId : (req.user ? req.user.tenant_id : null);
+            const branchId = req.tenantCtx ? req.tenantCtx.branchId : (req.user ? req.user.branch_id : null);
             const action = `${req.method} ${req.originalUrl}`;
             const details = JSON.stringify({
                 body: req.body,
@@ -26,8 +28,8 @@ module.exports = async (req, res, next) => {
             });
 
             db.query(
-                `INSERT INTO activity_logs (user_id, user_email, action, details) VALUES (?, ?, ?, ?)`,
-                [userId, userEmail, action, details]
+                `INSERT INTO activity_logs (tenant_id, branch_id, user_id, user_email, action, details) VALUES (?, ?, ?, ?, ?, ?)`,
+                [tenantId, branchId, userId, userEmail, action, details]
             ).catch(err => {
                 console.error('[LOG ERROR] No se pudo escribir log de actividad:', err);
             });
@@ -36,3 +38,4 @@ module.exports = async (req, res, next) => {
 
     next();
 };
+

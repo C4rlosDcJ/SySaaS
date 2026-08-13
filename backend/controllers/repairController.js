@@ -1,21 +1,23 @@
 const db = require('../config/database');
 const { sendEmail } = require('../services/emailService');
 
-// Generar número de ticket único
-const generateTicketNumber = () => {
+// Generar número de ticket único con prefijo de sucursal si está disponible
+const generateTicketNumber = (branchCode = 'REP') => {
     const date = new Date();
     const year = date.getFullYear().toString().slice(-2);
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-    return `REP-${year}${month}${day}-${random}`;
+    return `${branchCode}-${year}${month}${day}-${random}`;
 };
 
-// Obtener todas las reparaciones
+// Obtener todas las reparaciones (SaaS Scoped)
 exports.getAll = async (req, res) => {
     try {
         const { status, customer_id, technician_id, page = 1, limit = 10 } = req.query;
         const offset = (page - 1) * limit;
+        const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.tenantCtx.branchId;
 
         let query = `
       SELECT r.*, 
@@ -28,10 +30,16 @@ exports.getAll = async (req, res) => {
       LEFT JOIN users t ON r.technician_id = t.id
       LEFT JOIN device_types dt ON r.device_type_id = dt.id
       LEFT JOIN brands b ON r.brand_id = b.id
-      WHERE 1=1
+      WHERE r.tenant_id = ?
     `;
 
-        const params = [];
+        const params = [tenantId];
+
+        // Filtrar por sucursal activa si no es superadmin
+        if (branchId) {
+            query += ' AND r.branch_id = ?';
+            params.push(branchId);
+        }
 
         // Filtrar por rol
         if (req.user.role === 'client') {
@@ -47,11 +55,11 @@ exports.getAll = async (req, res) => {
             query += ' AND r.status = ?';
             params.push(status);
         }
-        if (customer_id && req.user.role === 'admin') {
+        if (customer_id && req.user.role !== 'client') {
             query += ' AND r.customer_id = ?';
             params.push(customer_id);
         }
-        if (technician_id && req.user.role === 'admin') {
+        if (technician_id && req.user.role !== 'client') {
             query += ' AND r.technician_id = ?';
             params.push(technician_id);
         }
@@ -74,16 +82,17 @@ exports.getAll = async (req, res) => {
         const [repairs] = await db.query(query, params);
 
         // Contar total
-        let countQuery = 'SELECT COUNT(*) as total FROM repairs r';
-        
-        // Agregar JOIN si buscamos por nombre de cliente
-        if (req.query.search) {
-            countQuery += ' LEFT JOIN users u ON r.customer_id = u.id';
-        }
-        
-        countQuery += ' WHERE 1=1';
-        const countParams = [];
+        let countQuery = `
+            SELECT COUNT(*) as total FROM repairs r
+            LEFT JOIN users u ON r.customer_id = u.id
+            WHERE r.tenant_id = ?
+        `;
+        const countParams = [tenantId];
 
+        if (branchId) {
+            countQuery += ' AND r.branch_id = ?';
+            countParams.push(branchId);
+        }
         if (req.user.role === 'client') {
             countQuery += ' AND r.customer_id = ?';
             countParams.push(req.user.id);
@@ -129,6 +138,7 @@ exports.getAll = async (req, res) => {
 exports.getById = async (req, res) => {
     try {
         const { id } = req.params;
+        const tenantId = req.tenantCtx.tenantId;
 
         const [repairs] = await db.query(`
       SELECT r.*, 
@@ -143,8 +153,8 @@ exports.getById = async (req, res) => {
       LEFT JOIN device_types dt ON r.device_type_id = dt.id
       LEFT JOIN brands b ON r.brand_id = b.id
       LEFT JOIN services_catalog s ON r.service_id = s.id
-      WHERE r.id = ?
-    `, [id]);
+      WHERE r.id = ? AND r.tenant_id = ?
+    `, [id, tenantId]);
 
         if (repairs.length === 0) {
             return res.status(404).json({ message: 'Reparación no encontrada.' });
@@ -152,7 +162,7 @@ exports.getById = async (req, res) => {
 
         const repair = repairs[0];
 
-        // Verificar acceso
+        // Verificar acceso del cliente
         if (req.user.role === 'client' && repair.customer_id !== req.user.id) {
             return res.status(403).json({ message: 'Acceso denegado.' });
         }
@@ -184,14 +194,14 @@ exports.getById = async (req, res) => {
         // Obtener ticket de reparación padre si existe
         let parentTicket = null;
         if (repair.parent_repair_id) {
-            const [parent] = await db.query('SELECT ticket_number FROM repairs WHERE id = ?', [repair.parent_repair_id]);
+            const [parent] = await db.query('SELECT ticket_number FROM repairs WHERE id = ? AND tenant_id = ?', [repair.parent_repair_id, tenantId]);
             if (parent.length > 0) {
                 parentTicket = parent[0].ticket_number;
             }
         }
 
         // Obtener reclamaciones de garantía hijas si existen
-        const [children] = await db.query('SELECT id, ticket_number, created_at, status FROM repairs WHERE parent_repair_id = ? ORDER BY created_at DESC', [id]);
+        const [children] = await db.query('SELECT id, ticket_number, created_at, status FROM repairs WHERE parent_repair_id = ? AND tenant_id = ? ORDER BY created_at DESC', [id, tenantId]);
 
         res.json({
             ...repair,
@@ -243,10 +253,13 @@ exports.create = async (req, res) => {
             technician_id
         } = req.body;
 
+        const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.tenantCtx.branchId;
+
         // Obtener garantía por defecto si no se especifica
         let finalWarrantyDays = warranty_days;
         if (!finalWarrantyDays) {
-            const [settings] = await db.query('SELECT setting_value FROM settings WHERE setting_key = "default_warranty_days"');
+            const [settings] = await db.query('SELECT setting_value FROM settings WHERE tenant_id = ? AND setting_key = "default_warranty_days"', [tenantId]);
             finalWarrantyDays = settings.length > 0 ? parseInt(settings[0].setting_value) : 30;
         }
 
@@ -257,27 +270,27 @@ exports.create = async (req, res) => {
             return res.status(400).json({ message: 'Se requiere ID del cliente.' });
         }
 
-        const ticketNumber = generateTicketNumber();
+        // Obtener el código de la sucursal actual para usar de prefijo en el ticket
+        const [branchInfo] = await db.query('SELECT code FROM branches WHERE id = ?', [branchId]);
+        const branchPrefix = branchInfo.length > 0 ? branchInfo[0].code : 'REP';
+
+        const ticketNumber = generateTicketNumber(branchPrefix);
 
         // Calcular total
         const total = (parseFloat(diagnosis_cost) || 0) + (parseFloat(labor_cost) || 0) +
             (parseFloat(parts_cost) || 0) - (parseFloat(discount) || 0);
 
-        // Calcular fecha de expiración de garantía
-        const warrantyExpires = new Date();
-        warrantyExpires.setDate(warrantyExpires.getDate() + (warranty_days || 30));
-
         const [result] = await db.query(`
       INSERT INTO repairs (
-        ticket_number, customer_id, device_type_id, brand_id, brand_other, model, color,
+        tenant_id, branch_id, ticket_number, customer_id, device_type_id, brand_id, brand_other, model, color,
         storage_capacity, serial_number, imei, device_password, accessories_received,
         physical_condition, existing_damage, function_checklist, problem_description,
         service_requested, service_id, priority, estimated_delivery, diagnosis_cost,
         labor_cost, parts_cost, discount, total_cost, advance_payment, warranty_days, 
         warranty_expires, battery_health, screen_status, account_status, technical_observations, technician_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-            ticketNumber, finalCustomerId, 
+            tenantId, branchId, ticketNumber, finalCustomerId, 
             (device_type_id === 'other' || !device_type_id) ? null : device_type_id,
             (brand_id === 'other' || !brand_id) ? null : brand_id,
             brand_other || null,
@@ -298,8 +311,8 @@ exports.create = async (req, res) => {
 
         // Obtener datos del cliente para email
         const [customers] = await db.query(
-            'SELECT first_name, last_name, email FROM users WHERE id = ?',
-            [finalCustomerId]
+            'SELECT first_name, last_name, email FROM users WHERE id = ? AND tenant_id = ?',
+            [finalCustomerId, tenantId]
         );
 
         // Enviar email de confirmación
@@ -328,9 +341,10 @@ exports.update = async (req, res) => {
     try {
         const { id } = req.params;
         const updates = req.body;
+        const tenantId = req.tenantCtx.tenantId;
 
-        // Verificar que existe
-        const [existing] = await db.query('SELECT * FROM repairs WHERE id = ?', [id]);
+        // Verificar que existe y pertenece al tenant
+        const [existing] = await db.query('SELECT * FROM repairs WHERE id = ? AND tenant_id = ?', [id, tenantId]);
         if (existing.length === 0) {
             return res.status(404).json({ message: 'Reparación no encontrada.' });
         }
@@ -378,12 +392,12 @@ exports.update = async (req, res) => {
             return res.status(400).json({ message: 'No hay campos para actualizar.' });
         }
 
-        values.push(id);
-        await db.query(`UPDATE repairs SET ${setClauses.join(', ')} WHERE id = ?`, values);
+        values.push(id, tenantId);
+        await db.query(`UPDATE repairs SET ${setClauses.join(', ')} WHERE id = ? AND tenant_id = ?`, values);
 
         // Notificar al cliente y loggear en historial si cambia la aprobación de garantía
         if (updates.warranty_approved && updates.warranty_approved !== existing[0].warranty_approved) {
-            const [customer] = await db.query('SELECT email, first_name FROM users WHERE id = ?', [existing[0].customer_id]);
+            const [customer] = await db.query('SELECT email, first_name FROM users WHERE id = ? AND tenant_id = ?', [existing[0].customer_id, tenantId]);
             const statusText = updates.warranty_approved === 'approved' ? 'Aprobada' : updates.warranty_approved === 'rejected' ? 'Rechazada' : 'Pendiente';
             
             // 1. Registrar en historial de estados de la reparación
@@ -402,7 +416,7 @@ exports.update = async (req, res) => {
                             warranty_tech_notes: updates.warranty_tech_notes || updates.warranty_tech_notes === '' ? updates.warranty_tech_notes : existing[0].warranty_tech_notes
                         },
                         customer: customer[0],
-                        newStatus: updates.warranty_approved // se pasa como statusApproved a la función
+                        newStatus: updates.warranty_approved
                     });
                 } catch (emailErr) {
                     console.error('[REPAIRS] Error al enviar email de resolución de garantía:', emailErr.message);
@@ -412,7 +426,7 @@ exports.update = async (req, res) => {
 
         // Notificar cambio de fecha de entrega si cambió
         if (updates.estimated_delivery && updates.estimated_delivery !== existing[0].estimated_delivery) {
-            const [customer] = await db.query('SELECT email, first_name FROM users WHERE id = ?', [existing[0].customer_id]);
+            const [customer] = await db.query('SELECT email, first_name FROM users WHERE id = ? AND tenant_id = ?', [existing[0].customer_id, tenantId]);
             if (customer.length > 0 && customer[0].email) {
                 await sendEmail(customer[0].email, 'deliveryRescheduled', {
                     repair: {
@@ -437,6 +451,7 @@ exports.updateStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { status, notes, estimated_delivery } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
 
         const validStatuses = [
             'received', 'diagnosing', 'waiting_approval', 'waiting_parts',
@@ -447,13 +462,13 @@ exports.updateStatus = async (req, res) => {
             return res.status(400).json({ message: 'Estado inválido.' });
         }
 
-        // Verificar que existe
+        // Verificar que existe y pertenece al tenant
         const [existing] = await db.query(`
       SELECT r.*, u.first_name, u.last_name, u.email 
       FROM repairs r 
       LEFT JOIN users u ON r.customer_id = u.id 
-      WHERE r.id = ?
-    `, [id]);
+      WHERE r.id = ? AND r.tenant_id = ?
+    `, [id, tenantId]);
 
         if (existing.length === 0) {
             return res.status(404).json({ message: 'Reparación no encontrada.' });
@@ -463,7 +478,6 @@ exports.updateStatus = async (req, res) => {
 
         // Validar permisos si el usuario es cliente
         if (req.user.role === 'client') {
-            // Verificar que la reparación le pertenece
             if (repair.customer_id !== req.user.id) {
                 return res.status(403).json({ message: 'No tienes permiso para modificar esta reparación.' });
             }
@@ -479,7 +493,6 @@ exports.updateStatus = async (req, res) => {
                 if (status !== 'ready') {
                     return res.status(400).json({ message: 'No puedes cambiar el estado de una reparación lista.' });
                 }
-                // Si está en ready y envía status 'ready', es para agendar fecha, permitimos continuar
             } else {
                 return res.status(400).json({ message: 'No puedes modificar el estado de esta reparación.' });
             }
@@ -489,13 +502,11 @@ exports.updateStatus = async (req, res) => {
         let updateQuery = 'UPDATE repairs SET status = ?';
         const updateParams = [status];
 
-        // Si se proporciona fecha de entrega y es válida (cliente o admin)
         if (estimated_delivery) {
             updateQuery += ', estimated_delivery = ?';
             updateParams.push(estimated_delivery);
         }
 
-        // Si se proporciona firma (base64)
         if (req.body.signature) {
             if (status === 'repairing') {
                 updateQuery += ', signature_approval = ?';
@@ -506,9 +517,6 @@ exports.updateStatus = async (req, res) => {
             }
         }
 
-        // Agregar timestamps según el estado
-
-        // Agregar timestamps según el estado
         if (status === 'repairing' && !repair.started_at) {
             updateQuery += ', started_at = NOW()';
         } else if (status === 'ready' || status === 'delivered') {
@@ -518,12 +526,12 @@ exports.updateStatus = async (req, res) => {
             }
         }
 
-        updateQuery += ' WHERE id = ?';
-        updateParams.push(id);
+        updateQuery += ' WHERE id = ? AND tenant_id = ?';
+        updateParams.push(id, tenantId);
 
         await db.query(updateQuery, updateParams);
 
-        // Registrar en historial si cambió el estado o si es cliente agendando
+        // Registrar en historial si cambió el estado
         if (status !== repair.status || (req.user.role === 'client' && estimated_delivery)) {
             await db.query(
                 'INSERT INTO repair_status_history (repair_id, status, notes, changed_by) VALUES (?, ?, ?, ?)',
@@ -533,11 +541,7 @@ exports.updateStatus = async (req, res) => {
 
         // Enviar email de notificación
         if (repair.email) {
-            // Si el cliente agendó fecha (estaba ready, sigue ready y hay fecha)
-            if (req.user.role === 'client' && status === 'ready' && estimated_delivery) {
-                // Notificar recepción de agendamiento
-                // TODO: Crear template pickupScheduled
-            } else if (status !== repair.status) {
+            if (status !== repair.status) {
                 let template = 'statusChanged';
                 if (status === 'ready') template = 'repairReady';
                 if (status === 'delivered') template = 'repairDelivered';
@@ -568,6 +572,17 @@ exports.addNote = async (req, res) => {
     try {
         const { id } = req.params;
         const { note, is_internal } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
+
+        // Validar propiedad del ticket
+        const [repairs] = await db.query('SELECT customer_id FROM repairs WHERE id = ? AND tenant_id = ?', [id, tenantId]);
+        if (repairs.length === 0) {
+            return res.status(404).json({ message: 'Reparación no encontrada.' });
+        }
+
+        if (req.user.role === 'client' && repairs[0].customer_id !== req.user.id) {
+            return res.status(403).json({ message: 'Acceso denegado.' });
+        }
 
         // Solo admin/técnico pueden agregar notas internas
         const finalIsInternal = req.user.role !== 'client' && is_internal;
@@ -584,12 +599,13 @@ exports.addNote = async (req, res) => {
     }
 };
 
-// Eliminar reparación (solo admin)
+// Eliminar reparación (solo tenant_admin)
 exports.delete = async (req, res) => {
     try {
         const { id } = req.params;
+        const tenantId = req.tenantCtx.tenantId;
 
-        const [result] = await db.query('DELETE FROM repairs WHERE id = ?', [id]);
+        const [result] = await db.query('DELETE FROM repairs WHERE id = ? AND tenant_id = ?', [id, tenantId]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Reparación no encontrada.' });
@@ -607,13 +623,14 @@ exports.addReview = async (req, res) => {
     try {
         const { id } = req.params;
         const { rating, review_text } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
 
         if (!rating || rating < 1 || rating > 5) {
             return res.status(400).json({ message: 'Calificación inválida (debe ser entre 1 y 5).' });
         }
 
         // Obtener la reparación
-        const [repairs] = await db.query('SELECT * FROM repairs WHERE id = ?', [id]);
+        const [repairs] = await db.query('SELECT * FROM repairs WHERE id = ? AND tenant_id = ?', [id, tenantId]);
         if (repairs.length === 0) {
             return res.status(404).json({ message: 'Reparación no encontrada.' });
         }
@@ -627,8 +644,8 @@ exports.addReview = async (req, res) => {
 
         // Guardar reseña
         await db.query(
-            'UPDATE repairs SET rating = ?, review_text = ? WHERE id = ?',
-            [rating, review_text || '', id]
+            'UPDATE repairs SET rating = ?, review_text = ? WHERE id = ? AND tenant_id = ?',
+            [rating, review_text || '', id, tenantId]
         );
 
         res.json({ message: 'Reseña enviada exitosamente.' });
@@ -643,16 +660,18 @@ exports.claimWarranty = async (req, res) => {
     try {
         const { id } = req.params;
         const { problem_description, priority, estimated_delivery, technical_observations } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.tenantCtx.branchId;
 
         // 1. Obtener reparación original
-        const [repairs] = await db.query('SELECT * FROM repairs WHERE id = ?', [id]);
+        const [repairs] = await db.query('SELECT * FROM repairs WHERE id = ? AND tenant_id = ?', [id, tenantId]);
         if (repairs.length === 0) {
             return res.status(404).json({ message: 'Reparación original no encontrada.' });
         }
 
         const original = repairs[0];
 
-        // Validar permisos si el usuario es cliente (debe ser el propietario)
+        // Validar permisos si el usuario es cliente
         if (req.user.role === 'client' && original.customer_id !== req.user.id) {
             return res.status(403).json({ message: 'No tienes permiso para reclamar garantía de esta reparación.' });
         }
@@ -674,13 +693,15 @@ exports.claimWarranty = async (req, res) => {
             }
         }
 
-        // 4. Generar nuevo ticket
-        const ticketNumber = generateTicketNumber();
+        // 4. Generar nuevo ticket prefixado
+        const [branchInfo] = await db.query('SELECT code FROM branches WHERE id = ?', [branchId]);
+        const branchPrefix = branchInfo.length > 0 ? branchInfo[0].code : 'REP';
+        const ticketNumber = generateTicketNumber(branchPrefix);
 
         // 5. Copiar datos y crear nuevo registro
         const [result] = await db.query(`
             INSERT INTO repairs (
-                ticket_number, customer_id, device_type_id, brand_id, brand_other, model, color,
+                tenant_id, branch_id, ticket_number, customer_id, device_type_id, brand_id, brand_other, model, color,
                 storage_capacity, serial_number, imei, device_password, accessories_received,
                 physical_condition, existing_damage, problem_description, service_requested,
                 service_id, priority, estimated_delivery, diagnosis_cost, labor_cost, parts_cost,
@@ -688,6 +709,8 @@ exports.claimWarranty = async (req, res) => {
                 parent_repair_id, technical_observations, warranty_approved, warranty_tech_notes
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0, 0, ?, 'received', 'paid', ?, ?, 'pending', null)
         `, [
+            tenantId,
+            branchId,
             ticketNumber,
             original.customer_id,
             original.device_type_id,
@@ -726,7 +749,7 @@ exports.claimWarranty = async (req, res) => {
 
         // Enviar email de notificación al cliente
         try {
-            const [customers] = await db.query('SELECT first_name, email FROM users WHERE id = ?', [original.customer_id]);
+            const [customers] = await db.query('SELECT first_name, email FROM users WHERE id = ? AND tenant_id = ?', [original.customer_id, tenantId]);
             if (customers.length > 0 && customers[0].email) {
                 await sendEmail(customers[0].email, 'repairCreated', {
                     repair: { ticket_number: ticketNumber, model: original.model, problem_description: `[GARANTÍA] ${problem_description}` },
@@ -737,27 +760,26 @@ exports.claimWarranty = async (req, res) => {
             console.error('[REPAIRS] Error al enviar email de garantía al cliente (no crítico):', emailErr.message);
         }
 
-        // Notificar al técnico original y a los administradores
+        // Notificar al técnico original y a los administradores de la empresa (tenant)
         try {
             const emailsToNotify = [];
 
             // 1. Obtener email del técnico original
             if (original.technician_id) {
-                const [techs] = await db.query('SELECT email FROM users WHERE id = ? AND role = "technician"', [original.technician_id]);
+                const [techs] = await db.query('SELECT email FROM users WHERE id = ? AND tenant_id = ? AND role = "technician"', [original.technician_id, tenantId]);
                 if (techs.length > 0 && techs[0].email) {
                     emailsToNotify.push(techs[0].email);
                 }
             }
 
-            // 2. Obtener emails de los administradores
-            const [admins] = await db.query('SELECT email FROM users WHERE role = "admin"');
+            // 2. Obtener emails de los administradores del tenant
+            const [admins] = await db.query('SELECT email FROM users WHERE tenant_id = ? AND role IN ("tenant_admin", "branch_manager")', [tenantId]);
             admins.forEach(admin => {
                 if (admin.email && !emailsToNotify.includes(admin.email)) {
                     emailsToNotify.push(admin.email);
                 }
             });
 
-            // Enviar correo a cada uno informando la garantía pendiente
             for (const email of emailsToNotify) {
                 await sendEmail(email, 'repairCreated', {
                     repair: {

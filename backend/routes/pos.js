@@ -1,10 +1,14 @@
 const express = require('express');
-const router = express.Router();
+const router = Router = express.Router();
 const { auth, isAdmin } = require('../middleware/auth');
+const tenantContext = require('../middleware/tenantContext');
+const { subscriptionGuard } = require('../middleware/subscriptionGuard');
 const posController = require('../controllers/posController');
 
-// Todas las rutas requieren autenticación y ser admin
+// Todas las rutas requieren autenticación, contexto de tenant, verificación de suscripción y ser admin
 router.use(auth);
+router.use(tenantContext);
+router.use(subscriptionGuard);
 router.use(isAdmin);
 
 // Ventas
@@ -19,3 +23,4 @@ router.get('/repairs/billable', posController.getBillableRepairs);
 router.get('/repairs/:id', posController.getRepairForPOS);
 
 module.exports = router;
+

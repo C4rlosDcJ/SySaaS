@@ -203,6 +203,51 @@ async function dbInit() {
             console.error(`[DB-INIT] Error al verificar/alterar la tabla services_catalog para brand_id:`, e.message);
         }
 
+        // 14. SaaS Multi-Tenant Migration
+        console.log(`[DB-INIT] Verificando tablas SaaS multi-tenant...`);
+        const [tenantsTable] = await connection.query(`SHOW TABLES LIKE 'tenants'`);
+        if (tenantsTable.length === 0) {
+            console.log(`[DB-INIT] Tablas SaaS no encontradas. Ejecutando migracion SaaS...`);
+
+            // Ejecutar saas_migration.sql (schema)
+            const saasMigrationPath = path.join(__dirname, '../../database/saas_migration.sql');
+            if (fs.existsSync(saasMigrationPath)) {
+                console.log(`[DB-INIT] Leyendo ${path.basename(saasMigrationPath)}...`);
+                let saasMigrationSql = fs.readFileSync(saasMigrationPath, 'utf8');
+                saasMigrationSql = saasMigrationSql.replace(/USE\s+\w+/gi, `USE \`${dbName}\``);
+                await connection.query(saasMigrationSql);
+                console.log(`[DB-INIT] Migracion SaaS (schema) aplicada exitosamente.`);
+            } else {
+                console.warn(`[DB-INIT] ADVERTENCIA: No se encontro ${saasMigrationPath}`);
+            }
+
+            // Ejecutar saas_data_migration.sql (datos)
+            const saasDataPath = path.join(__dirname, '../../database/saas_data_migration.sql');
+            if (fs.existsSync(saasDataPath)) {
+                console.log(`[DB-INIT] Leyendo ${path.basename(saasDataPath)}...`);
+                let saasDataSql = fs.readFileSync(saasDataPath, 'utf8');
+                saasDataSql = saasDataSql.replace(/USE\s+\w+/gi, `USE \`${dbName}\``);
+                await connection.query(saasDataSql);
+                console.log(`[DB-INIT] Migracion SaaS (datos) aplicada exitosamente.`);
+            } else {
+                console.warn(`[DB-INIT] ADVERTENCIA: No se encontro ${saasDataPath}`);
+            }
+        } else {
+            console.log(`[DB-INIT] Tablas SaaS ya existen. Verificando tenant por defecto...`);
+            const [tenantCount] = await connection.query(`SELECT COUNT(*) as count FROM tenants`);
+            if (tenantCount[0].count === 0) {
+                // Las tablas existen pero no hay tenants -- ejecutar solo migracion de datos
+                const saasDataPath = path.join(__dirname, '../../database/saas_data_migration.sql');
+                if (fs.existsSync(saasDataPath)) {
+                    console.log(`[DB-INIT] Sin tenants encontrados. Ejecutando migracion de datos...`);
+                    let saasDataSql = fs.readFileSync(saasDataPath, 'utf8');
+                    saasDataSql = saasDataSql.replace(/USE\s+\w+/gi, `USE \`${dbName}\``);
+                    await connection.query(saasDataSql);
+                    console.log(`[DB-INIT] Migracion de datos SaaS aplicada exitosamente.`);
+                }
+            }
+        }
+
         console.log(`[DB-INIT] ✅ Base de datos "${dbName}" inicializada correctamente.`);
 
     } catch (error) {

@@ -1,18 +1,19 @@
 const db = require('../config/database');
 
-// Obtener todos los servicios
+// Obtener todos los servicios del tenant
 exports.getAll = async (req, res) => {
     try {
         const { device_type_id, active_only, brand_id } = req.query;
+        const tenantId = req.tenantCtx.tenantId;
 
         let query = `
       SELECT s.*, dt.name as device_type_name, b.name as brand_name
       FROM services_catalog s
       LEFT JOIN device_types dt ON s.device_type_id = dt.id
       LEFT JOIN brands b ON s.brand_id = b.id
-      WHERE 1=1
+      WHERE (s.tenant_id = ? OR s.tenant_id IS NULL)
     `;
-        const params = [];
+        const params = [tenantId];
 
         if (active_only === 'true') {
             query += ' AND s.is_active = TRUE';
@@ -40,14 +41,15 @@ exports.getAll = async (req, res) => {
 exports.getById = async (req, res) => {
     try {
         const { id } = req.params;
+        const tenantId = req.tenantCtx.tenantId;
 
         const [services] = await db.query(`
       SELECT s.*, dt.name as device_type_name, b.name as brand_name
       FROM services_catalog s
       LEFT JOIN device_types dt ON s.device_type_id = dt.id
       LEFT JOIN brands b ON s.brand_id = b.id
-      WHERE s.id = ?
-    `, [id]);
+      WHERE s.id = ? AND (s.tenant_id = ? OR s.tenant_id IS NULL)
+    `, [id, tenantId]);
 
         if (services.length === 0) {
             return res.status(404).json({ message: 'Servicio no encontrado.' });
@@ -64,15 +66,16 @@ exports.getById = async (req, res) => {
 exports.create = async (req, res) => {
     try {
         const { name, description, device_type_id, base_price, estimated_time, barcode, brand_id } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
         const finalPrice = (base_price === '' || base_price === undefined) ? 0 : base_price;
         
         // Generar código de barras automático si no se proporciona (12 dígitos numéricos con prefijo 9 para servicios)
         const finalBarcode = barcode || `9${Array.from({ length: 11 }, () => Math.floor(Math.random() * 10)).join('')}`;
 
         const [result] = await db.query(`
-      INSERT INTO services_catalog (name, description, device_type_id, base_price, estimated_time, barcode, brand_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [name, description, device_type_id || null, finalPrice, estimated_time, finalBarcode, brand_id || null]);
+      INSERT INTO services_catalog (tenant_id, name, description, device_type_id, base_price, estimated_time, barcode, brand_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `, [tenantId, name, description, device_type_id || null, finalPrice, estimated_time, finalBarcode, brand_id || null]);
 
         res.status(201).json({
             message: 'Servicio creado exitosamente.',
@@ -89,9 +92,10 @@ exports.update = async (req, res) => {
     try {
         const { id } = req.params;
         const { name, description, device_type_id, base_price, estimated_time, is_active, barcode, brand_id } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
         const finalPrice = (base_price === '' || base_price === undefined) ? 0 : base_price;
 
-        await db.query(`
+        const [result] = await db.query(`
       UPDATE services_catalog SET
         name = COALESCE(?, name),
         description = COALESCE(?, description),
@@ -101,8 +105,12 @@ exports.update = async (req, res) => {
         is_active = COALESCE(?, is_active),
         barcode = COALESCE(?, barcode),
         brand_id = ?
-      WHERE id = ?
-    `, [name, description, device_type_id, finalPrice, estimated_time, is_active, barcode, brand_id || null, id]);
+      WHERE id = ? AND tenant_id = ?
+    `, [name, description, device_type_id, finalPrice, estimated_time, is_active, barcode, brand_id || null, id, tenantId]);
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Servicio no encontrado o no pertenece a tu empresa.' });
+        }
 
         res.json({ message: 'Servicio actualizado exitosamente.' });
     } catch (error) {
@@ -115,8 +123,9 @@ exports.update = async (req, res) => {
 exports.delete = async (req, res) => {
     try {
         const { id } = req.params;
+        const tenantId = req.tenantCtx.tenantId;
 
-        const [result] = await db.query('DELETE FROM services_catalog WHERE id = ?', [id]);
+        const [result] = await db.query('DELETE FROM services_catalog WHERE id = ? AND tenant_id = ?', [id, tenantId]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Servicio no encontrado.' });
@@ -134,12 +143,16 @@ exports.delete = async (req, res) => {
 exports.getDeviceTypes = async (req, res) => {
     try {
         const { all } = req.query;
-        let query = 'SELECT * FROM device_types';
+        const tenantId = req.tenantCtx.tenantId;
+        
+        let query = 'SELECT * FROM device_types WHERE (tenant_id = ? OR tenant_id IS NULL)';
+        const params = [tenantId];
+        
         if (all !== 'true') {
-            query += ' WHERE is_active = TRUE';
+            query += ' AND is_active = TRUE';
         }
         query += ' ORDER BY name';
-        const [types] = await db.query(query);
+        const [types] = await db.query(query, params);
         res.json(types);
     } catch (error) {
         console.error('[SERVICES] Error al obtener tipos de dispositivo:', error);
@@ -150,9 +163,10 @@ exports.getDeviceTypes = async (req, res) => {
 exports.createDeviceType = async (req, res) => {
     try {
         const { name, is_active } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
         const [result] = await db.query(
-            'INSERT INTO device_types (name, is_active) VALUES (?, ?)',
-            [name, is_active !== undefined ? is_active : true]
+            'INSERT INTO device_types (tenant_id, name, is_active) VALUES (?, ?, ?)',
+            [tenantId, name, is_active !== undefined ? is_active : true]
         );
         res.status(201).json({ message: 'Tipo de dispositivo creado.', id: result.insertId });
     } catch (error) {
@@ -165,10 +179,15 @@ exports.updateDeviceType = async (req, res) => {
     try {
         const { id } = req.params;
         const { name, is_active } = req.body;
-        await db.query(
-            'UPDATE device_types SET name = COALESCE(?, name), is_active = COALESCE(?, is_active) WHERE id = ?',
-            [name, is_active, id]
+        const tenantId = req.tenantCtx.tenantId;
+        
+        const [result] = await db.query(
+            'UPDATE device_types SET name = COALESCE(?, name), is_active = COALESCE(?, is_active) WHERE id = ? AND tenant_id = ?',
+            [name, is_active, id, tenantId]
         );
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Tipo de dispositivo no encontrado o es de sistema.' });
+        }
         res.json({ message: 'Tipo de dispositivo actualizado.' });
     } catch (error) {
         console.error('[SERVICES] Error al actualizar tipo de dispositivo:', error);
@@ -179,12 +198,20 @@ exports.updateDeviceType = async (req, res) => {
 exports.deleteDeviceType = async (req, res) => {
     try {
         const { id } = req.params;
+        const tenantId = req.tenantCtx.tenantId;
+        
         // Verificar si hay servicios asociados
-        const [services] = await db.query('SELECT id FROM services_catalog WHERE device_type_id = ? LIMIT 1', [id]);
+        const [services] = await db.query(
+            'SELECT id FROM services_catalog WHERE device_type_id = ? AND (tenant_id = ? OR tenant_id IS NULL) LIMIT 1', 
+            [id, tenantId]
+        );
         if (services.length > 0) {
             return res.status(400).json({ message: 'No se puede eliminar: tiene servicios asociados.' });
         }
-        await db.query('DELETE FROM device_types WHERE id = ?', [id]);
+        const [result] = await db.query('DELETE FROM device_types WHERE id = ? AND tenant_id = ?', [id, tenantId]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Tipo de dispositivo no encontrado o es de sistema.' });
+        }
         res.json({ message: 'Tipo de dispositivo eliminado.' });
     } catch (error) {
         console.error('[SERVICES] Error al eliminar tipo de dispositivo:', error);
@@ -197,12 +224,16 @@ exports.deleteDeviceType = async (req, res) => {
 exports.getBrands = async (req, res) => {
     try {
         const { all } = req.query;
-        let query = 'SELECT * FROM brands';
+        const tenantId = req.tenantCtx.tenantId;
+        
+        let query = 'SELECT * FROM brands WHERE (tenant_id = ? OR tenant_id IS NULL)';
+        const params = [tenantId];
+        
         if (all !== 'true') {
-            query += ' WHERE is_active = TRUE';
+            query += ' AND is_active = TRUE';
         }
         query += ' ORDER BY name';
-        const [brands] = await db.query(query);
+        const [brands] = await db.query(query, params);
         res.json(brands);
     } catch (error) {
         console.error('[SERVICES] Error al obtener marcas:', error);
@@ -213,9 +244,10 @@ exports.getBrands = async (req, res) => {
 exports.createBrand = async (req, res) => {
     try {
         const { name, is_active } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
         const [result] = await db.query(
-            'INSERT INTO brands (name, is_active) VALUES (?, ?)',
-            [name, is_active !== undefined ? is_active : true]
+            'INSERT INTO brands (tenant_id, name, is_active) VALUES (?, ?, ?)',
+            [tenantId, name, is_active !== undefined ? is_active : true]
         );
         res.status(201).json({ message: 'Marca creada.', id: result.insertId });
     } catch (error) {
@@ -228,10 +260,15 @@ exports.updateBrand = async (req, res) => {
     try {
         const { id } = req.params;
         const { name, is_active } = req.body;
-        await db.query(
-            'UPDATE brands SET name = COALESCE(?, name), is_active = COALESCE(?, is_active) WHERE id = ?',
-            [name, is_active, id]
+        const tenantId = req.tenantCtx.tenantId;
+        
+        const [result] = await db.query(
+            'UPDATE brands SET name = COALESCE(?, name), is_active = COALESCE(?, is_active) WHERE id = ? AND tenant_id = ?',
+            [name, is_active, id, tenantId]
         );
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Marca no encontrada o es de sistema.' });
+        }
         res.json({ message: 'Marca actualizada.' });
     } catch (error) {
         console.error('[SERVICES] Error al actualizar marca:', error);
@@ -242,10 +279,16 @@ exports.updateBrand = async (req, res) => {
 exports.deleteBrand = async (req, res) => {
     try {
         const { id } = req.params;
-        await db.query('DELETE FROM brands WHERE id = ?', [id]);
+        const tenantId = req.tenantCtx.tenantId;
+        
+        const [result] = await db.query('DELETE FROM brands WHERE id = ? AND tenant_id = ?', [id, tenantId]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Marca no encontrada o es de sistema.' });
+        }
         res.json({ message: 'Marca eliminada.' });
     } catch (error) {
         console.error('[SERVICES] Error al eliminar marca:', error);
         res.status(500).json({ message: 'Error al eliminar marca.' });
     }
 };
+

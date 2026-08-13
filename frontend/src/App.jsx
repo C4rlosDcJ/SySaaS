@@ -37,7 +37,14 @@ import InventoryPage from './pages/admin/InventoryPage';
 import SalesHistoryPage from './pages/admin/SalesHistoryPage';
 import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 
+// SaaS Pages
+import Branches from './pages/admin/Branches';
+import TransfersPage from './pages/admin/Traslados';
+import SubscriptionPage from './pages/admin/Subscription';
+import SuperDashboard from './pages/admin/SuperDashboard';
+
 import './index.css';
+
 
 // Componente para manejar el layout con Sidebar/MobileHeader
 function DashboardLayout({ children, adminOnly = false }) {
@@ -233,26 +240,60 @@ function AppRoutes() {
         </DashboardLayout>
       } />
 
+      {/* SaaS Multi-Branch & Quota Routes */}
+      <Route path="/admin/sucursales" element={
+        <DashboardLayout adminOnly>
+          <Branches />
+        </DashboardLayout>
+      } />
+      <Route path="/admin/traslados" element={
+        <DashboardLayout adminOnly>
+          <TransfersPage />
+        </DashboardLayout>
+      } />
+      <Route path="/admin/suscripcion" element={
+        <DashboardLayout adminOnly>
+          <SubscriptionPage />
+        </DashboardLayout>
+      } />
+
+      {/* SaaS SuperAdmin Routes */}
+      <Route path="/superadmin" element={
+        <DashboardLayout adminOnly>
+          <SuperDashboard />
+        </DashboardLayout>
+      } />
+      <Route path="/superadmin/empresas" element={
+        <DashboardLayout adminOnly>
+          <SuperDashboard />
+        </DashboardLayout>
+      } />
+
       {/* Catch all */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+
   );
 }
 
 import { ThemeProvider } from './context/ThemeContext';
+import { TenantProvider } from './context/TenantContext';
 import AIChatbot from './components/AIChatbot';
 
 function App() {
   return (
     <Router>
       <ThemeProvider>
-        <AuthProvider>
-          <AppRoutes />
-          <AIChatbot />
-        </AuthProvider>
+        <TenantProvider>
+          <AuthProvider>
+            <AppRoutes />
+            <AIChatbot />
+          </AuthProvider>
+        </TenantProvider>
       </ThemeProvider>
     </Router>
   );
 }
 
 export default App;
+

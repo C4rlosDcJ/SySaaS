@@ -1,109 +1,133 @@
-# SysTeck - Sistema de Gestión de Reparaciones
+# SysTeck - Plataforma Integral SaaS Multi-Tenant & Multi-Sucursal para Gestión de Talleres
 
 [![License: ISC](https://img.shields.io/badge/License-ISC-007ACC.svg)](https://opensource.org/licenses/ISC)
 [![React](https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB.svg)](https://reactjs.org/)
 [![Node.js](https://img.shields.io/badge/Backend-Node.js%20%2B%20Express-339933.svg)](https://nodejs.org/)
 [![MySQL](https://img.shields.io/badge/Database-MySQL-4479A1.svg)](https://www.mysql.com/)
+[![Stripe](https://img.shields.io/badge/Payments-Stripe-6772E5.svg)](https://stripe.com/)
+[![AI-Powered](https://img.shields.io/badge/AI-Diagnostics-FF6B6B.svg)](https://gemini.google.com/)
 
-**SysTeck** es una solución profesional e integral diseñada para simplificar la gestión de talleres de reparación de dispositivos electrónicos. Desde el seguimiento de tickets hasta la gestión de inventario y clientes, SysTeck ofrece una interfaz moderna, rápida y eficiente.
-
----
-
-## Características Principales
-
-### Portal del Cliente
-- **Panel de Control Personalizado:** Vista rápida de reparaciones activas y su estado.
-- **Cotizaciones Inteligentes:** Solicita presupuestos detallados con carga de imágenes de los dispositivos.
-- **Seguimiento en Tiempo Real:** Consulta el progreso de tus dispositivos mediante número de ticket.
-- **Notificaciones Automáticas:** Mantente informado en cada etapa del proceso.
-- **Tienda y Catálogo Público:** Buscador unificado con filtros avanzados, paginación dinámica y vista consolidada de servicios y productos disponibles.
-
-### Panel Administrativo y Módulos de Control
-- **Gestión de Reparaciones:** Control total del ciclo de vida del equipo (Recibido -> Diagnóstico -> Reparando -> Listo).
-- **Punto de Venta (POS):** Módulo para facturación y cobro rápido de servicios, refacciones y ventas directas.
-- **Control de Inventario:** Catálogo de productos, categorías, niveles de stock, SKU y códigos de barras.
-- **Base de Datos de Clientes:** Historial completo de reparaciones, cotizaciones, compras realizadas y estadísticas detalladas.
-- **Catálogo de Servicios:** Administración de precios base y tiempos estimados por categoría de dispositivo.
-- **Reportes y Estadísticas:** Análisis detallado de ingresos, reparaciones completadas y rendimiento mensual.
-- **Configuración General:** Personalización de datos del negocio, logotipo, días de garantía, moneda y políticas.
+**SysTeck** es una plataforma integral SaaS (Software as a Service) multi-tenant y multi-sucursal diseñada para simplificar y digitalizar el ciclo operativo de talleres, laboratorios y cadenas de soporte técnico de dispositivos electrónicos. Con aislamiento total de datos de clientes, control de inventario descentralizado por sucursal, diagnósticos inteligentes potenciados por Inteligencia Artificial (AI) y procesamiento automatizado de suscripciones mediante Stripe.
 
 ---
 
-## Diseño y Experiencia de Usuario
+## 🛠️ Módulos del Sistema y Funcionalidades
 
-- **Soporte Multi-tema:** Alternancia dinámica entre Tema Claro y Tema Oscuro.
-- **Estética Premium:** Efectos de glassmorphism adaptativos y paleta de colores cohesiva.
-- **Interactividad Avanzada:** Animaciones fluidas basadas en microinteracciones y transiciones modernas.
-- **Responsivo y Optimizado:** Diseño completamente adaptado para smartphones, tablets y escritorio, con cuadrículas semánticas compactas y paginación dinámica unificada en todos los módulos.
+### 1. Panel de SuperAdministrador (Control de la Plataforma)
+- **Gestión Global de Tenants:** Visualización, suspensión y reactivación de empresas suscritas.
+- **Planes y Precios:** Configuración del catálogo de planes de suscripción (ej: Trial, Basic, Premium) con límites de uso directos.
+- **Facturación General:** Monitorización del estado de cuentas a través de Stripe.
+
+### 2. Multi-Tenancy & Aislamiento de Datos
+- **Aislamiento Multi-Tenant:** Cada empresa accede mediante su identificador (`systeck.com/app/empresa-slug`), aislando los datos de clientes, tickets y configuraciones.
+- **SubscriptionGuard & Límites:** Control de cuota automático (cantidad de sucursales, cantidad de personal staff y número de reparaciones mensuales permitidas).
+- **Acceso Restringido:** Bloqueo automático de inserción o lectura en caso de que una cuenta esté suspendida o tenga pagos pendientes.
+
+### 3. Gestión Operativa Multi-Sucursal
+- **Inventario Descentralizado:** Catálogo de productos unificado por empresa con stock físico controlado de manera individual por sucursal (`branch_inventory`).
+- **Traslados de Mercancía:** Flujo seguro para mover stock entre sucursales (Solicitud en origen -> Estado en tránsito -> Aprobación y recepción física en destino -> Movimiento de stock atómico).
+- **Selector de Sucursal:** El personal del staff (técnicos, cajeros, administradores) puede alternar en la barra lateral su sucursal activa según sus asignaciones autorizadas.
+
+### 4. Inteligencia Artificial (Diagnósticos y Cotizaciones AI)
+- **Generador de Diagnósticos AI:** Sugerencias automáticas de fallas probables, repuestos necesarios y estimación de tiempos de reparación según el modelo y problema del dispositivo.
+- **Estructuración de Presupuestos:** Automatización de cotizaciones a partir de descripciones de texto libre ingresadas por los clientes.
+- **Corrector y Optimizador de Notas:** Redacción profesional de observaciones técnicas para el reporte final del cliente.
+
+### 5. Portal y Experiencia de Clientes
+- **Seguimiento Público por Ticket:** Rastreo en tiempo real del progreso de equipos sin necesidad de iniciar sesión (Recibido -> Diagnóstico -> Esperando Aprobación -> Reparando -> Listo para entrega).
+- **Ingreso de Garantías:** Solicitudes y reclamos automáticos sobre tickets cerrados que estén dentro del periodo de cobertura.
+- **Catálogo y Tienda de Repuestos/Servicios:** Visualización de productos y servicios disponibles filtrados por sucursal.
+
+### 6. Punto de Venta (POS) e Historial
+- **Cobro Rápido:** Checkout unificado que descuenta stock en tiempo real de la sucursal activa, emite recibos y permite abonos en reparaciones.
+- **Estadísticas de Negocio:** Reportes mensuales interactivos de facturación global, métodos de pago, rendimiento de técnicos y balance de gastos.
 
 ---
 
-## Guía de Inicio Rápido
+## 🎨 Diseño y Experiencia de Usuario
+
+- **Estilo Minimalista Industrial:** Inspirado en la estética premium de Nothing/Apple con interfaces limpias de alto contraste.
+- **Soporte de Temas:** Transición fluida en caliente entre modo oscuro y claro.
+- **Micro-interacciones:** Animaciones dinámicas basadas en interacciones de teclado (incluyendo buscador global rápido con `⌘K`).
+- **Responsivo Completo:** UI fluida y compacta optimizada para teléfonos móviles, tablets y ordenadores de escritorio.
+
+---
+
+## 🚀 Guía de Inicio Rápido
 
 ### Requisitos Previos
 - **Node.js** (v18.x o superior)
-- **MySQL** (v8.0.x o compatible, soporta conexiones SSL)
-- **Git**
+- **MySQL** (v8.0.x o compatible)
+- **Stripe Account** & **Gemini API Key** (para diagnósticos AI)
 
-### 1. Clonación del Repositorio
+### 1. Instalación
 ```bash
 git clone https://github.com/C4rlosDcJ/SysTeck.git
-cd systeck
+cd SysTeck
 ```
 
-### 2. Configuración de la Base de Datos
-1. Crea una base de datos en tu servidor local o remoto (por ejemplo en Aiven o RDS).
-2. Importa el esquema inicial de tablas e índices desde la carpeta correspondiente:
+### 2. Configuración de Base de Datos
+1. Crea una base de datos MySQL local o remota.
+2. Importa el esquema general:
 ```bash
-mysql -u tu_usuario -p nombre_base_datos < database/schema.sql
+mysql -u tu_usuario -p nombre_db < database/schema.sql
+```
+*(Los scripts de migración SaaS se ejecutan de manera automática en el primer arranque).*
+
+### 3. Variables de Entorno (.env)
+
+En **`backend/.env`**:
+```env
+PORT=5000
+DB_HOST=localhost
+DB_USER=tu_usuario
+DB_PASSWORD=tu_contraseña
+DB_NAME=nombre_db
+JWT_SECRET=tu_secreto_jwt
+FRONTEND_URL=http://localhost:5173
+
+# Integración Stripe
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# AI Diagnostics
+GEMINI_API_KEY=AIzaSy...
 ```
 
-### 3. Backend (API)
-1. Instala las dependencias:
+### 4. Lanzar Entorno de Desarrollo
+
+**Backend**:
 ```bash
 cd backend
 npm install
-```
-2. Crea un archivo `.env` tomando como base `.env.example` y rellena las variables de entorno necesarias:
-   - Configuración de base de datos (host, usuario, contraseña, puerto, nombre de base de datos)
-   - Ajustes de SSL si tu servidor MySQL lo requiere (`MYSQL_ATTR_SSL_CA` o configuración equivalente en el código)
-   - Secretos para JWT y firmas de sesión
-3. Inicia el servidor de desarrollo:
-```bash
 npm run dev
 ```
 
-### 4. Frontend (UI)
-1. Navega al directorio del cliente e instala las dependencias:
+**Frontend**:
 ```bash
 cd ../frontend
 npm install
-```
-2. Configura las variables de entorno correspondientes para la API (por ejemplo `VITE_API_URL`).
-3. Inicia el servidor de desarrollo local:
-```bash
 npm run dev
 ```
 
 ---
 
-## Stack Tecnológico
+## 💻 Stack Tecnológico
 
-- **Frontend:** React, Vite, Recharts, Lucide Icons, Vanilla CSS con variables de diseño personalizadas.
-- **Backend:** Node.js, Express, JWT, Express Validator, CORS Dinámico.
-- **Base de Datos:** MySQL (Pool de conexiones con `mysql2/promise` y soporte de certificados SSL).
-- **Despliegue:** Preparado para Vercel (frontend) y Render (backend).
+- **Frontend:** React (Vite), Recharts, Lucide Icons, Vanilla CSS Variables.
+- **Backend:** Node.js, Express, JWT, Stripe SDK, Gemini AI API.
+- **Base de Datos:** MySQL (Pool de conexiones a través de `mysql2/promise` con soporte SSL).
 
 ---
 
-## Estructura del Proyecto
+## 📂 Estructura del Directorio
 
 ```text
 SysTeck/
 ├── frontend/           # SPA en React y estilos CSS interactivos
-├── backend/            # API REST en Node.js y Express
-├── database/           # Archivos de inicialización SQL
-└── uploads/            # Archivos locales de imágenes (soporte multimedia)
+├── backend/            # API REST en Node.js, Express y controladores AI/Stripe
+├── database/           # Esquemas y scripts de migración SaaS
+└── uploads/            # Soporte multimedia local para fotos de dispositivos
 ```
 
 ---

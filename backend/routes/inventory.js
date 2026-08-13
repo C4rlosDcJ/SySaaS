@@ -1,10 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const { auth, isAdmin } = require('../middleware/auth');
+const tenantContext = require('../middleware/tenantContext');
+const { subscriptionGuard } = require('../middleware/subscriptionGuard');
 const inventoryController = require('../controllers/inventoryController');
 
-// Todas las rutas requieren autenticación y ser admin
+// Todas las rutas requieren autenticación, contexto de tenant, verificación de suscripción y ser admin
 router.use(auth);
+router.use(tenantContext);
+router.use(subscriptionGuard);
 router.use(isAdmin);
 
 // Categorías
@@ -28,3 +32,4 @@ router.post('/stock-movements', inventoryController.addStockMovement);
 router.get('/stats', inventoryController.getInventoryStats);
 
 module.exports = router;
+

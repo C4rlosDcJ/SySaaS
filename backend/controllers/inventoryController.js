@@ -1,12 +1,14 @@
 const db = require('../config/database');
 
 // =====================================================
-// Categorías de productos
+// Categorías de productos (SaaS Scoped)
 // =====================================================
 exports.getCategories = async (req, res) => {
     try {
+        const tenantId = req.tenantCtx.tenantId;
         const [categories] = await db.query(
-            'SELECT * FROM product_categories WHERE is_active = TRUE ORDER BY name'
+            'SELECT * FROM product_categories WHERE tenant_id = ? AND is_active = TRUE ORDER BY name',
+            [tenantId]
         );
         res.json(categories);
     } catch (error) {
@@ -18,11 +20,13 @@ exports.getCategories = async (req, res) => {
 exports.createCategory = async (req, res) => {
     try {
         const { name, description, color } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
+
         if (!name) return res.status(400).json({ message: 'El nombre es obligatorio.' });
 
         const [result] = await db.query(
-            'INSERT INTO product_categories (name, description, color) VALUES (?, ?, ?)',
-            [name, description || null, color || '#6366f1']
+            'INSERT INTO product_categories (tenant_id, name, description, color) VALUES (?, ?, ?, ?)',
+            [tenantId, name, description || null, color || '#6366f1']
         );
         res.status(201).json({ id: result.insertId, message: 'Categoría creada.' });
     } catch (error) {
@@ -35,10 +39,17 @@ exports.updateCategory = async (req, res) => {
     try {
         const { id } = req.params;
         const { name, description, color, is_active } = req.body;
-        await db.query(
-            'UPDATE product_categories SET name = ?, description = ?, color = ?, is_active = ? WHERE id = ?',
-            [name, description, color, is_active !== undefined ? is_active : true, id]
+        const tenantId = req.tenantCtx.tenantId;
+
+        const [result] = await db.query(
+            'UPDATE product_categories SET name = ?, description = ?, color = ?, is_active = ? WHERE id = ? AND tenant_id = ?',
+            [name, description, color, is_active !== undefined ? is_active : true, id, tenantId]
         );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Categoría no encontrada o no pertenece a tu empresa.' });
+        }
+
         res.json({ message: 'Categoría actualizada.' });
     } catch (error) {
         console.error('[INVENTORY] Error al actualizar categoría:', error);
@@ -46,32 +57,26 @@ exports.updateCategory = async (req, res) => {
     }
 };
 
-exports.deleteCategory = async (req, res) => {
-    try {
-        const { id } = req.params;
-        await db.query('UPDATE product_categories SET is_active = FALSE WHERE id = ?', [id]);
-        res.json({ message: 'Categoría desactivada.' });
-    } catch (error) {
-        console.error('[INVENTORY] Error al eliminar categoría:', error);
-        res.status(500).json({ message: 'Error al eliminar categoría.' });
-    }
-};
-
 // =====================================================
-// Productos
+// Productos (SaaS & Multi-Branch Scoped)
 // =====================================================
 exports.getProducts = async (req, res) => {
     try {
         const { category_id, search, low_stock, page = 1, limit = 50 } = req.query;
         const offset = (page - 1) * limit;
+        const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.tenantCtx.branchId;
 
         let query = `
-            SELECT p.*, pc.name as category_name, pc.color as category_color
+            SELECT p.*, pc.name as category_name, pc.color as category_color,
+                   COALESCE(bi.stock, 0) as stock, COALESCE(bi.min_stock, p.min_stock) as min_stock,
+                   bi.location_in_store
             FROM products p
             LEFT JOIN product_categories pc ON p.category_id = pc.id
-            WHERE p.is_active = TRUE
+            LEFT JOIN branch_inventory bi ON p.id = bi.product_id AND bi.branch_id = ?
+            WHERE p.tenant_id = ? AND p.is_active = TRUE
         `;
-        const params = [];
+        const params = [branchId, tenantId];
 
         if (category_id) {
             query += ' AND p.category_id = ?';
@@ -83,7 +88,7 @@ exports.getProducts = async (req, res) => {
             params.push(term, term, term);
         }
         if (low_stock === 'true') {
-            query += ' AND p.stock <= p.min_stock';
+            query += ' AND COALESCE(bi.stock, 0) <= COALESCE(bi.min_stock, p.min_stock)';
         }
 
         query += ' ORDER BY p.name ASC LIMIT ? OFFSET ?';
@@ -92,19 +97,25 @@ exports.getProducts = async (req, res) => {
         const [products] = await db.query(query, params);
 
         // Contar total
-        let countQuery = 'SELECT COUNT(*) as total FROM products WHERE is_active = TRUE';
-        const countParams = [];
+        let countQuery = `
+            SELECT COUNT(*) as total 
+            FROM products p
+            LEFT JOIN branch_inventory bi ON p.id = bi.product_id AND bi.branch_id = ?
+            WHERE p.tenant_id = ? AND p.is_active = TRUE
+        `;
+        const countParams = [branchId, tenantId];
+
         if (category_id) {
-            countQuery += ' AND category_id = ?';
+            countQuery += ' AND p.category_id = ?';
             countParams.push(category_id);
         }
         if (search) {
-            countQuery += ' AND (name LIKE ? OR sku LIKE ? OR barcode LIKE ?)';
+            countQuery += ' AND (p.name LIKE ? OR p.sku LIKE ? OR p.barcode LIKE ?)';
             const term = `%${search}%`;
             countParams.push(term, term, term);
         }
         if (low_stock === 'true') {
-            countQuery += ' AND stock <= min_stock';
+            countQuery += ' AND COALESCE(bi.stock, 0) <= COALESCE(bi.min_stock, p.min_stock)';
         }
         const [countResult] = await db.query(countQuery, countParams);
 
@@ -126,12 +137,18 @@ exports.getProducts = async (req, res) => {
 exports.getProductById = async (req, res) => {
     try {
         const { id } = req.params;
+        const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.tenantCtx.branchId;
+
         const [products] = await db.query(
-            `SELECT p.*, pc.name as category_name, pc.color as category_color
+            `SELECT p.*, pc.name as category_name, pc.color as category_color,
+                    COALESCE(bi.stock, 0) as stock, COALESCE(bi.min_stock, p.min_stock) as min_stock,
+                    bi.location_in_store
              FROM products p
              LEFT JOIN product_categories pc ON p.category_id = pc.id
-             WHERE p.id = ?`,
-            [id]
+             LEFT JOIN branch_inventory bi ON p.id = bi.product_id AND bi.branch_id = ?
+             WHERE p.id = ? AND p.tenant_id = ?`,
+            [branchId, id, tenantId]
         );
         if (products.length === 0) {
             return res.status(404).json({ message: 'Producto no encontrado.' });
@@ -144,8 +161,13 @@ exports.getProductById = async (req, res) => {
 };
 
 exports.createProduct = async (req, res) => {
+    const connection = await db.getConnection();
     try {
-        const { sku, barcode, name, description, category_id, purchase_price, sale_price, stock, min_stock, is_unique } = req.body;
+        await connection.beginTransaction();
+
+        const { sku, barcode, name, description, category_id, purchase_price, sale_price, stock, min_stock, is_unique, location_in_store } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.tenantCtx.branchId;
 
         if (!name || !sale_price) {
             return res.status(400).json({ message: 'Nombre y precio de venta son obligatorios.' });
@@ -154,79 +176,139 @@ exports.createProduct = async (req, res) => {
         // Generar SKU automático si no se proporciona
         const finalSku = sku || `PRD-${Date.now().toString(36).toUpperCase()}`;
 
-        // Generar Código de Barras automático si no se proporciona (código de 12 dígitos)
+        // Generar Código de Barras automático si no se proporciona
         const finalBarcode = barcode || Array.from({ length: 12 }, () => Math.floor(Math.random() * 10)).join('');
 
-        const [result] = await db.query(
-            `INSERT INTO products (sku, barcode, name, description, category_id, purchase_price, sale_price, stock, min_stock, is_unique)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [finalSku, finalBarcode, name, description || null, category_id || null,
+        // 1. Insertar el producto base
+        const [result] = await connection.query(
+            `INSERT INTO products (tenant_id, sku, barcode, name, description, category_id, purchase_price, sale_price, stock, min_stock, is_unique)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [tenantId, finalSku, finalBarcode, name, description || null, category_id || null,
              purchase_price || 0, sale_price, stock || 0, min_stock || 5, is_unique ? 1 : 0]
         );
 
-        // Registrar movimiento de stock inicial si hay stock
+        const newProductId = result.insertId;
+
+        // 2. Crear registro de stock para la sucursal activa
+        await connection.query(
+            `INSERT INTO branch_inventory (product_id, branch_id, stock, min_stock, location_in_store)
+             VALUES (?, ?, ?, ?, ?)`,
+            [newProductId, branchId, stock || 0, min_stock || 5, location_in_store || null]
+        );
+
+        // 3. Registrar movimiento de stock inicial si hay stock
         if (stock && stock > 0) {
-            await db.query(
-                `INSERT INTO stock_movements (product_id, type, quantity, reference, notes, created_by)
-                 VALUES (?, 'in', ?, 'INITIAL', 'Stock inicial', ?)`,
-                [result.insertId, stock, req.user.id]
+            await connection.query(
+                `INSERT INTO stock_movements (tenant_id, branch_id, product_id, type, quantity, reference, notes, created_by)
+                 VALUES (?, ?, ?, 'in', ?, 'INITIAL', 'Stock inicial', ?)`,
+                [tenantId, branchId, newProductId, stock, req.user.id]
             );
         }
 
-        res.status(201).json({ id: result.insertId, sku: finalSku, message: 'Producto creado exitosamente.' });
+        await connection.commit();
+        res.status(201).json({ id: newProductId, sku: finalSku, message: 'Producto creado exitosamente.' });
     } catch (error) {
+        await connection.rollback();
         if (error.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({ message: 'El SKU o código de barras ya existe.' });
         }
         console.error('[INVENTORY] Error al crear producto:', error);
         res.status(500).json({ message: 'Error al crear producto.' });
+    } finally {
+        connection.release();
     }
 };
 
 exports.updateProduct = async (req, res) => {
+    const connection = await db.getConnection();
     try {
-        const { id } = req.params;
-        const { sku, barcode, name, description, category_id, purchase_price, sale_price, stock, min_stock, is_unique } = req.body;
+        await connection.beginTransaction();
 
-        // Obtener stock actual para calcular diferencia
-        const [existing] = await db.query('SELECT stock FROM products WHERE id = ?', [id]);
-        if (existing.length === 0) {
-            return res.status(404).json({ message: 'Producto no encontrado.' });
+        const { id } = req.params;
+        const { sku, barcode, name, description, category_id, purchase_price, sale_price, stock, min_stock, is_unique, location_in_store } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.tenantCtx.branchId;
+
+        // Obtener stock actual de esta sucursal
+        const [existing] = await connection.query(
+            'SELECT stock FROM branch_inventory WHERE product_id = ? AND branch_id = ?', 
+            [id, branchId]
+        );
+        
+        let oldStock = 0;
+        let existsInBranch = false;
+        if (existing.length > 0) {
+            oldStock = existing[0].stock;
+            existsInBranch = true;
         }
 
-        await db.query(
+        // Actualizar datos del producto base
+        const [prodResult] = await connection.query(
             `UPDATE products SET sku = ?, barcode = ?, name = ?, description = ?, category_id = ?,
-             purchase_price = ?, sale_price = ?, stock = ?, min_stock = ?, is_unique = ? WHERE id = ?`,
+             purchase_price = ?, sale_price = ?, is_unique = ? WHERE id = ? AND tenant_id = ?`,
             [sku, barcode || null, name, description || null, category_id || null,
-             purchase_price || 0, sale_price, stock, min_stock || 5, is_unique ? 1 : 0, id]
+             purchase_price || 0, sale_price, is_unique ? 1 : 0, id, tenantId]
         );
 
+        if (prodResult.affectedRows === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'Producto no encontrado o no pertenece a tu empresa.' });
+        }
+
+        // Actualizar o insertar el stock por sucursal
+        if (existsInBranch) {
+            await connection.query(
+                `UPDATE branch_inventory SET stock = ?, min_stock = ?, location_in_store = ?
+                 WHERE product_id = ? AND branch_id = ?`,
+                [stock, min_stock || 5, location_in_store || null, id, branchId]
+            );
+        } else {
+            await connection.query(
+                `INSERT INTO branch_inventory (product_id, branch_id, stock, min_stock, location_in_store)
+                 VALUES (?, ?, ?, ?, ?)`,
+                [id, branchId, stock || 0, min_stock || 5, location_in_store || null]
+            );
+        }
+
         // Registrar movimiento si cambió el stock
-        const oldStock = existing[0].stock;
         if (stock !== undefined && stock !== oldStock) {
             const diff = stock - oldStock;
-            await db.query(
-                `INSERT INTO stock_movements (product_id, type, quantity, reference, notes, created_by)
-                 VALUES (?, ?, ?, 'ADJUSTMENT', ?, ?)`,
-                [id, diff > 0 ? 'in' : 'adjustment', Math.abs(diff),
+            await connection.query(
+                `INSERT INTO stock_movements (tenant_id, branch_id, product_id, type, quantity, reference, notes, created_by)
+                 VALUES (?, ?, ?, ?, ?, 'ADJUSTMENT', ?, ?)`,
+                [tenantId, branchId, id, diff > 0 ? 'in' : 'adjustment', Math.abs(diff),
                  `Ajuste manual: ${oldStock} → ${stock}`, req.user.id]
             );
         }
 
+        await connection.commit();
         res.json({ message: 'Producto actualizado exitosamente.' });
     } catch (error) {
+        await connection.rollback();
         if (error.code === 'ER_DUP_ENTRY') {
             return res.status(400).json({ message: 'El SKU o código de barras ya existe.' });
         }
         console.error('[INVENTORY] Error al actualizar producto:', error);
         res.status(500).json({ message: 'Error al actualizar producto.' });
+    } finally {
+        connection.release();
     }
 };
 
 exports.deleteProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        await db.query('UPDATE products SET is_active = FALSE WHERE id = ?', [id]);
+        const tenantId = req.tenantCtx.tenantId;
+
+        const [result] = await db.query(
+            'UPDATE products SET is_active = FALSE WHERE id = ? AND tenant_id = ?', 
+            [id, tenantId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Producto no encontrado.' });
+        }
+
         res.json({ message: 'Producto desactivado.' });
     } catch (error) {
         console.error('[INVENTORY] Error al eliminar producto:', error);
@@ -235,33 +317,63 @@ exports.deleteProduct = async (req, res) => {
 };
 
 // =====================================================
-// Stock Movements
+// Stock Movements (SaaS & Multi-Branch)
 // =====================================================
 exports.addStockMovement = async (req, res) => {
+    const connection = await db.getConnection();
     try {
+        await connection.beginTransaction();
+
         const { product_id, type, quantity, reference, notes } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.tenantCtx.branchId;
 
         if (!product_id || !type || !quantity) {
             return res.status(400).json({ message: 'Producto, tipo y cantidad son obligatorios.' });
         }
 
-        // Actualizar stock del producto
+        // Verificar que el producto pertenece al tenant
+        const [prodCheck] = await connection.query('SELECT id FROM products WHERE id = ? AND tenant_id = ?', [product_id, tenantId]);
+        if (prodCheck.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'Producto no encontrado.' });
+        }
+
+        // Asegurar que exista registro de stock en branch_inventory
+        const [existing] = await connection.query(
+            'SELECT stock FROM branch_inventory WHERE product_id = ? AND branch_id = ?',
+            [product_id, branchId]
+        );
+
         const operator = type === 'in' ? '+' : '-';
-        await db.query(
-            `UPDATE products SET stock = stock ${operator} ? WHERE id = ?`,
-            [Math.abs(quantity), product_id]
+        if (existing.length > 0) {
+            await connection.query(
+                `UPDATE branch_inventory SET stock = stock ${operator} ? WHERE product_id = ? AND branch_id = ?`,
+                [Math.abs(quantity), product_id, branchId]
+            );
+        } else {
+            const initialStock = type === 'in' ? Math.abs(quantity) : -Math.abs(quantity);
+            await connection.query(
+                `INSERT INTO branch_inventory (product_id, branch_id, stock) VALUES (?, ?, ?)`,
+                [product_id, branchId, initialStock]
+            );
+        }
+
+        // Registrar el movimiento de stock
+        await connection.query(
+            `INSERT INTO stock_movements (tenant_id, branch_id, product_id, type, quantity, reference, notes, created_by)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [tenantId, branchId, product_id, type, Math.abs(quantity), reference || null, notes || null, req.user.id]
         );
 
-        await db.query(
-            `INSERT INTO stock_movements (product_id, type, quantity, reference, notes, created_by)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [product_id, type, Math.abs(quantity), reference || null, notes || null, req.user.id]
-        );
-
+        await connection.commit();
         res.status(201).json({ message: 'Movimiento de stock registrado.' });
     } catch (error) {
+        await connection.rollback();
         console.error('[INVENTORY] Error al agregar movimiento:', error);
         res.status(500).json({ message: 'Error al registrar movimiento de stock.' });
+    } finally {
+        connection.release();
     }
 };
 
@@ -269,6 +381,8 @@ exports.getStockMovements = async (req, res) => {
     try {
         const { product_id, page = 1, limit = 20 } = req.query;
         const offset = (page - 1) * limit;
+        const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.tenantCtx.branchId;
 
         let query = `
             SELECT sm.*, p.name as product_name, p.sku,
@@ -276,9 +390,9 @@ exports.getStockMovements = async (req, res) => {
             FROM stock_movements sm
             LEFT JOIN products p ON sm.product_id = p.id
             LEFT JOIN users u ON sm.created_by = u.id
-            WHERE 1=1
+            WHERE sm.tenant_id = ? AND sm.branch_id = ?
         `;
-        const params = [];
+        const params = [tenantId, branchId];
 
         if (product_id) {
             query += ' AND sm.product_id = ?';
@@ -301,10 +415,39 @@ exports.getStockMovements = async (req, res) => {
 // =====================================================
 exports.getInventoryStats = async (req, res) => {
     try {
-        const [totalProducts] = await db.query('SELECT COUNT(*) as count FROM products WHERE is_active = TRUE');
-        const [lowStock] = await db.query('SELECT COUNT(*) as count FROM products WHERE is_active = TRUE AND stock <= min_stock');
-        const [outOfStock] = await db.query('SELECT COUNT(*) as count FROM products WHERE is_active = TRUE AND stock = 0');
-        const [totalValue] = await db.query('SELECT SUM(stock * sale_price) as value FROM products WHERE is_active = TRUE');
+        const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.tenantCtx.branchId;
+
+        const [totalProducts] = await db.query(
+            'SELECT COUNT(*) as count FROM products WHERE tenant_id = ? AND is_active = TRUE',
+            [tenantId]
+        );
+        
+        const [lowStock] = await db.query(
+            `SELECT COUNT(*) as count 
+             FROM products p
+             LEFT JOIN branch_inventory bi ON p.id = bi.product_id AND bi.branch_id = ?
+             WHERE p.tenant_id = ? AND p.is_active = TRUE 
+             AND COALESCE(bi.stock, 0) <= COALESCE(bi.min_stock, p.min_stock)`,
+            [branchId, tenantId]
+        );
+        
+        const [outOfStock] = await db.query(
+            `SELECT COUNT(*) as count 
+             FROM products p
+             LEFT JOIN branch_inventory bi ON p.id = bi.product_id AND bi.branch_id = ?
+             WHERE p.tenant_id = ? AND p.is_active = TRUE 
+             AND COALESCE(bi.stock, 0) = 0`,
+            [branchId, tenantId]
+        );
+        
+        const [totalValue] = await db.query(
+            `SELECT SUM(COALESCE(bi.stock, 0) * p.sale_price) as value 
+             FROM products p
+             JOIN branch_inventory bi ON p.id = bi.product_id AND bi.branch_id = ?
+             WHERE p.tenant_id = ? AND p.is_active = TRUE`,
+            [branchId, tenantId]
+        );
 
         res.json({
             totalProducts: totalProducts[0].count,

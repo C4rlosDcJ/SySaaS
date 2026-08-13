@@ -1,9 +1,10 @@
 const db = require('../config/database');
 
-// Obtener todas las configuraciones
+// Obtener todas las configuraciones del tenant
 exports.getAll = async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT * FROM settings');
+        const tenantId = req.tenantCtx.tenantId;
+        const [rows] = await db.query('SELECT * FROM settings WHERE tenant_id = ?', [tenantId]);
         const settings = rows.reduce((acc, curr) => {
             acc[curr.setting_key] = curr.setting_value;
             return acc;
@@ -18,12 +19,13 @@ exports.getAll = async (req, res) => {
 // Actualizar una configuración específica
 exports.update = async (req, res) => {
     try {
+        const tenantId = req.tenantCtx.tenantId;
         const settings = req.body; // Objeto { key: value }
 
         for (const [key, value] of Object.entries(settings)) {
             await db.query(
-                'INSERT INTO settings (setting_key, setting_value) VALUES (?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
-                [key, value, value]
+                'INSERT INTO settings (tenant_id, setting_key, setting_value) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',
+                [tenantId, key, value, value]
             );
         }
 
@@ -35,12 +37,13 @@ exports.update = async (req, res) => {
 };
 
 // Obtener un valor específico (Helper interno)
-exports.getSettingValue = async (key, defaultValue = null) => {
+exports.getSettingValue = async (tenantId, key, defaultValue = null) => {
     try {
-        const [rows] = await db.query('SELECT setting_value FROM settings WHERE setting_key = ?', [key]);
+        const [rows] = await db.query('SELECT setting_value FROM settings WHERE tenant_id = ? AND setting_key = ?', [tenantId, key]);
         if (rows.length > 0) return rows[0].setting_value;
         return defaultValue;
     } catch (error) {
         return defaultValue;
     }
 };
+

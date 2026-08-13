@@ -2,27 +2,31 @@ const express = require('express');
 const router = express.Router();
 const repairController = require('../controllers/repairController');
 const { auth, isAdmin, isTechnicianOrAdmin } = require('../middleware/auth');
+const tenantContext = require('../middleware/tenantContext');
+const { subscriptionGuard } = require('../middleware/subscriptionGuard');
 
-// Todas las rutas requieren autenticación
+// Todas las rutas requieren autenticación, contexto de tenant y verificación de suscripción
 router.use(auth);
+router.use(tenantContext);
+router.use(subscriptionGuard);
 
-// Listar reparaciones (filtradas por rol)
+// Listar reparaciones (filtradas por rol y tenant)
 router.get('/', repairController.getAll);
 
 // Obtener detalle de reparación
 router.get('/:id', repairController.getById);
 
-// Crear reparación (admin/técnico pueden crear para cualquier cliente, cliente solo para sí mismo)
+// Crear reparación
 router.post('/', repairController.create);
 
 // Actualizar reparación (solo admin/técnico)
 router.put('/:id', isTechnicianOrAdmin, repairController.update);
 
 // Cambiar estado (admin/técnico o cliente para aprobar/rechazar)
-router.put('/:id/status', auth, repairController.updateStatus);
+router.put('/:id/status', repairController.updateStatus);
 
 // Agregar reseña (cliente)
-router.post('/:id/review', auth, repairController.addReview);
+router.post('/:id/review', repairController.addReview);
 
 // Agregar nota
 router.post('/:id/notes', repairController.addNote);
@@ -34,3 +38,4 @@ router.delete('/:id', isAdmin, repairController.delete);
 router.post('/:id/claim-warranty', repairController.claimWarranty);
 
 module.exports = router;
+
