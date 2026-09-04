@@ -123,7 +123,7 @@ async function startServer() {
             `);
         });
     } catch (error) {
-        console.error('❌ Error fatal al arrancar el servidor backend:', error);
+        console.error('[ERROR] Error fatal al arrancar el servidor backend:', error);
         process.exit(1);
     }
 }
@@ -132,13 +132,13 @@ startServer();
 
 // Manejadores globales de errores del proceso
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('⚠️ Unhandled Promise Rejection at:', promise, 'reason:', reason);
+    console.error('[WARN] Unhandled Promise Rejection at:', promise, 'reason:', reason);
     // Nota: Dependiendo de tu estrategia de despliegue, podrías querer hacer un process.exit(1)
     // para permitir que un gestor de procesos (como pm2 o nodemon) reinicie la instancia limpia.
 });
 
 process.on('uncaughtException', (error) => {
-    console.error('⚠️ Uncaught Exception thrown:', error);
+    console.error('[WARN] Uncaught Exception thrown:', error);
     // Es buena práctica salir del proceso ante excepciones no controladas para evitar un estado inconsistente
     process.exit(1);
 });

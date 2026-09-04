@@ -286,10 +286,10 @@ async function dbInit() {
             }
         }
 
-        console.log(`[DB-INIT] ✅ Base de datos "${dbName}" inicializada correctamente.`);
+        console.log(`[DB-INIT] Base de datos "${dbName}" inicializada correctamente.`);
 
     } catch (error) {
-        console.error(`[DB-INIT] ❌ Error en la inicialización de la base de datos:`, error.message);
+        console.error(`[DB-INIT] Error en la inicialización de la base de datos:`, error.message);
         throw error;
     } finally {
         if (connection) {

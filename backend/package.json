@@ -7,6 +7,7 @@
     "start": "nodemon server.js",
     "dev": "nodemon server.js",
     "seed": "node ../database/seed_full_demo.js",
+    "clean:test-data": "node scripts/clean_test_data.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

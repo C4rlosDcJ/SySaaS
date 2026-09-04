@@ -66,7 +66,7 @@ const emailTemplates = {
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #171717; color: #EDEDED; padding: 20px; border-radius: 10px;">
         <h1 style="color: #DA0037; text-align: center;">${businessName}</h1>
         <h2>¡Hola ${customer.first_name}!</h2>
-        <p style="font-size: 18px; color: #4CAF50;">🎉 ¡Tu dispositivo está listo para ser recogido!</p>
+        <p style="font-size: 18px; color: #4CAF50;">¡Tu dispositivo está listo para ser recogido!</p>
         <div style="background: #444444; padding: 15px; border-radius: 8px; margin: 20px 0;">
           <p><strong>Número de ticket:</strong> ${repair.ticket_number}</p>
           <p><strong>Dispositivo:</strong> ${repair.model || 'N/A'}</p>
