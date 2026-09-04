@@ -17,7 +17,16 @@ exports.getAll = async (req, res) => {
         const { status, customer_id, technician_id, page = 1, limit = 10 } = req.query;
         const offset = (page - 1) * limit;
         const tenantId = req.tenantCtx.tenantId;
-        const branchId = req.tenantCtx.branchId;
+        const isGlobalAdmin = ['tenant_admin', 'admin', 'superadmin'].includes(req.user.role);
+        let branchId = null;
+
+        if (!isGlobalAdmin && req.tenantCtx.branchId) {
+            branchId = req.tenantCtx.branchId;
+        } else if (req.query.branch_id) {
+            branchId = parseInt(req.query.branch_id, 10);
+        } else if (isGlobalAdmin && req.headers['x-branch-id']) {
+            branchId = parseInt(req.headers['x-branch-id'], 10);
+        }
 
         let query = `
       SELECT r.*, 
@@ -35,7 +44,7 @@ exports.getAll = async (req, res) => {
 
         const params = [tenantId];
 
-        // Filtrar por sucursal activa si no es superadmin
+        // Filtrar por sucursal si corresponde
         if (branchId) {
             query += ' AND r.branch_id = ?';
             params.push(branchId);

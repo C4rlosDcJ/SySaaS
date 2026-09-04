@@ -95,7 +95,7 @@ export const ThemeProvider = ({ children }) => {
   // ── Contenido editable de la Landing Page ──
   const [contactAddress, setContactAddress] = useState(() => localStorage.getItem('contactAddress') || 'Av. Principal #123, Ciudad');
   const [contactSchedule, setContactSchedule] = useState(() => localStorage.getItem('contactSchedule') || 'Lun - Sáb: 9AM - 7PM');
-  const [contactEmail, setContactEmail] = useState(() => localStorage.getItem('contactEmail') || 'info@systeck.com');
+  const [contactEmail, setContactEmail] = useState(() => localStorage.getItem('contactEmail') || 'info@sysaas.com');
   const [contactPhone, setContactPhone] = useState(() => localStorage.getItem('contactPhone') || '(123) 456-7890');
   const [defaultWarrantyDays, setDefaultWarrantyDays] = useState(() => localStorage.getItem('defaultWarrantyDays') || '30');
   const [landingServices, setLandingServices] = useState(() => {
@@ -253,24 +253,14 @@ export const ThemeProvider = ({ children }) => {
     localStorage.setItem('borderRadius', borderRadius);
   }, [borderRadius]);
 
-  // ── Persist business name locally y actualizar título del navegador ──
+  // ── Persist business name locally ──
   useEffect(() => {
     localStorage.setItem('businessName', businessName);
-    document.title = businessName;
   }, [businessName]);
 
-  // ── Persist business logo locally y actualizar favicon del navegador ──
+  // ── Persist business logo locally ──
   useEffect(() => {
     localStorage.setItem('businessLogo', businessLogo);
-    if (businessLogo) {
-      let link = document.querySelector("link[rel~='icon']");
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = 'icon';
-        document.head.appendChild(link);
-      }
-      link.href = businessLogo;
-    }
   }, [businessLogo]);
 
   // ── Admin: persist visual settings to DB ──────────────────

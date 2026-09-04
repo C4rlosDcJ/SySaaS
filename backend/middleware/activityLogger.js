@@ -20,8 +20,22 @@ module.exports = async (req, res, next) => {
             const tenantId = req.tenantCtx ? req.tenantCtx.tenantId : (req.user ? req.user.tenant_id : null);
             const branchId = req.tenantCtx ? req.tenantCtx.branchId : (req.user ? req.user.branch_id : null);
             const action = `${req.method} ${req.originalUrl}`;
+
+            // Sanitizar cuerpo para no almacenar contraseñas o cadenas base64 gigantes en logs
+            let safeBody = null;
+            if (req.body && typeof req.body === 'object') {
+                safeBody = { ...req.body };
+                if (safeBody.password) safeBody.password = '[REDACTED]';
+                if (safeBody.confirmPassword) safeBody.confirmPassword = '[REDACTED]';
+                for (const k of Object.keys(safeBody)) {
+                    if (typeof safeBody[k] === 'string' && safeBody[k].startsWith('data:image')) {
+                        safeBody[k] = '[BASE64_IMAGE_DATA]';
+                    }
+                }
+            }
+
             const details = JSON.stringify({
-                body: req.body,
+                body: safeBody,
                 params: req.params,
                 query: req.query,
                 ip: req.ip || req.headers['x-forwarded-for']

@@ -1,10 +1,10 @@
--- SysTeck - Sistema de Gestión de Reparaciones
+-- SySaaS - Sistema de Gestión de Reparaciones
 
-CREATE DATABASE IF NOT EXISTS systeck
+CREATE DATABASE IF NOT EXISTS sysaas
 CHARACTER SET utf8mb4
 COLLATE utf8mb4_unicode_ci;
 
-USE systeck;
+USE sysaas;
 
 -- =====================================================
 -- TABLA: users - Usuarios del sistema
@@ -246,7 +246,7 @@ CREATE TABLE IF NOT EXISTS settings (
 -- Configuración por defecto
 INSERT INTO settings (setting_key, setting_value) VALUES
 ('default_warranty_days', '30'),
-('company_name', 'SysTeck'),
+('company_name', 'SySaaS'),
 ('company_phone', ''),
 ('company_email', ''),
 ('company_address', '')
@@ -269,7 +269,7 @@ INSERT INTO users (
     email, password, first_name, last_name,
     role, is_active, email_verified
 ) VALUES (
-    'admin@systeck.com',
+    'admin@sysaas.com',
     '$2a$10$5HjXkF/XpIdTcLEzlKG8ZeSVY33xY.YINlb6K1O6wwt03ljX3CiZm',
     'Administrador',
     'Sistema',
@@ -280,7 +280,7 @@ INSERT INTO users (
 
 
 -- -- =====================================================
--- -- SYS-TECK - Sistema de Gestión de Reparaciones
+-- -- SYSAAS - Sistema de Gestión de Reparaciones
 -- -- Base de datos MySQL
 -- -- =====================================================
 

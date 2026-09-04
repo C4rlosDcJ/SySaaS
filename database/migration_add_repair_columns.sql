@@ -1,7 +1,7 @@
 -- Migración: Agregar columnas faltantes a la tabla repairs
 -- Ejecutar este script en MySQL para actualizar la base de datos
 
-USE systeck;
+USE sysaas;
 
 -- Agregar columnas de información del dispositivo
 ALTER TABLE repairs ADD COLUMN IF NOT EXISTS device_password VARCHAR(255);

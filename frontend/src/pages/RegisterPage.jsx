@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { publicService, getImageUrl } from '../services/api';
 import {
     Wrench,
     Mail,
@@ -14,12 +15,19 @@ import {
     CheckCircle,
     LayoutDashboard,
     Bell,
-    Shield
+    Shield,
+    Building2,
+    Globe,
+    Sun,
+    Moon
 } from 'lucide-react';
 import './AuthPages.css';
 
 export default function RegisterPage() {
+    const [accountType, setAccountType] = useState('company'); // 'company' | 'client'
     const [formData, setFormData] = useState({
+        company_name: '',
+        slug: '',
         first_name: '',
         last_name: '',
         email: '',
@@ -30,14 +38,29 @@ export default function RegisterPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
-    const { register } = useAuth();
-    const { businessLogo, businessName } = useTheme();
+    const [platformName, setPlatformName] = useState('SySaaS');
+    const [platformLogo, setPlatformLogo] = useState('');
+    const { registerCompany, register } = useAuth();
+
+    useEffect(() => {
+        publicService.getPlatformInfo()
+            .then(data => {
+                if (data?.platform_name) setPlatformName(data.platform_name);
+                if (data?.platform_logo) setPlatformLogo(data.platform_logo);
+            })
+            .catch(() => {});
+    }, []);
+    const { businessLogo, businessName, theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
 
     const handleChange = (e) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value
+        const { name, value } = e.target;
+        setFormData(prev => {
+            const updated = { ...prev, [name]: value };
+            if (name === 'company_name' && !prev.slug) {
+                updated.slug = value.toLowerCase().replace(/[^a-z0-9]/g, '-');
+            }
+            return updated;
         });
         setError('');
     };
@@ -46,6 +69,12 @@ export default function RegisterPage() {
         e.preventDefault();
         setLoading(true);
         setError('');
+
+        if (accountType === 'company' && !formData.company_name.trim()) {
+            setError('El nombre de la empresa es obligatorio.');
+            setLoading(false);
+            return;
+        }
 
         // Validar contraseñas
         if (formData.password !== formData.confirmPassword) {
@@ -61,11 +90,16 @@ export default function RegisterPage() {
         }
 
         try {
-            const { confirmPassword: _confirmPassword, ...userData } = formData;
-            await register(userData);
-            navigate('/dashboard');
+            const { confirmPassword: _confirmPassword, ...payload } = formData;
+            if (accountType === 'company') {
+                await registerCompany(payload);
+                navigate('/admin');
+            } else {
+                await register(payload);
+                navigate('/dashboard');
+            }
         } catch (err) {
-            setError(err.message || 'Error al registrar usuario');
+            setError(err.message || 'Error al registrar la cuenta');
         } finally {
             setLoading(false);
         }
@@ -91,46 +125,72 @@ export default function RegisterPage() {
                 <div className="auth-visual">
                     <div className="auth-visual-content">
                         <div className="auth-logo">
-                            {businessLogo ? (
-                                <img src={businessLogo} alt="Logo" className="logo-img-auth" style={{ width: '36px', height: '36px', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
+                            {platformLogo ? (
+                                <img src={getImageUrl(platformLogo)} alt="Logo" className="logo-img-auth" style={{ width: '36px', height: '36px', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} onError={(e) => { e.target.style.display = 'none'; }} />
                             ) : (
                                 <Wrench size={28} className="logo-icon" />
                             )}
-                            <span className="logo-text">{renderBusinessName()}</span>
+                            <span className="logo-text">{platformName}</span>
                         </div>
-                        <h1>Únete a {businessName || 'Sys-Teck'}</h1>
-                        <p>Crea tu cuenta y obtén acceso a todas las ventajas de nuestro servicio de reparación</p>
+                        <h1>Únete a {platformName} SaaS</h1>
+                        <p>Crea tu cuenta de organización y comienza a administrar tus sucursales y personal técnico con el mejor flujo operativo.</p>
                         <div className="auth-features">
                             <div className="feature">
                                 <div className="feature-icon-wrapper">
                                     <CheckCircle size={20} />
                                 </div>
-                                <span>Cotizaciones en línea</span>
+                                <span>Administración Multi-Tenant</span>
                             </div>
                             <div className="feature">
                                 <div className="feature-icon-wrapper">
                                     <LayoutDashboard size={20} />
                                 </div>
-                                <span>Panel de control personal</span>
+                                <span>Control de Stock por Sucursal</span>
                             </div>
                             <div className="feature">
                                 <div className="feature-icon-wrapper">
                                     <Bell size={20} />
                                 </div>
-                                <span>Alertas de estado</span>
+                                <span>Diagnósticos Asistidos por IA</span>
                             </div>
                             <div className="feature">
                                 <div className="feature-icon-wrapper">
                                     <Shield size={20} />
                                 </div>
-                                <span>Garantía en reparaciones</span>
+                                <span>Pasarela de Stripe integrada</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div className="auth-form-container">
-                    <div className="auth-form-wrapper">
+                    <div className="auth-form-wrapper" style={{ position: 'relative' }}>
+                        <button
+                            type="button"
+                            onClick={toggleTheme}
+                            className="btn btn-outline btn-sm"
+                            title={`Cambiar a modo ${theme === 'dark' ? 'claro' : 'oscuro'}`}
+                            style={{ 
+                                position: 'absolute', 
+                                top: '-8px', 
+                                right: '0', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '6px', 
+                                padding: '6px 12px', 
+                                borderRadius: 'var(--radius-full)',
+                                border: '1px solid var(--color-border)',
+                                background: 'var(--color-bg-tertiary)',
+                                color: 'var(--color-text)',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: 500
+                            }}
+                        >
+                            {theme === 'dark' ? <Sun size={14} className="text-warning" /> : <Moon size={14} className="text-primary" />}
+                            <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}</span>
+                        </button>
+
                         <h2>Crear Cuenta</h2>
                         <p className="auth-subtitle">
                             ¿Ya tienes cuenta? <Link to="/login">Inicia sesión</Link>
@@ -139,9 +199,98 @@ export default function RegisterPage() {
                         <form onSubmit={handleSubmit} className="auth-form">
                             {error && <div className="error-alert">{error}</div>}
 
+                            {/* Selector de Tipo de Registro */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '24px', background: 'var(--color-bg-tertiary, var(--color-bg-elevated))', padding: '6px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--color-border)' }}>
+                                <button
+                                    type="button"
+                                    onClick={() => setAccountType('company')}
+                                    style={{
+                                        padding: '10px 14px',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: accountType === 'company' ? '1px solid var(--color-primary)' : '1px solid transparent',
+                                        background: accountType === 'company' ? 'var(--color-primary)' : 'transparent',
+                                        color: accountType === 'company' ? 'var(--color-primary-contrast)' : 'var(--color-text-secondary)',
+                                        fontWeight: 600,
+                                        fontSize: '13px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                >
+                                    <Building2 size={16} style={{ color: accountType === 'company' ? 'var(--color-primary-contrast)' : 'var(--color-text-secondary)' }} />
+                                    <span>Taller / Empresa</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setAccountType('client')}
+                                    style={{
+                                        padding: '10px 14px',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: accountType === 'client' ? '1px solid var(--color-primary)' : '1px solid transparent',
+                                        background: accountType === 'client' ? 'var(--color-primary)' : 'transparent',
+                                        color: accountType === 'client' ? 'var(--color-primary-contrast)' : 'var(--color-text-secondary)',
+                                        fontWeight: 600,
+                                        fontSize: '13px',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '8px',
+                                        transition: 'all 0.2s ease'
+                                    }}
+                                >
+                                    <User size={16} style={{ color: accountType === 'client' ? 'var(--color-primary-contrast)' : 'var(--color-text-secondary)' }} />
+                                    <span>Soy Cliente</span>
+                                </button>
+                            </div>
+
+                            {accountType === 'company' && (
+                                <>
+                                    <div className="input-group">
+                                        <label htmlFor="company_name">Nombre de la Empresa / Taller *</label>
+                                        <div className="input-with-icon">
+                                            <Building2 size={18} className="input-icon" />
+                                            <input
+                                                type="text"
+                                                id="company_name"
+                                                name="company_name"
+                                                className="input"
+                                                placeholder="Ej. TecnoFix Central"
+                                                value={formData.company_name}
+                                                onChange={handleChange}
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="input-group">
+                                        <label htmlFor="slug">Identificador Web (Slug de Empresa)</label>
+                                        <div className="input-with-icon">
+                                            <Globe size={18} className="input-icon" />
+                                            <input
+                                                type="text"
+                                                id="slug"
+                                                name="slug"
+                                                className="input"
+                                                placeholder="tecnofix-central"
+                                                value={formData.slug}
+                                                onChange={handleChange}
+                                                required
+                                            />
+                                        </div>
+                                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px', display: 'block' }}>
+                                            URL de tu empresa: {platformName.toLowerCase().replace(/[^a-z0-9]/g, '')}.com/app/{formData.slug || 'tu-empresa'}
+                                        </span>
+                                    </div>
+                                </>
+                            )}
+
                             <div className="form-row">
                                 <div className="input-group">
-                                    <label htmlFor="first_name">Nombre</label>
+                                    <label htmlFor="first_name">{accountType === 'company' ? 'Nombre Administrador *' : 'Nombre *'}</label>
                                     <div className="input-with-icon">
                                         <User size={18} className="input-icon" />
                                         <input

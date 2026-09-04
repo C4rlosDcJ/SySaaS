@@ -1,4 +1,4 @@
-# SysTeck - Plataforma Integral SaaS Multi-Tenant & Multi-Sucursal para Gestión de Talleres
+# SySaaS - Plataforma Integral SaaS Multi-Tenant & Multi-Sucursal para Gestion de Talleres y Soporte Tecnico
 
 [![License: ISC](https://img.shields.io/badge/License-ISC-007ACC.svg)](https://opensource.org/licenses/ISC)
 [![React](https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB.svg)](https://reactjs.org/)
@@ -7,94 +7,108 @@
 [![Stripe](https://img.shields.io/badge/Payments-Stripe-6772E5.svg)](https://stripe.com/)
 [![AI-Powered](https://img.shields.io/badge/AI-Diagnostics-FF6B6B.svg)](https://gemini.google.com/)
 
-**SysTeck** es una plataforma integral SaaS (Software as a Service) multi-tenant y multi-sucursal diseñada para simplificar y digitalizar el ciclo operativo de talleres, laboratorios y cadenas de soporte técnico de dispositivos electrónicos. Con aislamiento total de datos de clientes, control de inventario descentralizado por sucursal, diagnósticos inteligentes potenciados por Inteligencia Artificial (AI) y procesamiento automatizado de suscripciones mediante Stripe.
+**SySaaS** es una plataforma integral SaaS (Software as a Service) multi-tenant y multi-sucursal de ultima generacion, disenada para digitalizar, optimizar y automatizar el ciclo operativo completo de talleres, laboratorios de reparacion, tiendas de soporte tecnico y franquicias de dispositivos electronicos.
+
+Ofrece aislamiento total de datos por empresa (multi-tenancy con identificador de slug), control de inventario descentralizado con traslados inter-sucursales, punto de venta (POS) en tiempo real con impresion de tickets termicos, diagnosticos inteligentes potenciados por Inteligencia Artificial (Gemini AI), motor de analisis predictivo en Python, portal de clientes con tracking publico en vivo, control de suscripciones y facturacion automatizada mediante Stripe.
 
 ---
 
-## 🛠️ Módulos del Sistema y Funcionalidades
+## Modulos del Sistema y Funcionalidades
 
-### 1. Panel de SuperAdministrador (Control de la Plataforma)
-- **Gestión Global de Tenants:** Visualización, suspensión y reactivación de empresas suscritas.
-- **Planes y Precios:** Configuración del catálogo de planes de suscripción (ej: Trial, Basic, Premium) con límites de uso directos.
-- **Facturación General:** Monitorización del estado de cuentas a través de Stripe.
+### 1. Panel de SuperAdministrador (Control Global de la Plataforma)
+- **Gestion Global de Tenants:** Monitorizacion, alta, suspension y reactivacion instantanea de empresas cliente.
+- **Impersonacion Segura de Soporte:** Capacidad para ingresar a la vista de cualquier tenant para asistir a los usuarios y resolver incidencias tecnicas.
+- **Planes y Limites:** Configuracion dinamica de precios, cuotas de sucursales, limites de usuarios staff y tope mensual de reparaciones.
+- **Auditoria Global y Logs:** Trazabilidad completa de actividades y exportacion de auditorias en formato CSV.
+- **Sistema de Broadcasts:** Emision de avisos y notificaciones globales para todos los inquilinos activos.
+- **Ajustes de Plataforma:** Personalizacion del nombre de marca, logotipo, terminos de servicio y configuracion SMTP.
 
 ### 2. Multi-Tenancy & Aislamiento de Datos
-- **Aislamiento Multi-Tenant:** Cada empresa accede mediante su identificador (`systeck.com/app/empresa-slug`), aislando los datos de clientes, tickets y configuraciones.
-- **SubscriptionGuard & Límites:** Control de cuota automático (cantidad de sucursales, cantidad de personal staff y número de reparaciones mensuales permitidas).
-- **Acceso Restringido:** Bloqueo automático de inserción o lectura en caso de que una cuenta esté suspendida o tenga pagos pendientes.
+- **Aislamiento Multi-Tenant Estricto:** Cada empresa cuenta con su contexto (`sysaas.com/app/empresa-slug`), garantizando la privacidad absoluta de clientes, reparaciones y finanzas.
+- **SubscriptionGuard:** Middleware de verificacion de cuotas y limites de uso en tiempo real.
+- **Manejo de Roles Granular:** Permisos diferenciados para SuperAdmin, Admin de Empresa, Tecnicos, Cajeros y Clientes.
 
-### 3. Gestión Operativa Multi-Sucursal
-- **Inventario Descentralizado:** Catálogo de productos unificado por empresa con stock físico controlado de manera individual por sucursal (`branch_inventory`).
-- **Traslados de Mercancía:** Flujo seguro para mover stock entre sucursales (Solicitud en origen -> Estado en tránsito -> Aprobación y recepción física en destino -> Movimiento de stock atómico).
-- **Selector de Sucursal:** El personal del staff (técnicos, cajeros, administradores) puede alternar en la barra lateral su sucursal activa según sus asignaciones autorizadas.
+### 3. Gestion Operativa Multi-Sucursal e Inventario
+- **Inventario Descentralizado:** Catalogo unificado por empresa con stock fisico controlado independientemente por sucursal (`branch_inventory`).
+- **Filtros Avanzados de Stock:** Busqueda multi-criterio en tiempo real, alertas de bajo stock y deteccion de existencias agotadas con diseno sobrio de alto contraste.
+- **Traslados de Mercancia:** Flujo seguro de transferencia entre sucursales (Solicitud en origen -> Estado en transito -> Aprobacion y recepcion en destino -> Movimiento de stock atomico).
+- **Gestion de Proveedores y Compras:** Modulo de administracion de proveedores y costos de adquisicion.
 
-### 4. Inteligencia Artificial (Diagnósticos y Cotizaciones AI)
-- **Generador de Diagnósticos AI:** Sugerencias automáticas de fallas probables, repuestos necesarios y estimación de tiempos de reparación según el modelo y problema del dispositivo.
-- **Estructuración de Presupuestos:** Automatización de cotizaciones a partir de descripciones de texto libre ingresadas por los clientes.
-- **Corrector y Optimizador de Notas:** Redacción profesional de observaciones técnicas para el reporte final del cliente.
+### 4. Punto de Venta (POS) e Historial de Ventas
+- **Cobro Rapido y Descuento en Vivo:** Terminal de venta ágil con soporte para multiples metodos de pago (Efectivo, Tarjeta, Transferencia, Mixto).
+- **Historial Completo de Ventas:** Busqueda por folio de ticket o cliente, filtros por rango de fechas, exportacion a CSV y reimpresion de recibos termicos.
+- **Gestion de Cupones:** Creacion y aplicacion de codigos de descuento por porcentaje o monto fijo.
 
-### 5. Portal y Experiencia de Clientes
-- **Seguimiento Público por Ticket:** Rastreo en tiempo real del progreso de equipos sin necesidad de iniciar sesión (Recibido -> Diagnóstico -> Esperando Aprobación -> Reparando -> Listo para entrega).
-- **Ingreso de Garantías:** Solicitudes y reclamos automáticos sobre tickets cerrados que estén dentro del periodo de cobertura.
-- **Catálogo y Tienda de Repuestos/Servicios:** Visualización de productos y servicios disponibles filtrados por sucursal.
+### 5. Modulo de Reparaciones y Taller
+- **Ciclo Completo del Ticket:** Recepcion -> Diagnostico -> Cotizacion -> En Espera de Piezas -> Reparando -> Pruebas -> Listo para Entrega -> Entregado.
+- **Checklist Visual y Fotos:** Registro de condiciones de recepcion del equipo, danos previos, accesorios y fotografias con compresion automatica.
+- **Generacion de Documentos PDF:** Emision automatica de recibos de recepcion, ordenes de servicio y certificados de garantia.
 
-### 6. Punto de Venta (POS) e Historial
-- **Cobro Rápido:** Checkout unificado que descuenta stock en tiempo real de la sucursal activa, emite recibos y permite abonos en reparaciones.
-- **Estadísticas de Negocio:** Reportes mensuales interactivos de facturación global, métodos de pago, rendimiento de técnicos y balance de gastos.
+### 6. Inteligencia Artificial y Analisis Predictivo
+- **Diagnostico Asistido por AI:** Analisis inteligente de sintomas mediante Gemini AI, sugiriendo causas probables, componentes a revisar y tiempos estimados.
+- **Motor de Machine Learning & Analytics:** Script de Python integrado (`analytics_engine.py`) para proyecciones de demanda, deteccion de anomalias y tendencias operativas.
+- **Chatbot Asistente:** Asistente interactivo en tiempo real integrado en el portal publico y privado para resolver dudas frecuentes y consultas de estado.
+
+### 7. Portal y Experiencia del Cliente
+- **Tracking Publico en Vivo:** Rastreo de estado de reparacion en tiempo real con codigo de seguimiento sin requerir inicio de sesion.
+- **Aprobacion de Cotizaciones:** Aceptacion o rechazo digital de presupuestos de reparacion.
+- **Gestion de Garantias:** Registro y atencion de garantias con validacion automatica de plazos de cobertura.
+- **Tienda y Catalogo Publico:** Visualizacion de repuestos y servicios disponibles por sucursal.
 
 ---
 
-## 🎨 Diseño y Experiencia de Usuario
+## Diseno y Experiencia de Usuario
 
-- **Estilo Minimalista Industrial:** Inspirado en la estética premium de Nothing/Apple con interfaces limpias de alto contraste.
-- **Soporte de Temas:** Transición fluida en caliente entre modo oscuro y claro.
-- **Micro-interacciones:** Animaciones dinámicas basadas en interacciones de teclado (incluyendo buscador global rápido con `⌘K`).
-- **Responsivo Completo:** UI fluida y compacta optimizada para teléfonos móviles, tablets y ordenadores de escritorio.
+- **Estilo Industrial Minimalista:** Lineas limpias, acabados en cristal (glassmorphism) y paletas equilibradas inspiradas en diseno moderno.
+- **Soporte de Temas:** Alternancia instantanea entre modo claro y modo oscuro.
+- **Acceso Rapido por Teclado:** Buscador global rapido accesible con `Ctrl + K` / `Cmd + K`.
+- **Experiencia 100% Responsiva:** Interfaces totalmente adaptadas para dispositivos moviles, tablets y estaciones de trabajo.
 
 ---
 
-## 🚀 Guía de Inicio Rápido
+## Guia de Inicio Rapido
 
 ### Requisitos Previos
 - **Node.js** (v18.x o superior)
 - **MySQL** (v8.0.x o compatible)
-- **Stripe Account** & **Gemini API Key** (para diagnósticos AI)
+- **Python 3** (opcional, para el motor de analiticas avanzadas)
+- **Stripe Account** & **Google Gemini API Key**
 
-### 1. Instalación
+### 1. Clonar el Repositorio
 ```bash
 git clone https://github.com/C4rlosDcJ/SysTeck.git
 cd SysTeck
 ```
 
-### 2. Configuración de Base de Datos
-1. Crea una base de datos MySQL local o remota.
-2. Importa el esquema general:
+### 2. Configuracion de la Base de Datos
+1. Crea una base de datos MySQL.
+2. Ejecuta el archivo de esquema principal:
 ```bash
-mysql -u tu_usuario -p nombre_db < database/schema.sql
+mysql -u tu_usuario -p tu_base_datos < database/schema.sql
 ```
-*(Los scripts de migración SaaS se ejecutan de manera automática en el primer arranque).*
+*(Las migraciones de superadministrador y funciones SaaS se inicializan de forma automatica en el primer arranque del servidor).*
 
 ### 3. Variables de Entorno (.env)
 
-En **`backend/.env`**:
+Configura el archivo `backend/.env`:
 ```env
 PORT=5000
 DB_HOST=localhost
 DB_USER=tu_usuario
-DB_PASSWORD=tu_contraseña
-DB_NAME=nombre_db
-JWT_SECRET=tu_secreto_jwt
+DB_PASSWORD=tu_password
+DB_NAME=sysaas_db
+JWT_SECRET=tu_jwt_secret_super_seguro
 FRONTEND_URL=http://localhost:5173
 
-# Integración Stripe
+# Integracion con Stripe
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
-# AI Diagnostics
+# Google Gemini AI
 GEMINI_API_KEY=AIzaSy...
 ```
 
-### 4. Lanzar Entorno de Desarrollo
+### 4. Ejecutar en Modo Desarrollo
 
 **Backend**:
 ```bash
@@ -112,28 +126,34 @@ npm run dev
 
 ---
 
-## 💻 Stack Tecnológico
+## Stack Tecnologico
 
-- **Frontend:** React (Vite), Recharts, Lucide Icons, Vanilla CSS Variables.
-- **Backend:** Node.js, Express, JWT, Stripe SDK, Gemini AI API.
-- **Base de Datos:** MySQL (Pool de conexiones a través de `mysql2/promise` con soporte SSL).
+- **Frontend:** React 18, Vite, Recharts, Lucide Icons, Vanilla CSS Variables & Design Tokens.
+- **Backend:** Node.js, Express, JWT, Stripe SDK, Google Generative AI (Gemini).
+- **Analiticas:** Python 3 (NumPy, Scikit-learn / Analytics Engine).
+- **Base de Datos:** MySQL 8 (`mysql2/promise` con soporte para transacciones y pools seguros).
 
 ---
 
-## 📂 Estructura del Directorio
+## Estructura del Proyecto
 
 ```text
-SysTeck/
-├── frontend/           # SPA en React y estilos CSS interactivos
-├── backend/            # API REST en Node.js, Express y controladores AI/Stripe
-├── database/           # Esquemas y scripts de migración SaaS
-└── uploads/            # Soporte multimedia local para fotos de dispositivos
+SySaaS/
+├── frontend/           # SPA en React (Vite), componentes modulares y diseno responsivo
+├── backend/            # API REST en Express, controladores multi-tenant y servicios AI
+│   ├── config/         # Configuracion de base de datos y migraciones
+│   ├── controllers/    # Logica de negocio por modulo (POS, Inventario, AI, etc.)
+│   ├── middleware/     # Autenticacion, SubscriptionGuard y contexto de tenant
+│   ├── routes/         # Endpoints de la API REST
+│   └── services/       # Motor de analiticas y servicios auxiliares
+├── database/           # Scripts SQL de esquema, migraciones y datos de prueba
+└── uploads/            # Almacenamiento local de adjuntos y comprobantes
 ```
 
 ---
 
 ## Licencia
 
-Este proyecto está bajo la licencia **ISC**.
+Este proyecto esta bajo la licencia **ISC**.
 
-Desarrollado para **SysTeck** © 2026.
+Desarrollado para **SySaaS** (c) 2026.

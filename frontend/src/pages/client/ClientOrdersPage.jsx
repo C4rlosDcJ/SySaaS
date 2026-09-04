@@ -84,9 +84,9 @@ export default function ClientOrdersPage() {
             };
         });
 
-        localStorage.setItem('systeck_cart', JSON.stringify(cartItems));
-        localStorage.setItem('systeck_editing_order_id', order.id);
-        localStorage.setItem('systeck_editing_order_number', order.order_number);
+        localStorage.setItem('sysaas_cart', JSON.stringify(cartItems));
+        localStorage.setItem('sysaas_editing_order_id', order.id);
+        localStorage.setItem('sysaas_editing_order_number', order.order_number);
 
         navigate('/dashboard/tienda');
     };

@@ -1,11 +1,12 @@
 {
-  "name": "systeck-backend",
+  "name": "sysaas-backend",
   "version": "1.0.0",
-  "description": "API Backend para Sistema de Gestión de Reparaciones SysTeck",
+  "description": "API Backend para Sistema de Gestión de Reparaciones SySaaS",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "nodemon server.js",
     "dev": "nodemon server.js",
+    "seed": "node ../database/seed_full_demo.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -26,9 +27,11 @@
     "jsonwebtoken": "^9.0.2",
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.6.5",
-    "nodemailer": "^6.9.8"
+    "nodemailer": "^6.9.8",
+    "stripe": "^22.5.0",
+    "uuid": "^14.0.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.11"
+    "nodemon": "^3.1.14"
   }
 }

@@ -1,90 +1,32 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import Navbar from '../components/Navbar';
+import Nothing3DCanvas from '../components/Nothing3DCanvas';
+import Tilt3DCard from '../components/Tilt3DCard';
 import {
-    Smartphone, Laptop, Monitor, Gamepad2, Watch, Tablet, Wrench,
-    ClipboardList, Search, Truck, Star, MapPin, Phone,
-    Mail, Clock, Shield, Zap, Award, ArrowRight, ChevronRight,
-    Cpu, Sparkles
+    Search,
+    ArrowRight,
+    Building2,
+    GitBranch,
+    Cpu,
+    Check,
+    CreditCard,
+    MessageSquare,
+    ShoppingBag
 } from 'lucide-react';
-import heroImage from '../assets/images/hero_visual.png';
 import './LandingPage.css';
-
-const ICON_MAP = {
-    smartphone: Smartphone,
-    phone: Smartphone,
-    laptop: Laptop,
-    monitor: Monitor,
-    desktop: Monitor,
-    gamepad: Gamepad2,
-    console: Gamepad2,
-    watch: Watch,
-    smartwatch: Watch,
-    tablet: Tablet,
-    wrench: Wrench,
-    default: Wrench
-};
-
-// Hook para animar elementos al entrar en el viewport
-function useScrollReveal() {
-    const ref = useRef(null);
-
-    useEffect(() => {
-        const el = ref.current;
-        if (!el) return;
-
-        const observer = new IntersectionObserver(
-            (entries) => {
-                entries.forEach((entry) => {
-                    if (entry.isIntersecting) {
-                        entry.target.classList.add('revealed');
-                        observer.unobserve(entry.target);
-                    }
-                });
-            },
-            { threshold: 0.12 }
-        );
-
-        observer.observe(el);
-        return () => observer.disconnect();
-    }, []);
-
-    return ref;
-}
-
-// Componente wrapper para secciones animadas
-function Reveal({ children, className = '', delay = 0 }) {
-    const ref = useScrollReveal();
-    return (
-        <div ref={ref} className={`reveal ${className}`} style={{ transitionDelay: `${delay}ms` }}>
-            {children}
-        </div>
-    );
-}
 
 export default function LandingPage() {
     const { isAuthenticated, isAdmin } = useAuth();
-    const {
-        landingShowStats,
-        landingShowWhy,
-        landingShowServices,
-        landingShowProcess,
-        landingShowTestimonials,
-        landingShowCTA,
-        landingShowContact,
-        contactAddress,
-        contactSchedule,
-        contactPhone,
-        contactEmail,
-        defaultWarrantyDays,
-        landingServices,
-        landingTestimonials,
-        businessName
-    } = useTheme();
+    const { theme, businessName } = useTheme();
+    const isDark = theme === 'dark';
+    const currentBrand = businessName || 'SYS-SAAS';
     const navigate = useNavigate();
+
     const [quickTicket, setQuickTicket] = useState('');
+    const [billingCycle, setBillingCycle] = useState('monthly'); // 'monthly' | 'yearly'
 
     const handleQuickTrack = (e) => {
         e.preventDefault();
@@ -93,312 +35,358 @@ export default function LandingPage() {
         }
     };
 
-    const processSteps = [
-        { number: '01', icon: ClipboardList, title: 'Recepción', description: 'Traes tu dispositivo o solicitas una cotización en línea.' },
-        { number: '02', icon: Search, title: 'Diagnóstico', description: 'Evaluamos tu equipo y te damos un presupuesto exacto.' },
-        { number: '03', icon: Wrench, title: 'Reparación', description: 'Nuestros técnicos expertos reparan tu dispositivo.' },
-        { number: '04', icon: Truck, title: 'Entrega', description: 'Recibes tu equipo funcionando con garantía incluida.' }
+    const saasFeatures = [
+        {
+            num: '01',
+            icon: Building2,
+            title: 'Arquitectura Multi-Tenant',
+            description: 'Aislamiento total de base de datos para cada empresa. Subdominio dedicado, inventarios y clientes 100% privados.'
+        },
+        {
+            num: '02',
+            icon: GitBranch,
+            title: 'Control Multi-Sucursal',
+            description: 'Administra todas tus sedes desde un solo panel. Traspasos de stock atómicos, staff y métricas en vivo.'
+        },
+        {
+            num: '03',
+            icon: Cpu,
+            title: 'Diagnósticos con IA & ML',
+            description: 'Modelos de machine learning que analizan fallas recurrentes, tiempos de reparación y piezas sugeridas.'
+        },
+        {
+            num: '04',
+            icon: ShoppingBag,
+            title: 'Punto de Venta POS & Facturación',
+            description: 'Cobro ágil de tickets y accesorios. Compatible con lectores de código de barras e impresión térmica.'
+        },
+        {
+            num: '05',
+            icon: CreditCard,
+            title: 'Suscripciones con Stripe',
+            description: 'Pasarela integrada con procesamiento automático de cobros recurrentes y control de cuotas SaaS.'
+        },
+        {
+            num: '06',
+            icon: MessageSquare,
+            title: 'Avisos Automáticos por WhatsApp',
+            description: 'Notifica a tus clientes de manera instantánea cuando su orden cambie de estado con link de rastreo.'
+        }
     ];
 
-    const whyUs = [
-        { icon: Shield, title: 'Garantía Real', description: 'Todas nuestras reparaciones incluyen garantía por escrito. Si algo falla, lo resolvemos sin costo.' },
-        { icon: Zap, title: 'Rapidez Comprobada', description: 'Diagnóstico en menos de 2 horas. La mayoría de reparaciones se completan el mismo día.' },
-        { icon: Award, title: 'Piezas Originales', description: 'Trabajamos exclusivamente con refacciones certificadas y de máxima calidad.' },
-        { icon: Cpu, title: 'Técnicos Certificados', description: 'Nuestro equipo cuenta con certificaciones y años de experiencia profesional.' }
+    const plans = [
+        {
+            name: 'Plan Básico',
+            slug: 'basico',
+            priceMonthly: 299,
+            priceYearly: 2990,
+            description: 'Para talleres individuales o negocios en crecimiento.',
+            features: [
+                '1 Sucursal matriz',
+                'Hasta 3 usuarios de staff',
+                '100 tickets de reparación al mes',
+                'Punto de Venta POS e Inventario',
+                'Rastreo público para clientes',
+                'Soporte técnico por correo'
+            ],
+            popular: false,
+            cta: 'Comenzar Prueba'
+        },
+        {
+            name: 'Plan Pro',
+            slug: 'pro',
+            priceMonthly: 599,
+            priceYearly: 5990,
+            description: 'La opción recomendada para cadenas en expansión.',
+            features: [
+                'Hasta 3 Sucursales en red',
+                'Hasta 10 usuarios de staff',
+                '500 tickets de reparación al mes',
+                'Punto de Venta POS & Traspasos',
+                'Diagnósticos predictivos con IA',
+                'Notificaciones por WhatsApp',
+                'Soporte prioritario'
+            ],
+            popular: true,
+            cta: 'Adquirir Plan Pro'
+        },
+        {
+            name: 'Plan Enterprise',
+            slug: 'enterprise',
+            priceMonthly: 999,
+            priceYearly: 9990,
+            description: 'Para cadenas corporativas y redes a gran escala.',
+            features: [
+                'Sucursales ilimitadas',
+                'Usuarios y técnicos ilimitados',
+                'Tickets y reparaciones ilimitadas',
+                'Módulo POS & Traspasos avanzados',
+                'Inteligencia Artificial y ML avanzada',
+                'Reportes ejecutivos de red',
+                'Soporte 24/7 y Onboarding dedicado'
+            ],
+            popular: false,
+            cta: 'Contactar Ventas'
+        }
     ];
 
     return (
-        <div className="landing-page">
+        <div className={`landing-page ${isDark ? 'theme-dark' : 'theme-light'}`}>
             <Navbar />
 
-            {/* ── HERO ── */}
-            <section className="hero">
-                <div className="hero-ambient"></div>
+            {/* ── HERO SECTION (3D CANVAS + MINIMALIST GLYPH) ── */}
+            <section className="nothing-hero">
                 <div className="container hero-container">
                     <div className="hero-content">
-                        <div className="hero-badge anim-hero-1">
-                            <Sparkles size={16} />
-                            <span>Centro de Servicio Tecnico</span>
+
+                        {/* Pixel Glyph Capsule Tag */}
+                        <div className="nothing-badge pixel-font">
+                            <span className="glyph-dot" />
+                            <span>(01) PLATAFORMA SAAS MULTI-EMPRESA</span>
                         </div>
 
-                        <h1 className="hero-title anim-hero-2">
-                            Reparacion profesional para <span className="text-accent">todos tus dispositivos</span>
+                        {/* Title */}
+                        <h1 className="nothing-hero-title">
+                            EL SISTEMA DEFINITIVO PARA <span className="nothing-highlight">TALLERES Y SOPORTE TÉCNICO</span>
                         </h1>
 
-                        <p className="hero-description anim-hero-3">
-                            Diagnostico express, refacciones originales y garantia por escrito en cada servicio.
-                            Celulares, laptops, consolas, tablets y mas.
+                        {/* Description */}
+                        <p className="nothing-hero-description">
+                            Controla múltiples sucursales, automatiza diagnósticos con Inteligencia Artificial, gestiona tu inventario descentralizado y procesa cobros con diseño minimalista de alto rendimiento.
                         </p>
 
-                        <div className="hero-buttons anim-hero-4">
+                        {/* Action Buttons (Pill Capsules) */}
+                        <div className="nothing-hero-actions">
                             <Link
-                                to={isAuthenticated ? (isAdmin ? '/admin' : '/dashboard/nueva-cotizacion') : '/register'}
-                                className="btn btn-primary btn-lg"
+                                to={isAuthenticated ? (isAdmin ? '/admin' : '/dashboard') : '/register'}
+                                className="nothing-btn-primary"
                             >
-                                {isAuthenticated ? 'Solicitar Reparación' : 'Crear Cuenta'}
+                                <span>{isAuthenticated ? 'Panel de Control' : 'Registra tu Empresa'}</span>
                                 <ArrowRight size={16} />
                             </Link>
-                            <a href="#servicios" className="btn btn-outline btn-lg">
-                                Ver Servicios
+
+                            <a href="#caracteristicas" className="nothing-btn-secondary">
+                                <span>Ver Capacidades</span>
                             </a>
                         </div>
 
-                        <form onSubmit={handleQuickTrack} className="quick-track anim-hero-5">
-                            <Search size={16} className="quick-track-icon" />
+                        {/* Public Ticket Tracker Search (Capsule Shape) */}
+                        <form onSubmit={handleQuickTrack} className="nothing-quick-track">
+                            <Search size={16} className="track-icon" />
                             <input
                                 type="text"
-                                placeholder="Rastrear ticket (ej. ST-1001)"
+                                placeholder="Rastrear ticket público (ej. REP-1001)"
                                 value={quickTicket}
                                 onChange={(e) => setQuickTicket(e.target.value)}
                             />
-                            <button type="submit">Rastrear</button>
+                            <button type="submit" className="track-btn">
+                                Rastrear
+                            </button>
                         </form>
                     </div>
 
-                    <div className="hero-visual anim-hero-img">
-                        <div className="hero-image-wrapper">
-                            <img src={heroImage} alt="Device Repair" className="hero-main-image" />
-                        </div>
+                    {/* Hero Visual 3D Interactive Canvas */}
+                    <div className="nothing-hero-visual">
+                        <Tilt3DCard className="visual-card-wrapper">
+                            <div style={{ position: 'relative', width: '100%', minHeight: '340px' }}>
+                                <Nothing3DCanvas isDark={isDark} />
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: '16px',
+                                    left: '16px',
+                                    right: '16px',
+                                    background: isDark ? 'rgba(0, 0, 0, 0.75)' : 'rgba(255, 255, 255, 0.85)',
+                                    backdropFilter: 'blur(8px)',
+                                    border: isDark ? '1px solid rgba(255, 255, 255, 0.15)' : '1px solid rgba(0, 0, 0, 0.15)',
+                                    padding: '8px 14px',
+                                    borderRadius: '9999px',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    fontSize: '11px',
+                                    fontFamily: 'monospace',
+                                    color: 'var(--nothing-text-primary)'
+                                }}>
+                                    <span>{currentBrand.toUpperCase()} 3D HARDWARE CORE</span>
+                                    <span>OPERATIVO 100%</span>
+                                </div>
+                            </div>
+                            <div className="glyph-corner top-left" />
+                            <div className="glyph-corner top-right" />
+                            <div className="glyph-corner bottom-left" />
+                            <div className="glyph-corner bottom-right" />
+                        </Tilt3DCard>
                     </div>
                 </div>
             </section>
 
-            {/* ── STATS ── */}
-            {landingShowStats && (
-                <section className="stats-section">
-                    <div className="container">
-                        <div className="stats-grid">
-                            {[
-                                { value: '500+', label: 'Equipos Reparados' },
-                                { value: '98%', label: 'Clientes Satisfechos' },
-                                { value: `${defaultWarrantyDays || 30} Días`, label: 'Garantía Completa' },
-                                { value: '<24h', label: 'Tiempo Promedio' }
-                            ].map((stat, i) => (
-                                <Reveal key={i} delay={i * 80}>
-                                    <div className="stat-item">
-                                        <span className="stat-value">{stat.value}</span>
-                                        <span className="stat-label">{stat.label}</span>
-                                    </div>
-                                </Reveal>
-                            ))}
-                        </div>
+            {/* ── BENTO PLATFORM STATS ── */}
+            <section className="nothing-stats-section">
+                <div className="container">
+                    <div className="nothing-stats-grid">
+                        {[
+                            { code: '01', value: '99.9%', label: 'Uptime Garantizado' },
+                            { code: '02', value: 'MULTI', label: 'Sedes Descentralizadas' },
+                            { code: '03', value: 'AI/ML', label: 'Diagnósticos Asistidos' },
+                            { code: '04', value: 'STRIPE', label: 'Pasarela Integrada' }
+                        ].map((stat, i) => (
+                            <Tilt3DCard key={i} className="nothing-stat-card">
+                                <span className="stat-code pixel-font">({stat.code})</span>
+                                <div className="stat-value">{stat.value}</div>
+                                <div className="stat-label">{stat.label}</div>
+                            </Tilt3DCard>
+                        ))}
                     </div>
-                </section>
-            )}
+                </div>
+            </section>
 
-            {/* ── WHY US ── */}
-            {landingShowWhy && (
-                <section className="section why-section">
-                    <div className="container">
-                        <Reveal>
-                            <div className="section-header">
-                                <span className="section-tag">¿Por qué elegirnos?</span>
-                                <h2>Confianza respaldada por <span className="text-accent">resultados</span></h2>
-                            </div>
-                        </Reveal>
-                        <div className="why-grid">
-                            {whyUs.map((item, i) => (
-                                <Reveal key={i} delay={i * 100}>
-                                    <div className="why-card">
-                                        <div className="why-icon">
-                                            <item.icon size={22} />
-                                        </div>
-                                        <h3>{item.title}</h3>
-                                        <p>{item.description}</p>
-                                    </div>
-                                </Reveal>
-                            ))}
-                        </div>
+            {/* ── CORE SAAS CAPABILITIES (BENTO GRID WITH 3D TILT) ── */}
+            <section id="caracteristicas" className="nothing-section">
+                <div className="container">
+                    <div className="nothing-section-header">
+                        <span className="nothing-badge pixel-font">
+                            <span className="glyph-dot" />
+                            <span>(02) CAPACIDADES DE PLATAFORMA</span>
+                        </span>
+                        <h2 className="nothing-section-title">
+                            TECNOLOGÍA DE VANGUARDIA PARA ESCALAR TU NEGOCIO
+                        </h2>
                     </div>
-                </section>
-            )}
 
-            {/* ── SERVICES ── */}
-            {landingShowServices && (
-                <section id="servicios" className="section services-section">
-                    <div className="container">
-                        <Reveal>
-                            <div className="section-header">
-                                <span className="section-tag">Especialidades</span>
-                                <h2>Reparamos <span className="text-accent">todo tipo</span> de dispositivos</h2>
-                                <p>Servicio técnico especializado con la mejor calidad y garantía.</p>
-                            </div>
-                        </Reveal>
-                        <div className="services-grid">
-                            {landingServices.map((service, i) => {
-                                const ServiceIcon = ICON_MAP[service.icon?.toLowerCase()] || Wrench;
-                                return (
-                                    <Reveal key={i} delay={i * 80}>
-                                        <div className="service-card" style={{ '--accent': service.color }}>
-                                            <div className="service-icon-wrap">
-                                                <ServiceIcon size={24} />
-                                            </div>
-                                            <h3>{service.title}</h3>
-                                            <p>{service.description}</p>
-                                            <Link to={isAuthenticated ? '/dashboard/nueva-cotizacion' : '/register'} className="service-link">
-                                                Cotizar <ChevronRight size={14} />
-                                            </Link>
-                                        </div>
-                                    </Reveal>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </section>
-            )}
-
-            {/* ── PROCESS ── */}
-            {landingShowProcess && (
-                <section id="proceso" className="section process-section">
-                    <div className="container">
-                        <Reveal>
-                            <div className="section-header">
-                                <span className="section-tag">Proceso</span>
-                                <h2>Cuatro pasos, <span className="text-accent">cero complicaciones</span></h2>
-                                <p>Te mantenemos informado en cada etapa del servicio.</p>
-                            </div>
-                        </Reveal>
-                        <div className="process-grid">
-                            {processSteps.map((step, i) => (
-                                <Reveal key={i} delay={i * 120}>
-                                    <div className="process-card">
-                                        <div className="process-number">{step.number}</div>
-                                        <div className="process-icon-wrap">
-                                            <step.icon size={20} />
-                                        </div>
-                                        <h3>{step.title}</h3>
-                                        <p>{step.description}</p>
-                                    </div>
-                                </Reveal>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-            )}
-
-            {/* ── TESTIMONIALS ── */}
-            {landingShowTestimonials && (
-                <section className="section testimonials-section">
-                    <div className="container">
-                        <Reveal>
-                            <div className="section-header">
-                                <span className="section-tag">Clientes</span>
-                                <h2>Lo que opinan de <span className="text-accent">nuestro servicio</span></h2>
-                            </div>
-                        </Reveal>
-                        <div className="testimonials-grid">
-                            {landingTestimonials.map((t, i) => (
-                                <Reveal key={i} delay={i * 100}>
-                                    <div className="testimonial-card">
-                                        <div className="testimonial-stars">
-                                            {[...Array(t.rating || 5)].map((_, j) => (
-                                                <Star key={j} size={14} fill="#f59e0b" color="#f59e0b" />
-                                            ))}
-                                        </div>
-                                        <p className="testimonial-text">"{t.text}"</p>
-                                        <div className="testimonial-author">
-                                            <div className="author-avatar">{t.name ? t.name.charAt(0) : '?'}</div>
-                                            <div>
-                                                <span className="author-name">{t.name}</span>
-                                                <span className="author-device">{t.device}</span>
-                                            </div>
+                    <div className="nothing-bento-grid">
+                        {saasFeatures.map((item, i) => {
+                            const Icon = item.icon;
+                            return (
+                                <Tilt3DCard key={i} className="nothing-bento-card">
+                                    <div className="bento-card-top">
+                                        <span className="bento-num pixel-font">({item.num})</span>
+                                        <div className="bento-icon-wrapper">
+                                            <Icon size={18} />
                                         </div>
                                     </div>
-                                </Reveal>
-                            ))}
+                                    <h3 className="bento-title">{item.title}</h3>
+                                    <p className="bento-desc">{item.description}</p>
+                                </Tilt3DCard>
+                            );
+                        })}
+                    </div>
+                </div>
+            </section>
+
+            {/* ── SAAS PRICING PLANS ── */}
+            <section id="planes" className="nothing-section nothing-pricing-section">
+                <div className="container">
+                    <div className="nothing-section-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                        <span className="nothing-badge pixel-font">
+                            <span className="glyph-dot" />
+                            <span>(03) SUSCRIPCIONES Y PLANES</span>
+                        </span>
+                        <h2 className="nothing-section-title">
+                            PLANES TRANSPARENTES SIN COSTOS OCULTOS
+                        </h2>
+
+                        {/* Selector Mensual / Anual */}
+                        <div className="nothing-cycle-selector">
+                            <button
+                                type="button"
+                                className={`cycle-btn ${billingCycle === 'monthly' ? 'active' : ''}`}
+                                onClick={() => setBillingCycle('monthly')}
+                            >
+                                Facturación Mensual
+                            </button>
+                            <button
+                                type="button"
+                                className={`cycle-btn ${billingCycle === 'yearly' ? 'active' : ''}`}
+                                onClick={() => setBillingCycle('yearly')}
+                            >
+                                Anual (2 Meses Gratis)
+                            </button>
                         </div>
                     </div>
-                </section>
-            )}
 
-            {/* ── CTA ── */}
-            {landingShowCTA && (
-                <section className="section cta-section">
-                    <div className="container">
-                        <Reveal>
-                            <div className="cta-card">
-                                <div className="cta-content">
-                                    <h2>¿Tu equipo necesita asistencia?</h2>
-                                    <p>Cotiza gratis y recibe diagnóstico express el mismo día. Sin compromiso.</p>
+                    <div className="nothing-pricing-grid">
+                        {plans.map((plan, i) => {
+                            const price = billingCycle === 'yearly' ? plan.priceYearly : plan.priceMonthly;
+                            return (
+                                <Tilt3DCard
+                                    key={i}
+                                    className={`nothing-pricing-card ${plan.popular ? 'popular' : ''}`}
+                                >
+                                    {plan.popular && (
+                                        <div className="popular-glyph-badge pixel-font">
+                                            <span>RECOMENDADO</span>
+                                        </div>
+                                    )}
+
+                                    <div className="pricing-card-header">
+                                        <h3 className="plan-name">{plan.name}</h3>
+                                        <p className="plan-desc">{plan.description}</p>
+                                    </div>
+
+                                    <div className="pricing-cost">
+                                        <span className="price-val">${price}</span>
+                                        <span className="price-unit">MXN /{billingCycle === 'yearly' ? 'año' : 'mes'}</span>
+                                    </div>
+
+                                    <ul className="plan-features-list">
+                                        {plan.features.map((feat, idx) => (
+                                            <li key={idx}>
+                                                <Check size={14} className="feature-check" />
+                                                <span>{feat}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+
                                     <Link
-                                        to={isAuthenticated ? '/dashboard/nueva-cotizacion' : '/register'}
-                                        className="btn btn-primary btn-lg"
+                                        to="/register"
+                                        className={plan.popular ? 'nothing-btn-primary w-full' : 'nothing-btn-secondary w-full'}
                                     >
-                                        Solicitar Cotización
-                                        <ArrowRight size={16} />
+                                        {plan.cta}
                                     </Link>
-                                </div>
-                                <div className="cta-visual">
-                                    <div className="cta-icon-ring">
-                                        <Smartphone size={40} />
-                                    </div>
-                                </div>
-                            </div>
-                        </Reveal>
+                                </Tilt3DCard>
+                            );
+                        })}
                     </div>
-                </section>
-            )}
-
-            {/* ── CONTACT ── */}
-            {landingShowContact && (
-                <section id="contacto" className="section contact-section">
-                    <div className="container">
-                        <Reveal>
-                            <div className="section-header">
-                                <span className="section-tag">Contacto</span>
-                                <h2>Visítanos o <span className="text-accent">escríbenos</span></h2>
-                            </div>
-                        </Reveal>
-                        <div className="contact-grid">
-                            {[
-                                { icon: MapPin, title: 'Ubicación', info: contactAddress },
-                                { icon: Phone, title: 'Teléfono', info: contactPhone },
-                                { icon: Mail, title: 'Correo', info: contactEmail },
-                                { icon: Clock, title: 'Horario', info: contactSchedule }
-                            ].map((c, i) => (
-                                <Reveal key={i} delay={i * 80}>
-                                    <div className="contact-card">
-                                        <div className="contact-icon-wrap">
-                                            <c.icon size={20} />
-                                        </div>
-                                        <h4>{c.title}</h4>
-                                        <p>{c.info}</p>
-                                    </div>
-                                </Reveal>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-            )}
+                </div>
+            </section>
 
             {/* ── FOOTER ── */}
-            <footer className="footer">
+            <footer className="nothing-footer">
                 <div className="container">
-                    <div className="footer-content">
+                    <div className="footer-top">
                         <div className="footer-brand">
-                            <div className="footer-logo">
-                                <Wrench size={24} className="text-primary" />
-                                <span>{businessName || 'SysTeck'}</span>
+                            <div className="footer-logo pixel-font">
+                                <span className="glyph-dot" />
+                                <strong>{currentBrand.toUpperCase()}</strong>
                             </div>
-                            <p>Servicio técnico profesional para todos tus dispositivos electrónicos.</p>
+                            <p className="footer-tagline">
+                                Infraestructura tecnológica para administración y escalamiento de cadenas de servicio técnico.
+                            </p>
                         </div>
-                        <div className="footer-links">
+
+                        <div className="footer-nav">
                             <div className="footer-col">
-                                <h4>Servicios</h4>
-                                <a href="#servicios">Celulares</a>
-                                <a href="#servicios">Laptops</a>
-                                <a href="#servicios">Consolas</a>
+                                <h4 className="pixel-font">(PLATAFORMA)</h4>
+                                <ul>
+                                    <li><a href="#caracteristicas">Capacidades</a></li>
+                                    <li><a href="#planes">Precios y Planes</a></li>
+                                    <li><Link to="/rastrear">Rastreo de Ticket</Link></li>
+                                </ul>
                             </div>
+
                             <div className="footer-col">
-                                <h4>Empresa</h4>
-                                <a href="#proceso">Proceso</a>
-                                <a href="#contacto">Contacto</a>
-                                <Link to="/rastrear">Rastrear</Link>
+                                <h4 className="pixel-font">(ACCESO)</h4>
+                                <ul>
+                                    <li><Link to="/login">Iniciar Sesión</Link></li>
+                                    <li><Link to="/register">Registrar Empresa</Link></li>
+                                </ul>
                             </div>
                         </div>
                     </div>
+
                     <div className="footer-bottom">
-                        <p>© {new Date().getFullYear()} {businessName || 'SysTeck'}. Todos los derechos reservados.</p>
+                        <p>© {new Date().getFullYear()} {currentBrand.toUpperCase()}. ARQUITECTURA MULTI-TENANT & MULTI-SUCURSAL.</p>
+                        <p className="footer-mono-status">ESTADO DEL SISTEMA: OPERATIVO 100%</p>
                     </div>
                 </div>
             </footer>

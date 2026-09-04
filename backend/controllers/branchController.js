@@ -1,14 +1,35 @@
 const db = require('../config/database');
 
-// Listar todas las sucursales de mi empresa
+// Listar todas las sucursales de mi empresa con métricas operativas
 exports.getBranches = async (req, res) => {
     try {
         const tenantId = req.tenantCtx.tenantId;
-        const [branches] = await db.query(
-            'SELECT * FROM branches WHERE tenant_id = ? ORDER BY is_main DESC, name ASC',
-            [tenantId]
-        );
-        res.json(branches);
+        const [branches] = await db.query(`
+            SELECT 
+                b.*,
+                (SELECT COUNT(*) FROM user_branch_assignments uba WHERE uba.branch_id = b.id) as staff_count,
+                (SELECT COUNT(*) FROM repairs r WHERE r.branch_id = b.id AND r.status NOT IN ('delivered', 'cancelled')) as active_repairs,
+                (SELECT COUNT(*) FROM repairs r WHERE r.branch_id = b.id) as total_repairs,
+                (SELECT COUNT(*) FROM sales s WHERE s.branch_id = b.id AND s.status = 'completed') as total_sales,
+                (
+                    (SELECT COALESCE(SUM(total_cost), 0) FROM repairs r WHERE r.branch_id = b.id) +
+                    (SELECT COALESCE(SUM(total), 0) FROM sales s WHERE s.branch_id = b.id AND s.status = 'completed')
+                ) as total_revenue
+            FROM branches b
+            WHERE b.tenant_id = ?
+            ORDER BY b.is_main DESC, b.name ASC
+        `, [tenantId]);
+
+        const formatted = branches.map(b => ({
+            ...b,
+            staff_count: parseInt(b.staff_count || 0, 10),
+            active_repairs: parseInt(b.active_repairs || 0, 10),
+            total_repairs: parseInt(b.total_repairs || 0, 10),
+            total_sales: parseInt(b.total_sales || 0, 10),
+            total_revenue: parseFloat(b.total_revenue || 0)
+        }));
+
+        res.json(formatted);
     } catch (error) {
         console.error('[BRANCHES] Error al obtener sucursales:', error);
         res.status(500).json({ message: 'Error al obtener sucursales.' });

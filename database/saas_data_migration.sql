@@ -1,10 +1,10 @@
 -- =====================================================
--- SysTeck -- SaaS Data Migration Script
+-- SySaaS -- SaaS Data Migration Script
 -- Run this AFTER saas_migration.sql
 -- Migrates existing data to a default tenant and branch
 -- =====================================================
 
-USE systeck;
+USE sysaas;
 
 -- =====================================================
 -- PASO 9: Migrar datos existentes al tenant por defecto
@@ -49,7 +49,7 @@ WHERE role = 'admin' AND tenant_id = @default_tenant_id;
 
 -- Crear SuperAdmin de la plataforma si no existe
 INSERT INTO users (email, password, first_name, last_name, role, is_active, email_verified)
-SELECT 'superadmin@systeck.com',
+SELECT 'superadmin@sysaas.com',
     '$2a$10$5HjXkF/XpIdTcLEzlKG8ZeSVY33xY.YINlb6K1O6wwt03ljX3CiZm',
     'Super', 'Admin', 'superadmin', TRUE, TRUE
 FROM dual

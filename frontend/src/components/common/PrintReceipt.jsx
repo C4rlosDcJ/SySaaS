@@ -1,14 +1,16 @@
 import { Printer, X } from 'lucide-react';
 import { formatCurrency, formatDateTime } from '../../utils/constants';
+import { useTenant } from '../../context/TenantContext';
 import './PrintReceipt.css';
 
 export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', settings = {} }) {
+    const { tenant } = useTenant();
     if (!isOpen || !data) return null;
 
-    const businessName = settings.business_name || 'SysTeck';
-    const contactEmail = settings.contact_email || '';
-    const contactPhone = settings.contact_phone || '';
-    const contactAddress = settings.business_address || 'Dirección de la empresa';
+    const businessName = tenant?.company_name || tenant?.name || settings.business_name || data.tenant_name || data.company_name || 'Mi Empresa';
+    const contactEmail = settings.contact_email || tenant?.email || '';
+    const contactPhone = settings.contact_phone || tenant?.phone || '';
+    const contactAddress = settings.business_address || tenant?.address || 'Dirección de la empresa';
 
     const trackingCode = data.ticket_number || data.sale_number;
     const trackingUrl = `${window.location.origin}/rastrear?ticketId=${encodeURIComponent(trackingCode || '')}`;

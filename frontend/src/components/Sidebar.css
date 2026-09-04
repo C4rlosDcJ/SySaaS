@@ -12,21 +12,29 @@
 
 /* Header */
 .sidebar-header {
-    padding: var(--sp-5) var(--sp-4);
+    padding: 16px 16px 14px;
     border-bottom: 1px solid var(--color-border);
 }
 .sidebar-logo {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
-    font-family: var(--font-mono);
-    font-size: var(--font-md);
-    font-weight: 600;
-    letter-spacing: 0.08em;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    line-height: 1.3;
     text-transform: uppercase;
+    min-height: 32px;
 }
-.sidebar-logo .logo-icon { color: var(--color-text); }
-.logo-text { color: var(--color-text); }
+.sidebar-logo .logo-icon { color: var(--color-text); flex-shrink: 0; }
+.logo-text { 
+    color: var(--color-text);
+    word-break: break-word;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
 
 /* Nav */
 .sidebar-search-trigger {

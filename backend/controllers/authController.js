@@ -5,7 +5,99 @@ const { validationResult } = require('express-validator');
 const crypto = require('crypto');
 const emailService = require('../services/emailService');
 
-// Registro de usuario (multi-tenant)
+// Registro de nueva Empresa SaaS (Onboarding)
+exports.registerCompany = async (req, res) => {
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const { company_name, slug, email, password, first_name, last_name, phone } = req.body;
+
+        if (!company_name || !email || !password || !first_name || !last_name) {
+            return res.status(400).json({ message: 'Todos los campos marcados como obligatorios son requeridos.' });
+        }
+
+        // 1. Resolver o formatear slug
+        const finalSlug = slug ? slug.toLowerCase().replace(/[^a-z0-9-]/g, '') : company_name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+
+        // Validar si el slug ya existe
+        const [existingTenant] = await connection.query('SELECT id FROM tenants WHERE slug = ?', [finalSlug]);
+        if (existingTenant.length > 0) {
+            await connection.rollback();
+            return res.status(400).json({ message: 'El identificador de empresa (slug) ya está en uso.' });
+        }
+
+        // Validar si el email ya existe
+        const [existingUser] = await connection.query('SELECT id FROM users WHERE email = ?', [email]);
+        if (existingUser.length > 0) {
+            await connection.rollback();
+            return res.status(400).json({ message: 'El correo electrónico ya está registrado.' });
+        }
+
+        // 2. Obtener plan trial / inicial por defecto
+        const [defaultPlan] = await connection.query('SELECT id FROM saas_plans ORDER BY id ASC LIMIT 1');
+        const planId = defaultPlan.length > 0 ? defaultPlan[0].id : 1;
+
+        // 3. Crear Tenant
+        const { v4: uuidv4 } = require('uuid');
+        const tenantUuid = uuidv4();
+        const [tenantResult] = await connection.query(
+            `INSERT INTO tenants (uuid, company_name, slug, plan_id, subscription_status)
+             VALUES (?, ?, ?, ?, 'active')`,
+            [tenantUuid, company_name, finalSlug, planId]
+        );
+        const tenantId = tenantResult.insertId;
+
+        // 4. Crear Sucursal Principal para la Empresa
+        const [branchResult] = await connection.query(
+            `INSERT INTO branches (tenant_id, code, name, is_main, phone)
+             VALUES (?, 'SUC-001', 'Matriz Principal', TRUE, ?)`,
+            [tenantId, phone || null]
+        );
+        const branchId = branchResult.insertId;
+
+        // 5. Crear Usuario Administrador de la Empresa
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const [userResult] = await connection.query(
+            `INSERT INTO users (email, password, first_name, last_name, phone, role, tenant_id, branch_id)
+             VALUES (?, ?, ?, ?, ?, 'admin', ?, ?)`,
+            [email, hashedPassword, first_name, last_name, phone || null, tenantId, branchId]
+        );
+
+        await connection.commit();
+
+        // 6. Generar JWT Token
+        const token = jwt.sign(
+            { id: userResult.insertId, tenant_id: tenantId },
+            process.env.JWT_SECRET,
+            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        );
+
+        res.status(201).json({
+            message: 'Empresa registrada exitosamente.',
+            token,
+            user: {
+                id: userResult.insertId,
+                email,
+                first_name,
+                last_name,
+                role: 'admin',
+                tenant_id: tenantId,
+                branch_id: branchId,
+                company_name,
+                slug: finalSlug
+            }
+        });
+    } catch (error) {
+        await connection.rollback();
+        console.error('[AUTH] Error en registro de empresa:', error);
+        res.status(500).json({ message: 'Error al registrar la empresa.' });
+    } finally {
+        connection.release();
+    }
+};
+
+// Registro de usuario cliente (multi-tenant)
 exports.register = async (req, res) => {
     try {
         const errors = validationResult(req);
@@ -164,8 +256,8 @@ exports.login = async (req, res) => {
                     branches = branchData;
                     defaultBranchId = user.branch_id;
                 }
-            } else if (user.role === 'tenant_admin') {
-                // Tenant admin: acceso a todas las sucursales
+            } else if (['tenant_admin', 'admin', 'superadmin'].includes(user.role)) {
+                // Tenant admin / Admin: acceso a todas las sucursales del tenant
                 const [allBranches] = await db.query(
                     'SELECT id, code, name, is_main FROM branches WHERE tenant_id = ? AND is_active = TRUE ORDER BY is_main DESC, name',
                     [user.tenant_id]
@@ -180,7 +272,7 @@ exports.login = async (req, res) => {
                     ? defaultAssign[0].branch_id 
                     : (allBranches.find(b => b.is_main)?.id || allBranches[0]?.id);
             } else {
-                // Staff (technician, cashier, branch_manager): solo sucursales asignadas
+                // Staff (technician, cashier, branch_manager): solo sucursales asignadas o sucursal base
                 const [assignedBranches] = await db.query(
                     `SELECT b.id, b.code, b.name, b.is_main, uba.is_default
                      FROM branches b
@@ -189,9 +281,18 @@ exports.login = async (req, res) => {
                      ORDER BY uba.is_default DESC, b.name`,
                     [user.id]
                 );
-                branches = assignedBranches;
-                const defaultAssign = assignedBranches.find(b => b.is_default);
-                defaultBranchId = defaultAssign ? defaultAssign.id : (assignedBranches[0]?.id || null);
+                if (assignedBranches.length > 0) {
+                    branches = assignedBranches;
+                    const defaultAssign = assignedBranches.find(b => b.is_default);
+                    defaultBranchId = defaultAssign ? defaultAssign.id : (assignedBranches[0]?.id || null);
+                } else if (user.branch_id) {
+                    const [fallbackBranch] = await db.query(
+                        'SELECT id, code, name, is_main FROM branches WHERE id = ? AND is_active = TRUE',
+                        [user.branch_id]
+                    );
+                    branches = fallbackBranch;
+                    defaultBranchId = user.branch_id;
+                }
             }
         }
 
@@ -206,7 +307,9 @@ exports.login = async (req, res) => {
                 phone: user.phone,
                 role: user.role,
                 tenant_id: user.tenant_id,
-                branch_id: user.branch_id
+                branch_id: user.branch_id,
+                company_name: tenant?.company_name,
+                slug: tenant?.slug
             },
             tenant,
             branches,
@@ -218,12 +321,11 @@ exports.login = async (req, res) => {
     }
 };
 
-// Obtener usuario actual (con datos de tenant y sucursales)
+// Obtener usuario actual autenticado (con tenant y sucursales)
 exports.getMe = async (req, res) => {
     try {
         const [users] = await db.query(
-            `SELECT id, email, first_name, last_name, phone, address, role, avatar, created_at, tenant_id, branch_id 
-             FROM users WHERE id = ?`,
+            'SELECT id, email, first_name, last_name, phone, address, role, is_active, tenant_id, branch_id, created_at FROM users WHERE id = ?',
             [req.user.id]
         );
 
@@ -240,10 +342,9 @@ exports.getMe = async (req, res) => {
 
         if (userData.tenant_id) {
             const [tenants] = await db.query(
-                `SELECT t.id, t.company_name, t.slug, t.logo_url, t.primary_color, t.currency,
+                `SELECT t.id, t.company_name, t.slug, t.logo_url, t.primary_color, t.currency, 
                         t.tax_rate, t.subscription_status, t.trial_ends_at,
-                        sp.name as plan_name, sp.slug as plan_slug,
-                        sp.max_branches, sp.max_users, sp.features as plan_features
+                        sp.name as plan_name, sp.slug as plan_slug
                  FROM tenants t
                  JOIN saas_plans sp ON t.plan_id = sp.id
                  WHERE t.id = ?`,
@@ -263,7 +364,7 @@ exports.getMe = async (req, res) => {
                     branches = branchData;
                     defaultBranchId = userData.branch_id;
                 }
-            } else if (userData.role === 'tenant_admin' || userData.role === 'superadmin') {
+            } else if (['tenant_admin', 'admin', 'superadmin'].includes(userData.role)) {
                 const [allBranches] = await db.query(
                     'SELECT id, code, name, is_main FROM branches WHERE tenant_id = ? AND is_active = TRUE ORDER BY is_main DESC, name',
                     [userData.tenant_id]
@@ -285,9 +386,18 @@ exports.getMe = async (req, res) => {
                      ORDER BY uba.is_default DESC, b.name`,
                     [userData.id]
                 );
-                branches = assignedBranches;
-                const defaultAssign = assignedBranches.find(b => b.is_default);
-                defaultBranchId = defaultAssign ? defaultAssign.id : (assignedBranches[0]?.id || null);
+                if (assignedBranches.length > 0) {
+                    branches = assignedBranches;
+                    const defaultAssign = assignedBranches.find(b => b.is_default);
+                    defaultBranchId = defaultAssign ? defaultAssign.id : (assignedBranches[0]?.id || null);
+                } else if (userData.branch_id) {
+                    const [fallbackBranch] = await db.query(
+                        'SELECT id, code, name, is_main FROM branches WHERE id = ? AND is_active = TRUE',
+                        [userData.branch_id]
+                    );
+                    branches = fallbackBranch;
+                    defaultBranchId = userData.branch_id;
+                }
             }
         }
 
@@ -471,5 +581,296 @@ exports.resetPassword = async (req, res) => {
     } catch (error) {
         console.error('[AUTH] Error en resetPassword:', error);
         res.status(500).json({ message: 'Error al restablecer la contraseña.' });
+    }
+};
+
+// Impersonar Tenant por SuperAdmin (Soporte Técnico Asistido)
+exports.impersonateTenant = async (req, res) => {
+    try {
+        const { tenant_id } = req.body;
+        if (!tenant_id) {
+            return res.status(400).json({ message: 'tenant_id es requerido para impersonar.' });
+        }
+
+        // Buscar un usuario tenant_admin o admin de esa empresa
+        const [users] = await db.query(
+            "SELECT id, email, first_name, last_name, role, tenant_id, branch_id FROM users WHERE tenant_id = ? AND role IN ('tenant_admin', 'admin') ORDER BY (role = 'tenant_admin') DESC, id ASC LIMIT 1",
+            [tenant_id]
+        );
+
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'No se encontró un usuario administrador en esta empresa.' });
+        }
+
+        const targetUser = users[0];
+
+        // Generar JWT temporal con el tenant_id de la empresa a la que se da soporte
+        const token = jwt.sign(
+            { id: targetUser.id, tenant_id: targetUser.tenant_id, is_impersonated: true },
+            process.env.JWT_SECRET,
+            { expiresIn: '2h' }
+        );
+
+        // Obtener datos de la empresa
+        const [tenants] = await db.query(
+            `SELECT t.id, t.company_name, t.slug, t.logo_url, t.primary_color, t.currency, 
+                    t.tax_rate, t.subscription_status, t.trial_ends_at,
+                    sp.name as plan_name, sp.slug as plan_slug
+             FROM tenants t
+             JOIN saas_plans sp ON t.plan_id = sp.id
+             WHERE t.id = ?`,
+            [tenant_id]
+        );
+
+        // Obtener sucursales de la empresa
+        const [branches] = await db.query(
+            'SELECT id, code, name, address, phone, email, is_main FROM branches WHERE tenant_id = ? AND is_active = TRUE',
+            [tenant_id]
+        );
+
+        res.json({
+            message: `Impersonación exitosa. Modos soporte activo para ${tenants[0]?.company_name}`,
+            token,
+            user: {
+                id: targetUser.id,
+                email: targetUser.email,
+                first_name: `[Soporte] ${targetUser.first_name}`,
+                last_name: targetUser.last_name,
+                role: targetUser.role,
+                tenant_id: targetUser.tenant_id,
+                branch_id: targetUser.branch_id
+            },
+            tenant: tenants[0] || null,
+            branches,
+            default_branch_id: branches[0]?.id || null
+        });
+    } catch (error) {
+        console.error('[AUTH] Error al impersonar empresa:', error);
+        res.status(500).json({ message: 'Error al impersonar empresa.' });
+    }
+};
+
+// Obtener usuarios/personal del tenant
+exports.getTenantUsers = async (req, res) => {
+    try {
+        const tenantId = req.tenantCtx.tenantId;
+        const isBranchManager = req.user.role === 'branch_manager';
+        const userBranchId = req.user.branch_id || req.tenantCtx.branchId;
+
+        let query = `
+            SELECT u.id, u.email, u.first_name, u.last_name, u.phone, u.role, u.is_active, u.created_at,
+                    u.branch_id, b.name as branch_name
+             FROM users u
+             LEFT JOIN branches b ON u.branch_id = b.id
+             WHERE u.tenant_id = ? AND u.role != 'client'
+        `;
+        const params = [tenantId];
+
+        // Si es gerente de sucursal, ver los miembros de su sede
+        if (isBranchManager && userBranchId) {
+            query += ' AND (u.branch_id = ? OR u.id = ?)';
+            params.push(userBranchId, req.user.id);
+        }
+
+        query += ' ORDER BY u.created_at DESC';
+
+        const [users] = await db.query(query, params);
+
+        res.json(users);
+    } catch (error) {
+        console.error('[AUTH] Error al obtener usuarios del tenant:', error);
+        res.status(500).json({ message: 'Error al obtener usuarios de la empresa.' });
+    }
+};
+
+// Crear usuario de personal (Admin de Empresa o Gerente de Sucursal)
+exports.createTenantUser = async (req, res) => {
+    try {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+
+        const { email, password, first_name, last_name, phone, role, branch_id } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
+        const isBranchManager = req.user.role === 'branch_manager';
+        const managerBranchId = req.user.branch_id || req.tenantCtx.branchId;
+
+        // Validar permisos de rol según el rango de quien crea
+        if (isBranchManager) {
+            // Un gerente SOLO puede crear roles con menor rango que él
+            const allowedForManager = ['technician', 'salesperson', 'cashier'];
+            if (!allowedForManager.includes(role)) {
+                return res.status(403).json({ 
+                    message: 'No tienes permisos para asignar este rol. Como Gerente solo puedes crear Técnicos, Vendedores o Cajeros.' 
+                });
+            }
+        }
+
+        const allowedRoles = ['technician', 'salesperson', 'cashier', 'branch_manager', 'tenant_admin', 'admin'];
+        let finalRole = allowedRoles.includes(role) ? role : 'technician';
+        if (finalRole === 'admin') finalRole = 'tenant_admin';
+
+        // Verificar si el email ya existe en el sistema
+        const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
+        if (existing.length > 0) {
+            return res.status(400).json({ message: 'El correo electrónico ya está registrado.' });
+        }
+
+        // Determinar la sucursal de asignación (si es gerente, forzar su sucursal)
+        let targetBranchId = isBranchManager ? managerBranchId : (branch_id || req.tenantCtx.branchId);
+        if (!targetBranchId) {
+            const [mainBranch] = await db.query('SELECT id FROM branches WHERE tenant_id = ? AND is_main = TRUE LIMIT 1', [tenantId]);
+            if (mainBranch.length > 0) {
+                targetBranchId = mainBranch[0].id;
+            }
+        }
+
+        // Hash de contraseña
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Crear usuario
+        const [result] = await db.query(
+            `INSERT INTO users (tenant_id, branch_id, email, password, first_name, last_name, phone, role)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [tenantId, targetBranchId || null, email, hashedPassword, first_name, last_name, phone || null, finalRole]
+        );
+
+        res.status(201).json({
+            message: 'Usuario de personal creado exitosamente.',
+            user: {
+                id: result.insertId,
+                email,
+                first_name,
+                last_name,
+                role: finalRole,
+                branch_id: targetBranchId
+            }
+        });
+    } catch (error) {
+        console.error('[AUTH] Error al crear usuario de personal:', error);
+        res.status(500).json({ message: 'Error al crear el usuario.' });
+    }
+};
+
+// Actualizar usuario de personal
+exports.updateTenantUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { first_name, last_name, phone, role, branch_id, password, is_active } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
+        const isBranchManager = req.user.role === 'branch_manager';
+        const managerBranchId = req.user.branch_id || req.tenantCtx.branchId;
+
+        // Verificar que el usuario pertenezca al tenant y no sea cliente
+        const [users] = await db.query(
+            'SELECT id, role, branch_id FROM users WHERE id = ? AND tenant_id = ? AND role != "client"',
+            [id, tenantId]
+        );
+
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado o no pertenece a tu empresa.' });
+        }
+
+        const targetUser = users[0];
+
+        if (isBranchManager) {
+            // Un gerente no puede modificar administradores ni a otros gerentes
+            const higherRoles = ['tenant_admin', 'admin', 'superadmin', 'branch_manager'];
+            if (higherRoles.includes(targetUser.role) && targetUser.id !== req.user.id) {
+                return res.status(403).json({ 
+                    message: 'No tienes permisos para modificar a administradores o gerentes de sucursal.' 
+                });
+            }
+
+            // No puede asignar roles iguales o superiores
+            if (role && !['technician', 'salesperson', 'cashier'].includes(role)) {
+                return res.status(403).json({ 
+                    message: 'No tienes permisos para asignar este rol. Solo puedes gestionar Técnicos, Vendedores o Cajeros.' 
+                });
+            }
+        }
+
+        const allowedRoles = ['technician', 'salesperson', 'cashier', 'branch_manager', 'tenant_admin', 'admin'];
+        let finalRole = allowedRoles.includes(role) ? role : null;
+        if (finalRole === 'admin') finalRole = 'tenant_admin';
+
+        const updates = [];
+        const params = [];
+
+        if (first_name !== undefined) { updates.push('first_name = ?'); params.push(first_name); }
+        if (last_name !== undefined) { updates.push('last_name = ?'); params.push(last_name); }
+        if (phone !== undefined) { updates.push('phone = ?'); params.push(phone); }
+        
+        if (finalRole && !isBranchManager) { 
+            updates.push('role = ?'); 
+            params.push(finalRole); 
+        } else if (finalRole && isBranchManager && ['technician', 'salesperson', 'cashier'].includes(finalRole)) { 
+            updates.push('role = ?'); 
+            params.push(finalRole); 
+        }
+        
+        if (branch_id !== undefined && !isBranchManager) { 
+            updates.push('branch_id = ?'); 
+            params.push(branch_id || null); 
+        } else if (isBranchManager) {
+            updates.push('branch_id = ?');
+            params.push(managerBranchId);
+        }
+
+        if (is_active !== undefined) { updates.push('is_active = ?'); params.push(is_active); }
+
+        if (password && password.trim().length >= 6) {
+            const hashedPassword = await bcrypt.hash(password, 10);
+            updates.push('password = ?');
+            params.push(hashedPassword);
+        }
+
+        if (updates.length > 0) {
+            params.push(id, tenantId);
+            await db.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ? AND tenant_id = ?`, params);
+        }
+
+        res.json({ message: 'Usuario actualizado exitosamente.' });
+    } catch (error) {
+        console.error('[AUTH] Error al actualizar usuario de personal:', error);
+        res.status(500).json({ message: 'Error al actualizar usuario.' });
+    }
+};
+
+// Cambiar estado activo/inactivo del usuario
+exports.toggleTenantUserStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const tenantId = req.tenantCtx.tenantId;
+        const isBranchManager = req.user.role === 'branch_manager';
+
+        const [users] = await db.query(
+            'SELECT id, role, is_active FROM users WHERE id = ? AND tenant_id = ? AND role != "client"',
+            [id, tenantId]
+        );
+
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado.' });
+        }
+
+        const targetUser = users[0];
+
+        if (isBranchManager) {
+            const higherRoles = ['tenant_admin', 'admin', 'superadmin', 'branch_manager'];
+            if (higherRoles.includes(targetUser.role)) {
+                return res.status(403).json({ 
+                    message: 'No tienes permisos para desactivar o activar a administradores o gerentes.' 
+                });
+            }
+        }
+
+        const newStatus = !targetUser.is_active;
+        await db.query('UPDATE users SET is_active = ? WHERE id = ? AND tenant_id = ?', [newStatus, id, tenantId]);
+
+        res.json({ message: `Estado del usuario cambiado a ${newStatus ? 'activo' : 'inactivo'}.` });
+    } catch (error) {
+        console.error('[AUTH] Error al cambiar estado de usuario:', error);
+        res.status(500).json({ message: 'Error al cambiar estado del usuario.' });
     }
 };

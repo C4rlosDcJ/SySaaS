@@ -3,7 +3,7 @@ const router = express.Router();
 const repairController = require('../controllers/repairController');
 const { auth, isAdmin, isTechnicianOrAdmin } = require('../middleware/auth');
 const tenantContext = require('../middleware/tenantContext');
-const { subscriptionGuard } = require('../middleware/subscriptionGuard');
+const { subscriptionGuard, planLimit } = require('../middleware/subscriptionGuard');
 
 // Todas las rutas requieren autenticación, contexto de tenant y verificación de suscripción
 router.use(auth);
@@ -17,7 +17,7 @@ router.get('/', repairController.getAll);
 router.get('/:id', repairController.getById);
 
 // Crear reparación
-router.post('/', repairController.create);
+router.post('/', planLimit('monthly_repairs'), repairController.create);
 
 // Actualizar reparación (solo admin/técnico)
 router.put('/:id', isTechnicianOrAdmin, repairController.update);

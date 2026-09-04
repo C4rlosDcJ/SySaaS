@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { authService } from '../services/api';
+import { authService, getImageUrl } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import { Wrench, Lock, Eye, EyeOff, ArrowLeft, CheckCircle2, ShieldAlert } from 'lucide-react';
 import './AuthPages.css';
@@ -73,7 +73,13 @@ export default function ResetPasswordPage() {
                     <div className="auth-visual-content">
                         <div className="auth-logo">
                             {businessLogo ? (
-                                <img src={businessLogo} alt="Logo" className="logo-img-auth" style={{ width: '36px', height: '36px', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
+                                <img 
+                                    src={getImageUrl(businessLogo)} 
+                                    alt="Logo" 
+                                    className="logo-img-auth" 
+                                    style={{ width: '36px', height: '36px', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }}
+                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                />
                             ) : (
                                 <div className="logo-icon">
                                     <Wrench size={20} />

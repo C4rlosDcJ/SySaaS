@@ -109,21 +109,26 @@ const tenantContext = async (req, res, next) => {
             }
         }
 
-        // Validar que la sucursal pertenezca al tenant
+        // Validar que la sucursal pertenezca al tenant (o auto-corregir a la sucursal matriz)
         if (branchId) {
             const [branchCheck] = await db.query(
                 `SELECT id FROM branches WHERE id = ? AND tenant_id = ? AND is_active = TRUE`,
                 [branchId, tenantId]
             );
             if (branchCheck.length === 0) {
-                return res.status(403).json({ 
-                    message: 'Sucursal no valida o no pertenece a tu empresa.' 
-                });
+                const [mainBranch] = await db.query(
+                    `SELECT id FROM branches WHERE tenant_id = ? AND is_main = TRUE AND is_active = TRUE LIMIT 1`,
+                    [tenantId]
+                );
+                branchId = mainBranch.length > 0 ? mainBranch[0].id : null;
             }
         }
 
-        // Validar que el staff tenga acceso a la sucursal (user_branch_assignments)
-        if (branchId && req.user.role !== 'client' && req.user.role !== 'tenant_admin') {
+        // Validar que el staff no administrador tenga acceso a la sucursal
+        const isGlobalAdmin = ['tenant_admin', 'admin', 'superadmin'].includes(req.user.role);
+        const isAssignedDirectly = req.user.branch_id === branchId;
+
+        if (branchId && req.user.role !== 'client' && !isGlobalAdmin && !isAssignedDirectly) {
             const [access] = await db.query(
                 `SELECT id FROM user_branch_assignments 
                  WHERE user_id = ? AND branch_id = ?`,

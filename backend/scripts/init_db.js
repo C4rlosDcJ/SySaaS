@@ -168,7 +168,7 @@ async function initDB() {
         // Insertar settings default
         await connection.query(`
             INSERT IGNORE INTO settings (setting_key, setting_value) VALUES 
-            ('business_name', 'SysTeck'),
+            ('business_name', 'SySaaS'),
             ('default_warranty_days', '30'),
             ('contact_email', ''),
             ('contact_phone', '')

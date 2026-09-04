@@ -307,6 +307,37 @@ export default function NewQuoteForm() {
                                 rows={5}
                                 required
                             />
+                            <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                style={{ marginTop: '8px', display: 'inline-flex', alignItems: 'center', gap: '6px', alignSelf: 'flex-start', width: 'auto' }}
+                                onClick={async () => {
+                                    if (!formData.problem_description.trim()) {
+                                        alert('Por favor describe primero el problema para que la IA lo analice.');
+                                        return;
+                                    }
+                                    try {
+                                        setError('');
+                                        const res = await import('../../services/api').then(m => m.aiService.parseQuote(formData.problem_description));
+                                        if (res) {
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                device_type_id: res.device_type_id || prev.device_type_id,
+                                                brand_id: res.brand_id || prev.brand_id,
+                                                brand_other: res.brand_other || prev.brand_other,
+                                                model: res.model || prev.model,
+                                                color: res.color || prev.color,
+                                                service_id: res.service_id || prev.service_id
+                                            }));
+                                            alert('¡Formulario auto-completado con éxito por la IA!');
+                                        }
+                                    } catch (err) {
+                                        setError(err.message || 'Error al procesar el análisis de IA');
+                                    }
+                                }}
+                            >
+                                ✨ Auto-completar Formulario con IA
+                            </button>
                         </div>
 
                         <div className="input-group">

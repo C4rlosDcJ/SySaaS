@@ -260,23 +260,45 @@ exports.createSale = async (req, res) => {
 // =====================================================
 exports.getSales = async (req, res) => {
     try {
-        const { page = 1, limit = 20, date_from, date_to, payment_method, cashier_id } = req.query;
+        const { page = 1, limit = 20, search, date_from, date_to, payment_method, status, cashier_id } = req.query;
         const offset = (page - 1) * limit;
         const tenantId = req.tenantCtx.tenantId;
-        const branchId = req.tenantCtx.branchId;
+        const isGlobalAdmin = ['tenant_admin', 'admin', 'superadmin'].includes(req.user.role);
+        let branchId = null;
+
+        if (!isGlobalAdmin && req.tenantCtx.branchId) {
+            branchId = req.tenantCtx.branchId;
+        } else if (req.query.branch_id) {
+            branchId = parseInt(req.query.branch_id, 10);
+        } else if (isGlobalAdmin && req.headers['x-branch-id']) {
+            branchId = parseInt(req.headers['x-branch-id'], 10);
+        }
 
         let query = `
             SELECT s.*,
                 u.first_name as customer_first_name, u.last_name as customer_last_name,
                 c.first_name as cashier_first_name, c.last_name as cashier_last_name,
-                r.ticket_number as repair_ticket
+                r.ticket_number as repair_ticket,
+                b.name as branch_name
             FROM sales s
             LEFT JOIN users u ON s.customer_id = u.id
             LEFT JOIN users c ON s.cashier_id = c.id
             LEFT JOIN repairs r ON s.repair_id = r.id
-            WHERE s.tenant_id = ? AND s.branch_id = ?
+            LEFT JOIN branches b ON s.branch_id = b.id
+            WHERE s.tenant_id = ?
         `;
-        const params = [tenantId, branchId];
+        const params = [tenantId];
+
+        if (branchId) {
+            query += ' AND s.branch_id = ?';
+            params.push(branchId);
+        }
+
+        if (search && search.trim()) {
+            const term = `%${search.trim()}%`;
+            query += ' AND (s.sale_number LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR CONCAT(u.first_name, " ", u.last_name) LIKE ? OR c.first_name LIKE ? OR c.last_name LIKE ? OR r.ticket_number LIKE ?)';
+            params.push(term, term, term, term, term, term, term);
+        }
 
         if (date_from) {
             query += ' AND DATE(s.created_at) >= ?';
@@ -289,6 +311,10 @@ exports.getSales = async (req, res) => {
         if (payment_method) {
             query += ' AND s.payment_method = ?';
             params.push(payment_method);
+        }
+        if (status) {
+            query += ' AND s.status = ?';
+            params.push(status);
         }
         if (cashier_id) {
             query += ' AND s.cashier_id = ?';
@@ -424,43 +450,62 @@ exports.cancelSale = async (req, res) => {
 exports.getSalesStats = async (req, res) => {
     try {
         const tenantId = req.tenantCtx.tenantId;
-        const branchId = req.tenantCtx.branchId;
+        const isGlobalAdmin = ['tenant_admin', 'admin', 'superadmin'].includes(req.user.role);
+        let branchId = null;
+
+        if (!isGlobalAdmin && req.tenantCtx.branchId) {
+            branchId = req.tenantCtx.branchId;
+        } else if (req.query.branch_id) {
+            branchId = parseInt(req.query.branch_id, 10);
+        } else if (isGlobalAdmin && req.headers['x-branch-id']) {
+            branchId = parseInt(req.headers['x-branch-id'], 10);
+        }
+
+        const branchCondition = branchId ? ' AND branch_id = ?' : '';
+        const branchParams = branchId ? [tenantId, branchId] : [tenantId];
 
         // Ventas de hoy
         const [todaySales] = await db.query(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
-             FROM sales WHERE DATE(created_at) = CURDATE() AND status = 'completed' AND tenant_id = ? AND branch_id = ?`,
-            [tenantId, branchId]
+             FROM sales WHERE DATE(created_at) = CURDATE() AND status = 'completed' AND tenant_id = ? ${branchCondition}`,
+            branchParams
         );
 
         // Ventas de la semana
         const [weekSales] = await db.query(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
-             FROM sales WHERE YEARWEEK(created_at) = YEARWEEK(CURDATE()) AND status = 'completed' AND tenant_id = ? AND branch_id = ?`,
-            [tenantId, branchId]
+             FROM sales WHERE YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1) AND status = 'completed' AND tenant_id = ? ${branchCondition}`,
+            branchParams
         );
 
         // Ventas del mes
         const [monthSales] = await db.query(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
-             FROM sales WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) AND status = 'completed' AND tenant_id = ? AND branch_id = ?`,
-            [tenantId, branchId]
+             FROM sales WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) AND status = 'completed' AND tenant_id = ? ${branchCondition}`,
+            branchParams
+        );
+
+        // Ventas totales históricas
+        const [totalSales] = await db.query(
+            `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
+             FROM sales WHERE status = 'completed' AND tenant_id = ? ${branchCondition}`,
+            branchParams
         );
 
         // Ventas por día (últimos 30 días)
         const [dailySales] = await db.query(
             `SELECT DATE(created_at) as date, COUNT(*) as count, SUM(total) as total
-             FROM sales WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND status = 'completed' AND tenant_id = ? AND branch_id = ?
+             FROM sales WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND status = 'completed' AND tenant_id = ? ${branchCondition}
              GROUP BY DATE(created_at) ORDER BY date ASC`,
-            [tenantId, branchId]
+            branchParams
         );
 
         // Ventas por método de pago (mes actual)
         const [byPaymentMethod] = await db.query(
             `SELECT payment_method, COUNT(*) as count, SUM(total) as total
-             FROM sales WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) AND status = 'completed' AND tenant_id = ? AND branch_id = ?
+             FROM sales WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) AND status = 'completed' AND tenant_id = ? ${branchCondition}
              GROUP BY payment_method`,
-            [tenantId, branchId]
+            branchParams
         );
 
         // Productos más vendidos (mes actual)
@@ -468,17 +513,22 @@ exports.getSalesStats = async (req, res) => {
             `SELECT si.description, SUM(si.quantity) as total_qty, SUM(si.total) as total_revenue
              FROM sale_items si
              JOIN sales s ON si.sale_id = s.id
-             WHERE YEAR(s.created_at) = YEAR(CURDATE()) AND MONTH(s.created_at) = MONTH(CURDATE()) AND s.status = 'completed' AND s.tenant_id = ? AND s.branch_id = ?
+             WHERE YEAR(s.created_at) = YEAR(CURDATE()) AND MONTH(s.created_at) = MONTH(CURDATE()) AND s.status = 'completed' AND s.tenant_id = ? ${branchCondition.replace('branch_id', 's.branch_id')}
              GROUP BY si.description
              ORDER BY total_qty DESC LIMIT 10`,
-            [tenantId, branchId]
+            branchParams
         );
 
+        const monthTotal = parseFloat(monthSales[0]?.total || 0);
+        const monthCount = parseInt(monthSales[0]?.count || 0, 10);
+        const avgTicket = monthCount > 0 ? (monthTotal / monthCount) : 0;
+
         res.json({
-            today: todaySales[0],
-            week: weekSales[0],
-            month: monthSales[0],
-            dailySales,
+            today: { count: parseInt(todaySales[0]?.count || 0, 10), total: parseFloat(todaySales[0]?.total || 0) },
+            week: { count: parseInt(weekSales[0]?.count || 0, 10), total: parseFloat(weekSales[0]?.total || 0) },
+            month: { count: monthCount, total: monthTotal, averageTicket: avgTicket },
+            allTime: { count: parseInt(totalSales[0]?.count || 0, 10), total: parseFloat(totalSales[0]?.total || 0) },
+            dailySales: dailySales.map(d => ({ date: d.date, count: parseInt(d.count || 0, 10), total: parseFloat(d.total || 0) })),
             byPaymentMethod,
             topProducts
         });

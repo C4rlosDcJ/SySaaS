@@ -69,12 +69,16 @@ app.use('/api/tenants', require('./routes/tenants'));
 app.use('/api/branches', require('./routes/branches'));
 app.use('/api/transfers', require('./routes/transfers'));
 app.use('/api/billing', require('./routes/billing'));
+app.use('/api/suppliers', require('./routes/suppliers'));
+app.use('/api/coupons', require('./routes/coupons'));
+app.use('/api/broadcasts', require('./routes/broadcasts'));
+app.use('/api/analytics', require('./routes/analytics'));
 
 
 
 // Ruta de salud
 app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', message: 'SysTeck API funcionando correctamente' });
+    res.json({ status: 'ok', message: 'SySaaS API funcionando correctamente' });
 });
 
 // Manejo de errores global
@@ -110,7 +114,7 @@ async function startServer() {
             console.log(`
 ╔═══════════════════════════════════════════════════════╗
 ║                                                           ║
-║   SysTeck API Server                                     ║
+║   SySaaS API Server                                     ║
 ║   ───────────────────────────────────────────────────    ║
 ║   Servidor corriendo en: http://localhost:${PORT}          ║
 ║   Ambiente: ${process.env.NODE_ENV || 'development'}                              ║

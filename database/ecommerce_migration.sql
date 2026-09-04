@@ -1,9 +1,9 @@
 N-- =====================================================
--- SysTeck — E-commerce / Orders Migration
+-- SySaaS — E-commerce / Orders Migration
 -- Run this AFTER pos_migration.sql
 -- =====================================================
 
-USE systeck;
+USE sysaas;
 
 -- =====================================================
 -- TABLA: orders — Pedidos de clientes

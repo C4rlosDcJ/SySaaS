@@ -1,5 +1,5 @@
 /* =====================================================
-   SYS-TECK — Global Design System (Minimalist)
+   SYSAAS — Global Design System (Minimalist)
    ===================================================== */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -53,7 +53,8 @@
 
   /* Typography */
   --font-family: 'Inter', -apple-system, system-ui, sans-serif;
-  --font-mono: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+  --font-mono: 'Space Mono', monospace;
+  --font-pixel: 'Silkscreen', 'VT323', monospace;
   --font-xs: 0.7rem;
   --font-sm: 0.8125rem;
   --font-base: 0.9375rem;
@@ -158,16 +159,13 @@ body {
   line-height: 1.6;
   color: var(--color-text);
   background: var(--color-bg);
-  /* Nothing dot grid background */
-  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
-  background-size: 24px 24px;
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 :root[data-theme='light'] body {
-  background-image: radial-gradient(rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+  background: var(--color-bg);
 }
 
 a {
@@ -632,3 +630,8 @@ input, textarea, select { font-family: inherit; font-size: inherit; border: none
 .animate-fadeIn { animation: fadeIn 0.3s ease; }
 .animate-slideUp { animation: slideUp 0.3s ease; }
 .animate-pulse { animation: pulse 2s infinite; }
+
+/* SweetAlert2 Modal Z-Index: ensure it renders over all custom React modals */
+.swal2-container {
+    z-index: 100000 !important;
+}

@@ -1,5 +1,5 @@
 // =====================================================
-//   SysTeck — Centralized constants & formatters
+//   SySaaS — Centralized constants & formatters
 // =====================================================
 
 export const STATUS_LABELS = {

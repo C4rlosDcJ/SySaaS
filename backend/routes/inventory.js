@@ -20,7 +20,10 @@ router.delete('/categories/:id', inventoryController.deleteCategory);
 // Productos
 router.get('/products', inventoryController.getProducts);
 router.get('/products/:id', inventoryController.getProductById);
+router.get('/products/:id/movements', inventoryController.getProductMovements);
 router.post('/products', inventoryController.createProduct);
+router.post('/products/bulk-delete', inventoryController.bulkDeleteProducts);
+router.post('/products/bulk-category', inventoryController.bulkUpdateCategory);
 router.put('/products/:id', inventoryController.updateProduct);
 router.delete('/products/:id', inventoryController.deleteProduct);
 

@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { statsService, posService, inventoryService } from '../../services/api';
+import { statsService, posService, inventoryService, broadcastService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { useTenant } from '../../context/TenantContext';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell
+    PieChart, Pie, Cell, BarChart, Bar
 } from 'recharts';
 import {
     DollarSign,
@@ -24,7 +25,13 @@ import {
     BarChart3,
     Clock,
     Activity,
-    CheckCircle2
+    CheckCircle2,
+    Sparkles,
+    Megaphone,
+    ArrowUpRight,
+    Store,
+    Plus,
+    Shield
 } from 'lucide-react';
 import '../client/ClientDashboard.css';
 import './AdminDashboard.css';
@@ -42,16 +49,47 @@ const statusLabels = {
     cancelled: 'Cancelado'
 };
 
+// Paleta de colores fríos corporativos (Gama de azules, índigos, cianos fríos y pizarras)
 const STATUS_COLORS = {
-    received: '#3b82f6',
-    diagnosing: '#6366f1',
-    waiting_approval: '#f59e0b',
-    waiting_parts: '#a855f7',
-    repairing: '#ef4444',
-    quality_check: '#06b6d4',
-    ready: '#10b981',
-    delivered: '#22c55e',
-    cancelled: '#6b7280'
+    received: '#3b82f6',        // Azul corporativo
+    diagnosing: '#6366f1',      // Índigo frío
+    waiting_approval: '#818cf8',// Lavanda frío
+    waiting_parts: '#64748b',   // Pizarra fría
+    repairing: '#0284c7',       // Azul acero
+    quality_check: '#38bdf8',   // Cian hielo
+    ready: '#60a5fa',           // Azul cielo frío
+    delivered: '#2563eb',       // Azul zafiro
+    cancelled: '#94a3b8'        // Gris frío
+};
+
+const PIE_COLORS = [
+    '#3b82f6',
+    '#6366f1',
+    '#0284c7',
+    '#60a5fa',
+    '#818cf8',
+    '#38bdf8',
+    '#2563eb',
+    '#64748b',
+    '#94a3b8'
+];
+
+const formatCurrency = (amount) => {
+    if (!amount) return '$0.00';
+    return new Intl.NumberFormat('es-MX', {
+        style: 'currency',
+        currency: 'MXN',
+        minimumFractionDigits: 2
+    }).format(amount || 0);
+};
+
+const formatMonthLabel = (str) => {
+    if (!str) return '';
+    const parts = str.split('-');
+    if (parts.length < 2) return str;
+    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const idx = parseInt(parts[1], 10) - 1;
+    return `${months[idx] || parts[1]} '${parts[0].slice(-2)}`;
 };
 
 // Skeleton Loader Component
@@ -91,9 +129,11 @@ function DashboardSkeleton() {
 
 export default function AdminDashboard() {
     const { user } = useAuth();
+    const { activeBranch } = useTenant();
     const [stats, setStats] = useState(null);
     const [salesStats, setSalesStats] = useState(null);
     const [inventoryStats, setInventoryStats] = useState(null);
+    const [broadcasts, setBroadcasts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [currentTime, setCurrentTime] = useState(new Date());
 
@@ -111,15 +151,17 @@ export default function AdminDashboard() {
 
     const fetchAllStats = async () => {
         try {
-            const [dashData, salesData, invData] = await Promise.allSettled([
+            const [dashData, salesData, invData, bcData] = await Promise.allSettled([
                 statsService.getDashboard(),
                 posService.getStats(),
-                inventoryService.getStats()
+                inventoryService.getStats(),
+                broadcastService.getActive()
             ]);
 
             if (dashData.status === 'fulfilled') setStats(dashData.value);
             if (salesData.status === 'fulfilled') setSalesStats(salesData.value);
             if (invData.status === 'fulfilled') setInventoryStats(invData.value);
+            if (bcData.status === 'fulfilled') setBroadcasts(bcData.value || []);
         } catch (error) {
             console.error('Error al cargar estadísticas:', error);
         } finally {
@@ -127,21 +169,16 @@ export default function AdminDashboard() {
         }
     };
 
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('es-MX', {
-            style: 'currency',
-            currency: 'MXN'
-        }).format(amount || 0);
-    };
-
     // Calculate percentage comparison for monthly revenue
     const getRevenueChange = () => {
-        if (!stats?.thisMonth?.revenue || !stats?.lastMonth?.revenue) return null;
-        const diff = stats.thisMonth.revenue - stats.lastMonth.revenue;
-        const pct = (diff / stats.lastMonth.revenue) * 100;
+        const thisRev = parseFloat(stats?.thisMonth?.revenue || 0);
+        const lastRev = parseFloat(stats?.lastMonth?.revenue || 0);
+        if (!thisRev || !lastRev) return null;
+        const diff = thisRev - lastRev;
+        const pct = (diff / lastRev) * 100;
         return {
             positive: pct >= 0,
-            text: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% vs mes ant.`
+            text: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% vs mes anterior`
         };
     };
 
@@ -167,52 +204,45 @@ export default function AdminDashboard() {
     };
 
     // Prepare pie chart data from status counts
-    const pieData = stats?.statusSummary ? Object.entries(stats.statusSummary)
-        .filter(([_, value]) => value > 0)
-        .map(([key, value]) => ({
-            name: statusLabels[key] || key,
-            value,
-            color: STATUS_COLORS[key] || '#cccccc'
-        })) : [];
-
-    // Format chart date labels
-    const formatMonthLabel = (monthStr) => {
-        if (!monthStr) return '';
-        const [year, month] = monthStr.split('-');
-        const date = new Date(parseInt(year), parseInt(month) - 1, 1);
-        return date.toLocaleDateString('es-MX', { month: 'short', year: '2-digit' });
-    };
+    const pieData = useMemo(() => {
+        if (!stats?.statusSummary) return [];
+        return Object.entries(stats.statusSummary)
+            .filter(([_, value]) => value > 0)
+            .map(([key, value]) => ({
+                name: statusLabels[key] || key,
+                statusKey: key,
+                value,
+                color: STATUS_COLORS[key] || '#64748b'
+            }));
+    }, [stats]);
 
     // Simulating transaction details/payment methods split based on POS sales
-    const getPaymentSplit = () => {
+    const paymentSplit = useMemo(() => {
         const totalSales = salesStats?.month?.total || 0;
         if (totalSales === 0) {
             return { cash: 0, card: 0, transfer: 0 };
         }
-        // Consistent mock split: 50% cash, 40% card, 10% transfer
         return {
             cash: totalSales * 0.5,
             card: totalSales * 0.4,
             transfer: totalSales * 0.1
         };
-    };
-
-    const paymentSplit = getPaymentSplit();
+    }, [salesStats]);
 
     // Create custom timeline items from actual backend data
-    const getTimelineItems = () => {
+    const timelineItems = useMemo(() => {
         const timeline = [];
         
         // 1. Add recent repairs
         if (stats?.recentRepairs?.length > 0) {
             stats.recentRepairs.slice(0, 3).forEach((rep) => {
-                let statusMsg = `Ticket ${rep.ticket_number} ingresado con éxito.`;
+                let statusMsg = `Ticket ${rep.ticket_number} ingresado.`;
                 let badgeClass = 'info';
                 if (rep.status === 'ready') {
-                    statusMsg = `Equipo del Ticket ${rep.ticket_number} marcado como LISTO para entrega.`;
+                    statusMsg = `Equipo ${rep.model} marcado como LISTO para entrega.`;
                     badgeClass = 'success';
                 } else if (rep.status === 'repairing') {
-                    statusMsg = `Inició reparación del Ticket ${rep.ticket_number}.`;
+                    statusMsg = `Inició reparación del equipo ${rep.model}.`;
                     badgeClass = 'primary';
                 }
                 
@@ -220,7 +250,7 @@ export default function AdminDashboard() {
                     id: `repair-${rep.id}`,
                     title: rep.model,
                     desc: statusMsg,
-                    time: `Cliente: ${rep.first_name} ${rep.last_name}`,
+                    time: `Cliente: ${rep.first_name || ''} ${rep.last_name || ''}`,
                     date: new Date(rep.created_at || Date.now()),
                     type: badgeClass
                 });
@@ -232,19 +262,19 @@ export default function AdminDashboard() {
             timeline.push({
                 id: 'inv-warning',
                 title: 'Alerta de Inventario',
-                desc: `Hay ${inventoryStats.lowStockCount} productos con stock menor al límite mínimo.`,
-                time: 'Revisión recomendada en catálogo',
+                desc: `${inventoryStats.lowStockCount} productos tienen existencias por debajo del límite mínimo.`,
+                time: 'Revisión recomendada',
                 date: new Date(),
                 type: 'warning'
             });
         }
 
-        // Fallback default items if database is clean/empty
+        // Fallback default items
         if (timeline.length === 0) {
             timeline.push({
                 id: 'default-1',
-                title: 'Inicialización de Dashboard',
-                desc: 'Estadísticas del negocio actualizadas con éxito.',
+                title: 'Operación en Línea',
+                desc: 'Estadísticas del negocio sincronizadas correctamente.',
                 time: 'Hace un momento',
                 date: new Date(),
                 type: 'success'
@@ -252,38 +282,58 @@ export default function AdminDashboard() {
         }
 
         return timeline.slice(0, 4);
-    };
-
-    const timelineItems = getTimelineItems();
+    }, [stats, inventoryStats]);
 
     if (loading) {
         return <DashboardSkeleton />;
     }
 
-    // Identify critical notifications
     const pendingApprovalCount = stats?.statusSummary?.waiting_approval || 0;
     const lowStockCount = inventoryStats?.lowStockCount || 0;
 
     return (
-        <main className="dashboard-main">
-            {/* dynamic system notifications / banner */}
+        <main className="dashboard-main animate-fadeIn">
+            {/* Comunicados Globales */}
+            {broadcasts && broadcasts.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                    {broadcasts.map(bc => (
+                        <div key={bc.id} style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '12px 18px', borderRadius: 'var(--radius-md)',
+                            background: bc.type === 'urgent' ? 'rgba(239, 68, 68, 0.12)' : bc.type === 'warning' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(59, 130, 246, 0.12)',
+                            border: `1px solid ${bc.type === 'urgent' ? 'rgba(239, 68, 68, 0.25)' : bc.type === 'warning' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(59, 130, 246, 0.25)'}`,
+                            color: 'var(--color-text)', gap: '12px'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <Megaphone size={18} style={{ color: bc.type === 'urgent' ? '#ef4444' : bc.type === 'warning' ? '#f59e0b' : '#3b82f6', flexShrink: 0 }} />
+                                <div>
+                                    <strong style={{ fontSize: '13px', display: 'block' }}>{bc.title}</strong>
+                                    <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>{bc.message}</span>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Banner de Notificaciones Operativas Críticas */}
             {(lowStockCount > 0 || pendingApprovalCount > 0) && (
-                <div className="alert-banner">
+                <div className="alert-banner" style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
                     <div className="alert-banner-content">
-                        <AlertTriangle className="alert-banner-icon" size={18} />
-                        <span>
-                            {lowStockCount > 0 && `Tienes ${lowStockCount} productos con bajo stock. `}
-                            {pendingApprovalCount > 0 && `${pendingApprovalCount} reparaciones esperan aprobación.`}
+                        <AlertTriangle size={18} style={{ color: '#d97706', flexShrink: 0 }} />
+                        <span style={{ fontSize: '13px' }}>
+                            {lowStockCount > 0 && `Tienes ${lowStockCount} producto${lowStockCount > 1 ? 's' : ''} con bajo stock. `}
+                            {pendingApprovalCount > 0 && `${pendingApprovalCount} reparación${pendingApprovalCount > 1 ? 'es' : ''} esperan cotización o aprobación del cliente.`}
                         </span>
                     </div>
-                    <div className="header-actions">
+                    <div className="header-actions" style={{ display: 'flex', gap: '8px' }}>
                         {lowStockCount > 0 && (
-                            <Link to="/admin/inventario" className="btn btn-sm btn-outline" style={{ borderColor: 'var(--color-warning)', color: 'var(--color-warning)' }}>
-                                Surtir Stock
+                            <Link to="/admin/inventario" className="btn btn-sm btn-secondary" style={{ fontSize: '12px' }}>
+                                Revisar Stock
                             </Link>
                         )}
                         {pendingApprovalCount > 0 && (
-                            <Link to="/admin/reparaciones?status=waiting_approval" className="btn btn-sm btn-primary">
+                            <Link to="/admin/reparaciones?status=waiting_approval" className="btn btn-sm btn-primary" style={{ fontSize: '12px' }}>
                                 Ver Pendientes
                             </Link>
                         )}
@@ -291,212 +341,138 @@ export default function AdminDashboard() {
                 </div>
             )}
 
-            <header className="dashboard-header">
+            {/* Header del Dashboard con Acciones Rápidas */}
+            <header className="dashboard-header" style={{ marginBottom: '24px' }}>
                 <div>
-                    <h1>{getGreeting()}</h1>
-                    <p className="text-muted">{getFormattedDate()}</p>
+                    <h1 style={{ fontSize: '22px', fontWeight: 800, margin: 0, textTransform: 'none', letterSpacing: 'normal' }}>
+                        {getGreeting()}
+                    </h1>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--color-text-secondary)', textTransform: 'capitalize' }}>
+                        {getFormattedDate()} {activeBranch ? `· Sede: ${activeBranch.name}` : ''}
+                    </p>
                 </div>
-                <div className="header-clock-container">
-                    <div className="live-time">
-                        <Clock size={12} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle' }} />
-                        {currentTime.toLocaleTimeString('es-MX')}
+                
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <Link to="/admin/nueva-reparacion" className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                        <Plus size={15} />
+                        <span>Nueva Reparación</span>
+                    </Link>
+                    <Link to="/admin/pos" className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
+                        <ShoppingCart size={15} />
+                        <span>Punto de Venta</span>
+                    </Link>
+                    <div className="header-clock-container" style={{ marginLeft: '6px' }}>
+                        <div className="live-time" style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text)', border: '1px solid var(--color-border)', fontSize: '12px' }}>
+                            <Clock size={12} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle', color: 'var(--color-primary)' }} />
+                            {currentTime.toLocaleTimeString('es-MX')}
+                        </div>
                     </div>
-                    <p className="text-muted" style={{ fontSize: '11px', marginTop: '4px' }}>Zona Horaria Local</p>
                 </div>
             </header>
 
-            {/* Acciones Rápidas Premium */}
-            <section className="quick-actions-section">
-                <div className="quick-actions-grid">
-                    <Link to="/admin/nueva-reparacion" className="quick-action-card">
-                        <div className="quick-action-icon">
-                            <PlusCircle size={20} />
-                        </div>
-                        <div className="quick-action-info">
-                            <h4>Nueva Reparación</h4>
-                            <p>Registrar ticket de ingreso</p>
-                        </div>
-                    </Link>
-                    <Link to="/admin/pos" className="quick-action-card">
-                        <div className="quick-action-icon">
-                            <ShoppingCart size={20} />
-                        </div>
-                        <div className="quick-action-info">
-                            <h4>Punto de Venta</h4>
-                            <p>Cobrar venta o servicio</p>
-                        </div>
-                    </Link>
-                    <Link to="/admin/clientes" className="quick-action-card">
-                        <div className="quick-action-icon">
-                            <UserPlus size={20} />
-                        </div>
-                        <div className="quick-action-info">
-                            <h4>Registrar Cliente</h4>
-                            <p>Dar de alta clientes nuevos</p>
-                        </div>
-                    </Link>
-                    <Link to="/admin/reportes" className="quick-action-card">
-                        <div className="quick-action-icon">
-                            <BarChart3 size={20} />
-                        </div>
-                        <div className="quick-action-info">
-                            <h4>Ver Reportes</h4>
-                            <p>Análisis financiero completo</p>
-                        </div>
-                    </Link>
-                </div>
-            </section>
-
-            {/* KPIs principales */}
-            <div className="kpi-grid">
-                <div className="kpi-card revenue">
+            {/* Top 4 KPIs Operativos Clave */}
+            <div className="kpi-grid" style={{ marginBottom: '24px' }}>
+                
+                {/* Ingresos Reparaciones */}
+                <div className="kpi-card">
                     <div className="kpi-header-row">
-                        <div className="kpi-icon">
-                            <DollarSign size={22} />
+                        <div className="kpi-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: 'none' }}>
+                            <DollarSign size={20} />
                         </div>
                         {revenueChange && (
-                            <span className={`kpi-badge ${revenueChange.positive ? 'positive' : 'negative'}`}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: revenueChange.positive ? '#10b981' : '#ef4444' }}>
                                 {revenueChange.text}
                             </span>
                         )}
                     </div>
                     <div className="kpi-info">
-                        <span className="kpi-label">Ingresos del Mes</span>
+                        <span className="kpi-label">Ingresos Taller (Mes)</span>
                         <span className="kpi-value">{formatCurrency(stats?.thisMonth?.revenue)}</span>
-                        <span className="kpi-change positive">
-                            {stats?.thisMonth?.repairs || 0} reparaciones
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                            {stats?.thisMonth?.repairs || 0} órdenes completadas
                         </span>
                     </div>
                 </div>
 
-                <div className="kpi-card active">
+                {/* Reparaciones en Proceso */}
+                <div className="kpi-card">
                     <div className="kpi-header-row">
-                        <div className="kpi-icon">
-                            <Wrench size={22} />
+                        <div className="kpi-icon" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: 'none' }}>
+                            <Wrench size={20} />
                         </div>
+                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', background: 'var(--color-bg-tertiary)', padding: '2px 6px', borderRadius: '4px' }}>
+                            En Taller
+                        </span>
                     </div>
                     <div className="kpi-info">
-                        <span className="kpi-label">En Proceso</span>
+                        <span className="kpi-label">Reparaciones en Curso</span>
                         <span className="kpi-value">{stats?.inProgress || 0}</span>
-                        <span className="kpi-change">Reparaciones activas</span>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                            {stats?.statusSummary?.ready || 0} listas para entrega
+                        </span>
                     </div>
                 </div>
 
-                <div className="kpi-card customers">
+                {/* Ventas POS del Mes */}
+                <div className="kpi-card">
                     <div className="kpi-header-row">
-                        <div className="kpi-icon">
-                            <Users size={22} />
-                        </div>
-                    </div>
-                    <div className="kpi-info">
-                        <span className="kpi-label">Total Clientes</span>
-                        <span className="kpi-value">{stats?.totalCustomers || 0}</span>
-                        <span className="kpi-change">Registrados</span>
-                    </div>
-                </div>
-
-                <div className="kpi-card last-month">
-                    <div className="kpi-header-row">
-                        <div className="kpi-icon">
-                            <TrendingUp size={22} />
-                        </div>
-                    </div>
-                    <div className="kpi-info">
-                        <span className="kpi-label">Mes Anterior</span>
-                        <span className="kpi-value">{formatCurrency(stats?.lastMonth?.revenue)}</span>
-                        <span className="kpi-change">{stats?.lastMonth?.repairs || 0} reparaciones</span>
-                    </div>
-                </div>
-            </div>
-
-            {/* POS & Inventory Cards */}
-            <div className="kpi-grid">
-                <div className="kpi-card sales-today">
-                    <div className="kpi-header-row">
-                        <div className="kpi-icon">
-                            <ShoppingCart size={20} />
-                        </div>
-                    </div>
-                    <div className="kpi-info">
-                        <span className="kpi-label">Ventas Hoy</span>
-                        <span className="kpi-value">{formatCurrency(salesStats?.today?.total || 0)}</span>
-                        <span className="kpi-change positive">{salesStats?.today?.count || 0} ventas</span>
-                    </div>
-                </div>
-
-                <div className="kpi-card sales-month">
-                    <div className="kpi-header-row">
-                        <div className="kpi-icon">
+                        <div className="kpi-icon" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', border: 'none' }}>
                             <Receipt size={20} />
                         </div>
+                        <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 600 }}>
+                            {salesStats?.today?.count || 0} hoy
+                        </span>
                     </div>
                     <div className="kpi-info">
-                        <span className="kpi-label">Ventas del Mes (POS)</span>
+                        <span className="kpi-label">Ventas POS (Mes)</span>
                         <span className="kpi-value">{formatCurrency(salesStats?.month?.total || 0)}</span>
-                        <span className="kpi-change">{salesStats?.month?.count || 0} ventas POS</span>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                            {salesStats?.month?.count || 0} tickets facturados
+                        </span>
                     </div>
                 </div>
 
-                <div className="kpi-card inventory">
+                {/* Clientes Registrados */}
+                <div className="kpi-card">
                     <div className="kpi-header-row">
-                        <div className="kpi-icon">
-                            <Package size={20} />
+                        <div className="kpi-icon" style={{ background: 'rgba(217, 119, 6, 0.1)', color: '#d97706', border: 'none' }}>
+                            <Users size={20} />
                         </div>
                     </div>
                     <div className="kpi-info">
-                        <span className="kpi-label">Productos</span>
-                        <span className="kpi-value">{inventoryStats?.totalProducts || 0}</span>
-                        <span className="kpi-change">En catálogo activo</span>
+                        <span className="kpi-label">Clientes Totales</span>
+                        <span className="kpi-value">{stats?.totalCustomers || 0}</span>
+                        <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                            Base de datos consolidada
+                        </span>
                     </div>
                 </div>
-
-                {lowStockCount > 0 ? (
-                    <div className="kpi-card inventory-low">
-                        <div className="kpi-header-row">
-                            <div className="kpi-icon">
-                                <AlertTriangle size={20} />
-                            </div>
-                        </div>
-                        <div className="kpi-info">
-                            <span className="kpi-label">Bajo Stock</span>
-                            <span className="kpi-value" style={{ color: 'var(--color-warning)' }}>
-                                {lowStockCount}
-                            </span>
-                            <span className="kpi-change">
-                                <Link to="/admin/inventario" style={{ color: 'var(--color-warning)', fontWeight: 600 }}>
-                                    Ver productos →
-                                </Link>
-                            </span>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="kpi-card inventory">
-                        <div className="kpi-header-row">
-                            <div className="kpi-icon">
-                                <CheckCircle2 size={20} />
-                            </div>
-                        </div>
-                        <div className="kpi-info">
-                            <span className="kpi-label">Inventario</span>
-                            <span className="kpi-value" style={{ color: 'var(--color-success)' }}>OK</span>
-                            <span className="kpi-change">Stock saludable</span>
-                        </div>
-                    </div>
-                )}
             </div>
 
-            {/* Graficas Grid */}
-            <div className="dashboard-charts-grid">
-                <div className="chart-card">
-                    <h3>Historial de Ingresos</h3>
-                    <div className="chart-container">
+            {/* Grid 2 Columnas: Gráfica de Ingresos + Gráfica de Estados de Taller */}
+            <div className="dashboard-charts-grid" style={{ marginBottom: '24px' }}>
+                
+                {/* Historial de Ingresos Mensuales */}
+                <div className="chart-card" style={{ padding: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--color-text)' }}>
+                                Historial de Facturación Taller
+                            </h3>
+                            <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                                Facturación mensual registrada
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="chart-container" style={{ height: 260 }}>
                         {stats?.monthlyRevenue?.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={300}>
-                                <AreaChart data={stats.monthlyRevenue} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={stats.monthlyRevenue} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                     <defs>
-                                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.4}/>
-                                            <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0}/>
+                                        <linearGradient id="adminRevGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
+                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.01} />
                                         </linearGradient>
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
@@ -504,12 +480,14 @@ export default function AdminDashboard() {
                                         dataKey="month"
                                         tickFormatter={formatMonthLabel}
                                         stroke="var(--color-text-secondary)"
-                                        tick={{ fontSize: 11 }}
+                                        fontSize={11}
+                                        tickLine={false}
                                     />
                                     <YAxis
                                         stroke="var(--color-text-secondary)"
-                                        tickFormatter={(val) => `$${val}`}
-                                        tick={{ fontSize: 11 }}
+                                        fontSize={11}
+                                        tickLine={false}
+                                        tickFormatter={(v) => `$${v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v}`}
                                     />
                                     <Tooltip
                                         formatter={(value) => [formatCurrency(value), 'Ingresos']}
@@ -521,37 +499,52 @@ export default function AdminDashboard() {
                                             borderRadius: 'var(--radius-md)'
                                         }}
                                     />
-                                    <Area type="monotone" dataKey="revenue" stroke="var(--color-primary)" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
+                                    <Area type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} fill="url(#adminRevGradient)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         ) : (
-                            <div className="chart-empty">Sin historial de ingresos</div>
+                            <div className="chart-empty">Sin historial de ingresos registrado</div>
                         )}
                     </div>
                 </div>
 
-                <div className="chart-card">
-                    <h3>Estado General de Equipos</h3>
+                {/* Estado General de Equipos en Taller */}
+                <div className="chart-card" style={{ padding: '20px' }}>
+                    <div style={{ marginBottom: '16px' }}>
+                        <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--color-text)' }}>
+                            Estado de Equipos en Taller
+                        </h3>
+                        <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                            Distribución de órdenes en servicio
+                        </p>
+                    </div>
+
                     <div className="chart-container pie-container">
                         {pieData.length > 0 ? (
                             <div className="pie-row">
-                                <div style={{ width: '50%', height: 260 }}>
+                                <div style={{ width: '50%', height: 200 }}>
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
                                             <Pie
                                                 data={pieData}
                                                 cx="50%"
                                                 cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={80}
-                                                paddingAngle={4}
+                                                innerRadius={50}
+                                                outerRadius={75}
+                                                paddingAngle={3}
                                                 dataKey="value"
                                             >
                                                 {pieData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                    <Cell
+                                                        key={`cell-${index}`}
+                                                        fill={STATUS_COLORS[entry.statusKey] || PIE_COLORS[index % PIE_COLORS.length]}
+                                                        stroke="var(--color-bg-card)"
+                                                        strokeWidth={2}
+                                                    />
                                                 ))}
                                             </Pie>
                                             <Tooltip
+                                                formatter={(val, name) => [`${val} equipos`, name]}
                                                 contentStyle={{
                                                     background: 'var(--color-bg-card)',
                                                     borderColor: 'var(--color-border)',
@@ -562,10 +555,10 @@ export default function AdminDashboard() {
                                         </PieChart>
                                     </ResponsiveContainer>
                                 </div>
-                                <div className="pie-legend">
+                                <div className="pie-legend" style={{ maxHeight: '200px', overflowY: 'auto' }}>
                                     {pieData.map((item, idx) => (
-                                        <div key={idx} className="legend-item">
-                                            <span className="legend-dot" style={{ background: item.color }} />
+                                        <div key={idx} className="legend-item" style={{ fontSize: '12px', padding: '3px 0' }}>
+                                            <span className="legend-dot" style={{ background: STATUS_COLORS[item.statusKey] || PIE_COLORS[idx % PIE_COLORS.length] }} />
                                             <span className="legend-label">{item.name}</span>
                                             <span className="legend-val">({item.value})</span>
                                         </div>
@@ -573,71 +566,46 @@ export default function AdminDashboard() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="chart-empty">Sin datos de equipos</div>
+                            <div className="chart-empty">Sin equipos en servicio</div>
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Estado de reparaciones */}
-            <section className="dashboard-section">
-                <h2>Estado de Reparaciones</h2>
+            {/* Grid de Estado de Reparaciones */}
+            <section className="dashboard-section" style={{ marginBottom: '24px' }}>
+                <h2 style={{ fontSize: '16px', fontWeight: 700, marginBottom: '14px' }}>
+                    Flujo Operativo de Reparaciones
+                </h2>
                 <div className="status-grid">
                     {Object.entries(statusLabels).map(([key, label]) => (
-                        <div key={key} className={`status-item status-${key}`}>
-                            <span className="status-count">{stats?.statusSummary?.[key] || 0}</span>
-                            <span className="status-label">{label}</span>
+                        <div key={key} className={`status-item status-${key}`} style={{ padding: '14px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}>
+                            <span className="status-count" style={{ fontSize: '20px', fontWeight: 800, color: 'var(--color-text)' }}>
+                                {stats?.statusSummary?.[key] || 0}
+                            </span>
+                            <span className="status-label" style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                                {label}
+                            </span>
                         </div>
                     ))}
                 </div>
             </section>
 
-            {/* Métodos de Pago POS */}
-            {salesStats?.month?.total > 0 && (
-                <section className="payment-methods-card">
-                    <h3 style={{ fontSize: 'var(--font-base)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <CreditCard size={18} className="text-primary" />
-                        Desglose Métodos de Pago POS (Estimado del Mes)
-                    </h3>
-                    <div className="payment-methods-grid">
-                        <div className="payment-method-item">
-                            <span className="payment-method-label">
-                                <Banknote size={12} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle', color: '#10b981' }} />
-                                Efectivo (50%)
-                            </span>
-                            <span className="payment-method-value">{formatCurrency(paymentSplit.cash)}</span>
-                        </div>
-                        <div className="payment-method-item">
-                            <span className="payment-method-label">
-                                <CreditCard size={12} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle', color: '#3b82f6' }} />
-                                Tarjeta (40%)
-                            </span>
-                            <span className="payment-method-value">{formatCurrency(paymentSplit.card)}</span>
-                        </div>
-                        <div className="payment-method-item">
-                            <span className="payment-method-label">
-                                <ArrowRightLeft size={12} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'middle', color: '#818cf8' }} />
-                                Transferencia (10%)
-                            </span>
-                            <span className="payment-method-value">{formatCurrency(paymentSplit.transfer)}</span>
-                        </div>
-                    </div>
-                </section>
-            )}
-
-            <div className="dashboard-row" style={{ marginTop: 'var(--sp-5)' }}>
-                {/* Reparaciones recientes */}
-                <section className="dashboard-section flex-2">
-                    <div className="section-header">
-                        <h2>Reparaciones Recientes</h2>
-                        <Link to="/admin/reparaciones" className="btn btn-ghost btn-sm">
-                            Ver todas <ChevronRight size={16} />
+            {/* Split Layout: Reparaciones Recientes & Actividad */}
+            <div className="dashboard-row">
+                
+                {/* Reparaciones Recientes */}
+                <section className="dashboard-section flex-2 card" style={{ padding: '20px' }}>
+                    <div className="section-header" style={{ marginBottom: '14px' }}>
+                        <h2 style={{ fontSize: '16px', fontWeight: 700, margin: 0 }}>Reparaciones Recientes</h2>
+                        <Link to="/admin/reparaciones" className="btn btn-ghost btn-sm" style={{ fontSize: '12px' }}>
+                            Ver todas <ChevronRight size={14} />
                         </Link>
                     </div>
 
                     {stats?.recentRepairs?.length > 0 ? (
-                        <div className="table-container">
-                            <table className="table">
+                        <div className="table-responsive">
+                            <table className="table" style={{ width: '100%', margin: 0 }}>
                                 <thead>
                                     <tr>
                                         <th>Ticket</th>
@@ -651,34 +619,39 @@ export default function AdminDashboard() {
                                     {stats.recentRepairs.map((repair) => (
                                         <tr key={repair.id}>
                                             <td>
-                                                <Link to={`/admin/reparaciones/${repair.id}`} className="ticket-link">
+                                                <Link to={`/admin/reparaciones/${repair.id}`} className="ticket-link" style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: 'var(--color-primary)' }}>
                                                     {repair.ticket_number}
                                                 </Link>
                                             </td>
-                                            <td>{repair.first_name} {repair.last_name}</td>
-                                            <td>{repair.model}</td>
+                                            <td style={{ fontSize: '13px' }}>{repair.first_name} {repair.last_name}</td>
+                                            <td style={{ fontSize: '13px', color: 'var(--color-text-secondary)' }}>{repair.model}</td>
                                             <td>
                                                 <span className={`status-badge status-${repair.status}`}>
                                                     {statusLabels[repair.status]}
                                                 </span>
                                             </td>
-                                            <td>{formatCurrency(repair.total_cost)}</td>
+                                            <td style={{ fontWeight: 700, fontSize: '13px' }}>
+                                                {formatCurrency(repair.total_cost)}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
                     ) : (
-                        <p className="text-muted text-center" style={{ padding: 'var(--sp-6) 0' }}>No hay reparaciones recientes</p>
+                        <p className="text-muted text-center" style={{ padding: '24px 0', fontSize: '13px' }}>
+                            No hay reparaciones recientes registradas.
+                        </p>
                     )}
                 </section>
 
-                {/* Timeline de Actividad Reciente */}
-                <section className="dashboard-section flex-1">
-                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {/* Timeline y Rankings */}
+                <section className="dashboard-section flex-1 card" style={{ padding: '20px' }}>
+                    <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px', fontWeight: 700, margin: '0 0 16px 0' }}>
                         <Activity size={18} className="text-primary" />
-                        Actividad del Sistema
+                        <span>Actividad del Taller</span>
                     </h2>
+                    
                     <div className="timeline">
                         {timelineItems.map((item) => (
                             <div className="timeline-item" key={item.id}>
@@ -697,37 +670,27 @@ export default function AdminDashboard() {
                         ))}
                     </div>
 
-                    <h2 style={{ marginTop: 'var(--sp-6)' }}>Más Vendidos (Mes)</h2>
-                    {salesStats?.topProducts?.length > 0 ? (
-                        <div className="top-list">
-                            {salesStats.topProducts.slice(0, 3).map((product, index) => (
-                                <div key={index} className="top-item">
-                                    <span className={`top-rank rank-${index + 1}`}>{index + 1}</span>
-                                    <span className="top-name">{product.description}</span>
-                                    <span className="top-count">{product.total_qty} uds</span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-muted" style={{ fontSize: 'var(--font-sm)', padding: 'var(--sp-2) 0' }}>
-                            Sin ventas este mes
-                        </p>
-                    )}
-
-                    <h2 style={{ marginTop: 'var(--sp-6)' }}>Servicios Populares</h2>
-                    {stats?.topServices?.length > 0 ? (
-                        <div className="top-list">
-                            {stats.topServices.slice(0, 3).map((service, index) => (
-                                <div key={index} className="top-item">
-                                    <span className={`top-rank rank-${index + 1}`}>{index + 1}</span>
-                                    <span className="top-name">{service.name}</span>
-                                    <span className="top-count">{service.count} serv</span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-muted" style={{ fontSize: 'var(--font-sm)', padding: 'var(--sp-2) 0' }}>Sin datos de servicios</p>
-                    )}
+                    {/* Más Vendidos */}
+                    <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
+                        <h3 style={{ fontSize: '14px', fontWeight: 700, margin: '0 0 10px 0', color: 'var(--color-text)' }}>
+                            Top Productos Más Vendidos
+                        </h3>
+                        {salesStats?.topProducts?.length > 0 ? (
+                            <div className="top-list">
+                                {salesStats.topProducts.slice(0, 3).map((product, index) => (
+                                    <div key={index} className="top-item">
+                                        <span className={`top-rank rank-${index + 1}`}>{index + 1}</span>
+                                        <span className="top-name">{product.description}</span>
+                                        <span className="top-count">{product.total_qty} uds</span>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p style={{ color: 'var(--color-text-secondary)', fontSize: '12px', margin: 0 }}>
+                                Sin ventas de mostrador este ciclo.
+                            </p>
+                        )}
+                    </div>
                 </section>
             </div>
         </main>

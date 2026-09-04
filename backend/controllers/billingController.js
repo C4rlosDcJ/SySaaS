@@ -1,9 +1,13 @@
 const db = require('../config/database');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const stripe = process.env.STRIPE_SECRET_KEY ? require('stripe')(process.env.STRIPE_SECRET_KEY) : null;
+
 
 // Crear Checkout Session (TenantAdmin inicia la compra/suscripcion)
 exports.createCheckoutSession = async (req, res) => {
     try {
+        if (!stripe) {
+            return res.status(500).json({ message: 'La integración con Stripe no está configurada.' });
+        }
         const tenantId = req.tenantCtx.tenantId;
         const { plan_slug } = req.body;
 
@@ -66,6 +70,9 @@ exports.createCheckoutSession = async (req, res) => {
 // Crear Customer Portal Session (Para que autogestionen su suscripcion en Stripe)
 exports.createPortalSession = async (req, res) => {
     try {
+        if (!stripe) {
+            return res.status(500).json({ message: 'La integración con Stripe no está configurada.' });
+        }
         const tenantId = req.tenantCtx.tenantId;
 
         const [tenants] = await db.query('SELECT stripe_customer_id FROM tenants WHERE id = ?', [tenantId]);
@@ -87,6 +94,9 @@ exports.createPortalSession = async (req, res) => {
 
 // Webhook seguro de Stripe
 exports.handleWebhook = async (req, res) => {
+    if (!stripe) {
+        return res.status(500).send('Stripe is not configured.');
+    }
     const sig = req.headers['stripe-signature'];
     let event;
 
@@ -173,5 +183,52 @@ exports.handleWebhook = async (req, res) => {
     } catch (error) {
         console.error('[STRIPE WEBHOOK HANDLER ERROR]:', error);
         res.status(500).json({ message: 'Error procesando evento.' });
+    }
+};
+
+// Contratar, activar o renovar plan de suscripción directamente (Flujo In-App / Sin bloqueo)
+exports.subscribePlan = async (req, res) => {
+    try {
+        const tenantId = req.tenantCtx.tenantId;
+        const { plan_id, billing_cycle = 'monthly' } = req.body;
+
+        if (!plan_id) {
+            return res.status(400).json({ message: 'El plan_id es obligatorio.' });
+        }
+
+        const [plans] = await db.query('SELECT * FROM saas_plans WHERE id = ?', [plan_id]);
+        if (plans.length === 0) {
+            return res.status(404).json({ message: 'Plan de suscripción no encontrado.' });
+        }
+        const plan = plans[0];
+
+        // Calcular periodo (30 días mensual, 365 días anual)
+        const days = billing_cycle === 'yearly' ? 365 : 30;
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + days);
+
+        await db.query(`
+            UPDATE tenants 
+            SET plan_id = ?, 
+                subscription_status = 'active', 
+                subscription_expires_at = ?,
+                trial_ends_at = NULL
+            WHERE id = ?
+        `, [plan.id, expiresAt, tenantId]);
+
+        res.json({
+            message: `¡Suscripción al plan "${plan.name}" activada exitosamente!`,
+            tenant: {
+                plan_id: plan.id,
+                plan_name: plan.name,
+                subscription_status: 'active',
+                subscription_expires_at: expiresAt,
+                max_branches: plan.max_branches,
+                max_users: plan.max_users
+            }
+        });
+    } catch (error) {
+        console.error('[BILLING] Error al activar suscripción:', error);
+        res.status(500).json({ message: 'Error al procesar la activación de la suscripción.' });
     }
 };

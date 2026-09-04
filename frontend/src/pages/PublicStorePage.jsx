@@ -23,7 +23,7 @@ export default function PublicStorePage() {
                         <div className="footer-brand">
                             <div className="footer-logo">
                                 <Wrench size={24} className="text-primary" />
-                                <span>{businessName || 'SysTeck'}</span>
+                                <span>{businessName || 'SySaaS'}</span>
                             </div>
                             <p>Servicio técnico profesional para todos tus dispositivos electrónicos.</p>
                         </div>
@@ -43,7 +43,7 @@ export default function PublicStorePage() {
                         </div>
                     </div>
                     <div className="footer-bottom">
-                        <p>© {new Date().getFullYear()} {businessName || 'SysTeck'}. Todos los derechos reservados.</p>
+                        <p>© {new Date().getFullYear()} {businessName || 'SySaaS'}. Todos los derechos reservados.</p>
                     </div>
                 </div>
             </footer>

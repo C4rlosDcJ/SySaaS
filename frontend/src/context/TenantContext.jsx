@@ -15,16 +15,19 @@ export function TenantProvider({ children }) {
         setTenant(tenantData);
         setBranches(branchList || []);
         
-        // Si no hay branch activa o la guardada no está en la lista del tenant, reestablecer
         const branchIds = (branchList || []).map(b => b.id);
-        if (defaultBranchId && !activeBranchId) {
+        if (defaultBranchId && branchIds.includes(defaultBranchId)) {
             updateActiveBranch(defaultBranchId);
-        } else if (activeBranchId && !branchIds.includes(activeBranchId)) {
-            if (branchIds.length > 0) {
-                updateActiveBranch(branchIds[0]);
+        } else if (branchIds.length > 0) {
+            const currentStored = localStorage.getItem('activeBranchId');
+            const parsedStored = currentStored ? parseInt(currentStored, 10) : null;
+            if (parsedStored && branchIds.includes(parsedStored)) {
+                updateActiveBranch(parsedStored);
             } else {
-                updateActiveBranch(null);
+                updateActiveBranch(branchIds[0]);
             }
+        } else {
+            updateActiveBranch(null);
         }
     };
 
@@ -44,6 +47,18 @@ export function TenantProvider({ children }) {
         updateActiveBranch(null);
     };
 
+    const setBranchesList = (branchList) => {
+        setBranches(branchList || []);
+        const branchIds = (branchList || []).map(b => b.id);
+        if (branchIds.length > 0 && (!activeBranchId || !branchIds.includes(activeBranchId))) {
+            updateActiveBranch(branchIds[0]);
+        }
+    };
+
+    const updateTenantInfo = (partialData) => {
+        setTenant(prev => prev ? ({ ...prev, ...partialData }) : partialData);
+    };
+
     const value = {
         tenant,
         branches,
@@ -51,6 +66,8 @@ export function TenantProvider({ children }) {
         activeBranch: branches.find(b => b.id === activeBranchId) || null,
         setTenantData,
         updateActiveBranch,
+        setBranchesList,
+        updateTenantInfo,
         clearTenantData
     };
 

@@ -3,6 +3,7 @@ import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { Search, Smartphone, Package, ChevronLeft, Calendar, FileText, Settings, User, Phone, CheckCircle, Clock, Tag, CreditCard, Shield, AlertTriangle, ListTodo, Wrench } from 'lucide-react';
 import { publicService } from '../services/api';
 import Navbar from '../components/Navbar';
+import Tilt3DCard from '../components/Tilt3DCard';
 import { useTheme } from '../context/ThemeContext';
 import './TrackRepairPage.css';
 
@@ -192,12 +193,20 @@ function TrackRepairPage() {
         <div className="public-track-page">
             <Navbar />
             
-            <main className="track-container animate-fadeIn" style={{ paddingTop: '100px' }}>
+            <main className="track-container animate-fadeIn" style={{ paddingTop: '90px' }}>
                 <div className="track-header-section">
-
                     
-                    <h1 className="mt-md">Rastrear mi Servicio</h1>
-                    <p className="text-muted">Ingresa tu número de ticket o folio de compra para conocer el estado actual.</p>
+                    <span className="nothing-badge pixel-font" style={{ marginBottom: '12px' }}>
+                        <span className="glyph-dot" />
+                        <span>(01) RASTREO PÚBLICO EN TIEMPO REAL</span>
+                    </span>
+
+                    <h1 style={{ marginTop: '8px', fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>
+                        Consulta de Servicio Técnico
+                    </h1>
+                    <p className="text-muted font-mono" style={{ fontSize: '13px' }}>
+                        Ingresa el folio del ticket (ej. REP-1001) para verificar el estatus y diagnóstico del equipo.
+                    </p>
 
                     <div className="track-search-card mt-md">
                         <form className="track-search-form" onSubmit={handleSearch}>
@@ -205,19 +214,20 @@ function TrackRepairPage() {
                                 <Search className="search-icon" size={18} />
                                 <input
                                     type="text"
-                                    className="input"
-                                    placeholder="Ej. TKT-10293 o VTA-1002"
+                                    className="input font-mono"
+                                    placeholder="Ej. REP-1001 o VTA-1002"
                                     value={ticketId}
                                     onChange={(e) => setTicketId(e.target.value)}
                                 />
                             </div>
-                            <button type="submit" className="btn btn-primary">
+                            <button type="submit" className="btn btn-primary" style={{ borderRadius: '9999px', padding: '0 22px' }}>
                                 Buscar
                             </button>
                         </form>
                         {error && (
-                            <div className="error-message mt-sm text-center">
-                                ⚠ {error}
+                            <div className="error-message mt-sm text-center font-mono" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                                <AlertTriangle size={15} />
+                                <span>{error}</span>
                             </div>
                         )}
                     </div>
@@ -226,7 +236,7 @@ function TrackRepairPage() {
                 {loading && (
                     <div className="loading-state">
                         <div className="spinner"></div>
-                        <p>Buscando información...</p>
+                        <p style={{ marginTop: '12px', fontSize: '13px' }}>Buscando información en la red...</p>
                     </div>
                 )}
 
@@ -234,36 +244,36 @@ function TrackRepairPage() {
                     <div className="track-content animate-slideUp">
                         
                         {/* =====================================================
-                           REPAIR VIEW
+                           REPAIR VIEW WITH 3D TILT CARD
                            ===================================================== */}
                         {isRepair && (
                             <>
                                 {/* Header Info */}
-                                <div className="card result-card-header mb-md">
-                                    <div className="flex items-center justify-between gap-md flex-col-mobile">
+                                <Tilt3DCard className="card result-card-header mb-md">
+                                    <div className="flex items-center justify-between gap-md flex-col-mobile" style={{ padding: '8px' }}>
                                         <div className="flex items-center gap-md">
                                             <div className="device-avatar">
                                                 <Smartphone size={24} />
                                             </div>
                                             <div>
                                                 <span className="text-primary font-bold text-xs uppercase tracking-wider block">
-                                                    Orden de Reparación
+                                                    ORDEN DE REPARACIÓN
                                                 </span>
-                                                <h2 className="card-title m-0">
+                                                <h2 className="card-title m-0" style={{ fontSize: '18px', fontWeight: 800 }}>
                                                     {repair.brand_name === 'Otro' ? repair.brand_other : repair.brand_name} {repair.model}
                                                 </h2>
-                                                <p className="text-muted m-0 font-mono text-sm">
-                                                    Ticket: {repair.ticket_number || ticketId}
+                                                <p className="text-muted m-0 font-mono text-sm" style={{ color: 'var(--color-primary)' }}>
+                                                    FOLIO: {repair.ticket_number || ticketId}
                                                 </p>
                                             </div>
                                         </div>
                                         <div className="status-badge-container">
-                                            <span className={`status-badge ${getStatusClass(rawStatus)}`}>
+                                            <span className={`status-badge ${getStatusClass(rawStatus)} pixel-font`} style={{ padding: '6px 14px', borderRadius: '9999px', fontSize: '12px' }}>
                                                 {displayStatus}
                                             </span>
                                         </div>
                                     </div>
-                                </div>
+                                </Tilt3DCard>
 
                                 {/* Banner de garantía si es ingreso por garantía */}
                                 {repair.parent_repair_id && (
@@ -700,7 +710,7 @@ function TrackRepairPage() {
                         <div className="footer-brand">
                             <div className="footer-logo">
                                 <Wrench size={24} className="text-primary" />
-                                <span>{businessName || 'SysTeck'}</span>
+                                <span>{businessName || 'SySaaS'}</span>
                             </div>
                             <p>Servicio técnico profesional para todos tus dispositivos electrónicos.</p>
                         </div>
@@ -720,7 +730,7 @@ function TrackRepairPage() {
                         </div>
                     </div>
                     <div className="footer-bottom">
-                        <p>© {new Date().getFullYear()} {businessName || 'SysTeck'}. Todos los derechos reservados.</p>
+                        <p>© {new Date().getFullYear()} {businessName || 'SySaaS'}. Todos los derechos reservados.</p>
                     </div>
                 </div>
             </footer>

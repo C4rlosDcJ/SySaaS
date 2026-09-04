@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { repairService } from '../../services/api';
@@ -11,8 +11,15 @@ import {
     ChevronRight,
     Clock,
     Activity,
-    Shield
+    Shield,
+    PieChart as PieIcon,
+    DollarSign,
+    TrendingUp
 } from 'lucide-react';
+import {
+    BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
+    AreaChart, Area
+} from 'recharts';
 import './ClientDashboard.css';
 
 // Mapeo de estados
@@ -55,7 +62,7 @@ export default function ClientDashboard() {
 
     const fetchRepairs = async () => {
         try {
-            const allData = await repairService.getAll({ limit: 200 });
+            const allData = await repairService.getAll({ limit: 500 });
             const all = allData.repairs || [];
 
             const active = all.filter(r => !['delivered', 'cancelled'].includes(r.status)).length;
@@ -70,9 +77,38 @@ export default function ClientDashboard() {
         }
     };
 
+    // Calcular total gastado y historial mensual de gastos
+    const allRepairs = useMemo(() => {
+        // repairs solo tiene las 5 mas recientes; usamos stats.total para la cuenta
+        return repairs;
+    }, [repairs]);
+
+    const totalSpent = useMemo(() => {
+        return repairs.reduce((sum, r) => sum + parseFloat(r.total_cost || 0), 0);
+    }, [repairs]);
+
+    const monthlySpending = useMemo(() => {
+        const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+        const grouped = {};
+        repairs.forEach(r => {
+            if (!r.created_at) return;
+            const d = new Date(r.created_at);
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            if (!grouped[key]) grouped[key] = 0;
+            grouped[key] += parseFloat(r.total_cost || 0);
+        });
+        return Object.entries(grouped)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .slice(-6)
+            .map(([key, amount]) => {
+                const [y, m] = key.split('-');
+                return { label: `${months[parseInt(m) - 1]} '${y.slice(-2)}`, amount };
+            });
+    }, [repairs]);
+
     const getGreeting = () => {
         const hour = currentTime.getHours();
-        if (hour < 12) return 'Buenos días';
+        if (hour < 12) return 'Buenos dias';
         if (hour < 19) return 'Buenas tardes';
         return 'Buenas noches';
     };
@@ -107,7 +143,7 @@ export default function ClientDashboard() {
             </div>
 
             {/* Stats Cards */}
-            <div className="stats-grid">
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))' }}>
                 <div className="stat-card">
                     <div className="stat-icon active">
                         <Smartphone size={24} />
@@ -134,6 +170,77 @@ export default function ClientDashboard() {
                         <span className="stat-value">{stats.total}</span>
                         <span className="stat-label">Historial Total</span>
                     </div>
+                </div>
+                <div className="stat-card">
+                    <div className="stat-icon" style={{ background: 'rgba(16, 185, 129, 0.1)' }}>
+                        <DollarSign size={24} style={{ color: '#10b981' }} />
+                    </div>
+                    <div className="stat-info">
+                        <span className="stat-value" style={{ fontSize: '18px' }}>
+                            ${totalSpent.toLocaleString('es-MX', { minimumFractionDigits: 0 })}
+                        </span>
+                        <span className="stat-label">Total Invertido</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Graficas del Cliente */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+                {/* Historial de Gastos Mensual */}
+                <div className="card" style={{ padding: '20px' }}>
+                    <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <TrendingUp size={18} style={{ color: '#10b981' }} />
+                        Historial de Gastos (Ultimos 6 Meses)
+                    </h3>
+                    {monthlySpending.length === 0 ? (
+                        <p style={{ color: 'var(--color-text-secondary)', textAlign: 'center', padding: '30px', fontSize: '13px' }}>Sin historial de gastos aun.</p>
+                    ) : (
+                        <div style={{ width: '100%', height: 200 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={monthlySpending} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                                    <defs>
+                                        <linearGradient id="clientSpendGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0.02} />
+                                        </linearGradient>
+                                    </defs>
+                                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }} />
+                                    <YAxis tickFormatter={(v) => `$${v >= 1000 ? (v/1000).toFixed(0) + 'K' : v}`} tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }} />
+                                    <Tooltip formatter={(v) => [`$${parseFloat(v).toLocaleString('es-MX')}`, 'Gasto']} />
+                                    <Area type="monotone" dataKey="amount" name="Gasto" stroke="#10b981" strokeWidth={2} fill="url(#clientSpendGradient)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+                </div>
+
+                {/* Resumen de Dispositivos */}
+                <div className="card" style={{ padding: '20px' }}>
+                    <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <PieIcon size={18} className="text-primary" /> Estado de Mis Equipos
+                    </h3>
+                    {repairs.length === 0 ? (
+                        <p style={{ color: 'var(--color-text-secondary)', textAlign: 'center', padding: '30px', fontSize: '13px' }}>No tienes equipos registrados.</p>
+                    ) : (
+                        <div style={{ width: '100%', height: 200 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={[
+                                    { name: 'Activas', total: stats.active },
+                                    { name: 'Completadas', total: stats.completed },
+                                    { name: 'Total', total: stats.total }
+                                ]}>
+                                    <XAxis dataKey="name" stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} />
+                                    <YAxis stroke="var(--color-text-secondary)" fontSize={12} tickLine={false} allowDecimals={false} />
+                                    <Tooltip formatter={(val) => [`${val} equipos`, 'Cantidad']} />
+                                    <Bar dataKey="total" radius={[4, 4, 0, 0]}>
+                                        <Cell key="0" fill="#3b82f6" />
+                                        <Cell key="1" fill="#10b981" />
+                                        <Cell key="2" fill="#6366f1" />
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
                 </div>
             </div>
 

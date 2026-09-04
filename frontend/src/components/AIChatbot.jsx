@@ -8,7 +8,7 @@ export default function AIChatbot() {
     const [messages, setMessages] = useState([
         {
             role: 'assistant',
-            text: 'Hola, soy el asistente virtual de SysTeck. ¿En qué puedo ayudarte hoy? Puedes preguntarme sobre reparaciones, cotizaciones o escribir un número de ticket para rastrearlo (ej: REP-260625-1234).'
+            text: 'Hola, soy el asistente virtual de SySaaS. ¿En qué puedo ayudarte hoy? Puedes preguntarme sobre reparaciones, cotizaciones o escribir un número de ticket para rastrearlo (ej: REP-260625-1234).'
         }
     ]);
     const [input, setInput] = useState('');
@@ -102,12 +102,11 @@ export default function AIChatbot() {
             {/* Botón Flotante */}
             {!isOpen && (
                 <button 
-                    className="chatbot-trigger-btn animate-pulse" 
+                    className="chatbot-trigger-btn" 
                     onClick={() => setIsOpen(true)}
-                    title="Chatea con SysTeck AI"
+                    title="Asistente Virtual"
                 >
-                    <MessageSquare size={24} />
-                    <span className="trigger-badge">IA</span>
+                    <MessageSquare size={20} />
                 </button>
             )}
 
@@ -120,7 +119,7 @@ export default function AIChatbot() {
                                 <Sparkles size={16} className="sparkle-icon" />
                             </div>
                             <div>
-                                <h3>SysTeck AI</h3>
+                                <h3>SySaaS AI</h3>
                                 <span className="chatbot-status">En línea</span>
                             </div>
                         </div>

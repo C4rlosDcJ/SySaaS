@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Wrench, Menu, X, User, LogOut } from 'lucide-react';
+import { Menu, X, LogOut, Sun, Moon } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
+import { getImageUrl } from '../services/api';
 import './Navbar.css';
 
 export default function Navbar() {
     const { user, isAuthenticated, logout, isAdmin } = useAuth();
-    const { businessLogo, businessName } = useTheme();
+    const { businessLogo, businessName, theme, toggleTheme } = useTheme();
     const [menuOpen, setMenuOpen] = useState(false);
     const location = useLocation();
     const navigate = useNavigate();
@@ -18,20 +19,6 @@ export default function Navbar() {
     };
 
     const isActive = (path) => location.pathname === path;
-
-    const renderBusinessName = () => {
-        const name = businessName || 'Sys-Teck';
-        if (name.includes('-')) {
-            const parts = name.split('-');
-            return <>{parts[0]}<span className="text-primary">-{parts.slice(1).join('-')}</span></>;
-        }
-        if (name.includes(' ')) {
-            const parts = name.split(' ');
-            return <>{parts[0]} <span className="text-primary">{parts.slice(1).join(' ')}</span></>;
-        }
-        const mid = Math.ceil(name.length / 2);
-        return <>{name.substring(0, mid)}<span className="text-primary">{name.substring(mid)}</span></>;
-    };
 
     const handleSectionClick = (e, targetId) => {
         setMenuOpen(false);
@@ -47,26 +34,31 @@ export default function Navbar() {
     return (
         <nav className="navbar">
             <div className="navbar-container">
-                {/* Logo */}
+                {/* Logo Nothing OS */}
                 <Link to="/" className="navbar-logo">
                     {businessLogo ? (
-                        <img src={businessLogo} alt="Logo" className="logo-img-navbar" style={{ width: '28px', height: '28px', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
+                        <img
+                            src={getImageUrl(businessLogo)}
+                            alt="Logo"
+                            style={{ width: '26px', height: '26px', objectFit: 'contain', borderRadius: '4px' }}
+                            onError={(e) => { e.target.style.display = 'none'; }}
+                        />
                     ) : (
-                        <Wrench size={24} className="logo-icon" />
+                        <span className="logo-glyph-dot" />
                     )}
-                    <span className="logo-text">{renderBusinessName()}</span>
+                    <span>{businessName || 'SYS-SAAS'}</span>
                 </Link>
 
-                {/* Mobile menu button */}
+                {/* Mobile menu toggle */}
                 <button
-                    className={`menu-toggle ${menuOpen ? 'active' : ''}`}
+                    className="menu-toggle"
                     onClick={() => setMenuOpen(!menuOpen)}
                     aria-label="Toggle menu"
                 >
-                    {menuOpen ? <X size={24} /> : <Menu size={24} />}
+                    {menuOpen ? <X size={22} /> : <Menu size={22} />}
                 </button>
 
-                {/* Navigation links */}
+                {/* Navigation Links in Pill Capsule */}
                 <div className={`navbar-menu ${menuOpen ? 'active' : ''}`}>
                     <div className="navbar-links">
                         <Link
@@ -76,13 +68,7 @@ export default function Navbar() {
                         >
                             Inicio
                         </Link>
-                        <Link
-                            to="/tienda"
-                            className={`nav-link ${isActive('/tienda') ? 'active' : ''}`}
-                            onClick={() => setMenuOpen(false)}
-                        >
-                            Tienda
-                        </Link>
+
                         <Link
                             to="/rastrear"
                             className={`nav-link ${isActive('/rastrear') ? 'active' : ''}`}
@@ -90,31 +76,36 @@ export default function Navbar() {
                         >
                             Rastrear
                         </Link>
+
                         <Link
-                            to="/#servicios"
+                            to="/#caracteristicas"
                             className="nav-link"
-                            onClick={(e) => handleSectionClick(e, 'servicios')}
+                            onClick={(e) => handleSectionClick(e, 'caracteristicas')}
                         >
-                            Servicios
+                            Características
                         </Link>
+
                         <Link
-                            to="/#proceso"
+                            to="/#planes"
                             className="nav-link"
-                            onClick={(e) => handleSectionClick(e, 'proceso')}
+                            onClick={(e) => handleSectionClick(e, 'planes')}
                         >
-                            Proceso
-                        </Link>
-                        <Link
-                            to="/#contacto"
-                            className="nav-link"
-                            onClick={(e) => handleSectionClick(e, 'contacto')}
-                        >
-                            Contacto
+                            Planes
                         </Link>
                     </div>
 
-                    {/* Auth buttons */}
+                    {/* Auth & Theme Controls */}
                     <div className="navbar-auth">
+                        <button
+                            type="button"
+                            onClick={toggleTheme}
+                            className="theme-toggle-pill"
+                            title={`Cambiar a modo ${theme === 'dark' ? 'claro' : 'oscuro'}`}
+                            aria-label="Toggle theme"
+                        >
+                            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+                        </button>
+
                         {isAuthenticated ? (
                             <>
                                 <Link
@@ -125,25 +116,29 @@ export default function Navbar() {
                                     <span className="user-avatar">
                                         {user?.first_name?.charAt(0).toUpperCase()}
                                     </span>
-                                    {user?.first_name}
+                                    <span>{user?.first_name}</span>
                                 </Link>
-                                <button onClick={handleLogout} className="btn btn-outline btn-sm">
-                                    <LogOut size={16} />
-                                    Salir
+                                <button
+                                    onClick={handleLogout}
+                                    className="nav-auth-login"
+                                    style={{ border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                >
+                                    <LogOut size={14} />
+                                    <span>Salir</span>
                                 </button>
                             </>
                         ) : (
                             <>
                                 <Link
                                     to="/login"
-                                    className="btn btn-ghost"
+                                    className="nav-auth-login"
                                     onClick={() => setMenuOpen(false)}
                                 >
                                     Iniciar Sesión
                                 </Link>
                                 <Link
                                     to="/register"
-                                    className="btn btn-primary"
+                                    className="nav-auth-register"
                                     onClick={() => setMenuOpen(false)}
                                 >
                                     Registrarse

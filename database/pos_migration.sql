@@ -1,9 +1,9 @@
 -- =====================================================
--- SysTeck — POS & Inventory Migration
+-- SySaaS — POS & Inventory Migration
 -- Run this AFTER the original schema.sql
 -- =====================================================
 
-USE systeck;
+USE sysaas;
 
 -- =====================================================
 -- TABLA: product_categories — Categorías de productos

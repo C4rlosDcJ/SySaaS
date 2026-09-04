@@ -169,7 +169,7 @@
     overflow-y: auto;
     padding: var(--sp-4) var(--sp-5);
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
     gap: var(--sp-3);
     align-content: start;
 }
@@ -225,9 +225,10 @@
 .pos-product-stock {
     font-size: 0.65rem;
     font-weight: 700;
-    padding: 3px 8px;
+    padding: 4px 8px;
     border-radius: var(--radius-sm);
     display: inline-flex;
+    align-items: center;
     align-self: flex-start;
     text-transform: uppercase;
     letter-spacing: 0.02em;
@@ -249,6 +250,21 @@
     background: rgba(255, 255, 255, 0.02);
     color: var(--color-text-muted);
     border-color: rgba(255, 255, 255, 0.05);
+}
+
+.pos-product-stock.other-branch {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+    border-color: rgba(59, 130, 246, 0.3);
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+}
+
+.pos-product-stock.sold {
+    background: rgba(148, 163, 184, 0.1);
+    color: var(--color-text-muted);
+    border-color: rgba(148, 163, 184, 0.2);
 }
 
 /* Service items in POS */

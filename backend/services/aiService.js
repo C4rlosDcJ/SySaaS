@@ -284,7 +284,7 @@ exports.chatSupport = async (message, history = []) => {
         console.error('[CHAT] Error al cargar settings:', e);
     }
 
-    const companyName = shopInfo.company_name || 'SysTeck';
+    const companyName = shopInfo.company_name || 'SySaaS';
     const companyPhone = shopInfo.company_phone || 'No registrado';
     const companyEmail = shopInfo.company_email || 'No registrado';
     const companyAddress = shopInfo.company_address || 'No registrada';

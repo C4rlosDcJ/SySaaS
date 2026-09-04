@@ -3,16 +3,19 @@ import { useSearchParams } from 'react-router-dom';
 import {
     ShoppingCart, Search, Package, Wrench, X, Plus, Minus, Trash2,
     CreditCard, Banknote, ArrowRightLeft, Printer, CheckCircle2,
-    User, ShoppingBag, ClipboardList, Hash, AlertCircle
+    User, ShoppingBag, ClipboardList, Hash, AlertCircle, Store
 } from 'lucide-react';
-import { inventoryService, posService, customerService, servicesCatalog, settingsService, repairService, orderService } from '../../services/api';
+import { inventoryService, posService, customerService, servicesCatalog, settingsService, repairService, orderService, getImageUrl } from '../../services/api';
 import { formatCurrency, STATUS_LABELS } from '../../utils/constants';
 import PrintReceipt from '../../components/common/PrintReceipt';
 import SignatureModal from '../../components/common/SignatureModal';
+import { showAlert, showConfirm } from '../../utils/swal';
 import './POSPage.css';
+import { useTenant } from '../../context/TenantContext';
 
 export default function POSPage() {
     const [searchParams, setSearchParams] = useSearchParams();
+    const { activeBranchId } = useTenant();
 
     // ─── State ───
     const [mode, setMode] = useState('products'); // 'products' | 'services' | 'repairs' | 'pending_sales'
@@ -77,7 +80,7 @@ export default function POSPage() {
     // ─── Load data ───
     useEffect(() => {
         loadData();
-    }, []);
+    }, [activeBranchId]);
 
     // ─── Deep-link: load repair from URL ───
     useEffect(() => {
@@ -307,7 +310,13 @@ export default function POSPage() {
     };
 
     const handleCancelPendingSale = async (sale) => {
-        if (!window.confirm(`¿Estás seguro de que deseas cancelar el pedido ${sale.order_number}?`)) {
+        const confirmed = await showConfirm({
+            title: '¿Cancelar Pedido?',
+            text: `¿Estás seguro de que deseas cancelar el pedido ${sale.order_number}?`,
+            icon: 'warning',
+            confirmText: 'Sí, cancelar'
+        });
+        if (!confirmed) {
             return;
         }
         try {
@@ -626,33 +635,77 @@ export default function POSPage() {
                     {mode === 'products' ? (
                         /* ── Products Tab ── */
                         filteredProducts.length > 0 ? (
-                            filteredProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(product => (
-                                <div
-                                    key={product.id}
-                                    className="pos-product-card"
-                                    style={{ '--cat-color': product.category_color }}
-                                    onClick={() => product.stock > 0 && addToCart(product, 'product')}
-                                >
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                                        <span className="pos-product-name">{product.name}</span>
-                                        {product.is_unique ? (
-                                            <span style={{ fontSize: '8px', fontWeight: 700, background: 'rgba(255, 255, 255, 0.08)', border: '1px solid var(--color-border-strong)', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>Único</span>
-                                        ) : null}
+                            filteredProducts.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(product => {
+                                const otherBranchesWithStock = (product.other_branches_stock || []).filter(b => b.stock > 0);
+                                const hasStockOtherBranches = otherBranchesWithStock.length > 0;
+
+                                return (
+                                    <div
+                                        key={product.id}
+                                        className="pos-product-card"
+                                        style={{ '--cat-color': product.category_color }}
+                                        onClick={() => {
+                                            if (product.stock > 0) {
+                                                addToCart(product, 'product');
+                                            } else if (hasStockOtherBranches) {
+                                                const branchDetails = otherBranchesWithStock.map(b => `• ${b.branch_name}: ${b.stock} unidades`).join('\n');
+                                                showAlert({
+                                                    title: 'Disponible en otra sucursal',
+                                                    text: `"${product.name}" no cuenta con existencias en esta sede, pero está disponible en:\n\n${branchDetails}\n\nPuedes solicitar un traspaso de inventario en el módulo de Inventario.`,
+                                                    icon: 'info'
+                                                });
+                                            }
+                                        }}
+                                    >
+                                        {product.image_url && (
+                                            <div style={{ width: '100%', height: '70px', borderRadius: 'var(--radius-sm)', overflow: 'hidden', marginBottom: '2px', background: 'var(--color-bg-elevated)' }}>
+                                                <img 
+                                                    src={getImageUrl(product.image_url)} 
+                                                    alt={product.name} 
+                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                                                    onError={(e) => { e.target.parentElement.style.display = 'none'; }}
+                                                />
+                                            </div>
+                                        )}
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                            <span className="pos-product-name">{product.name}</span>
+                                            {product.is_unique ? (
+                                                <span style={{ fontSize: '8px', fontWeight: 700, background: 'rgba(255, 255, 255, 0.08)', border: '1px solid var(--color-border-strong)', padding: '1px 4px', borderRadius: '3px', textTransform: 'uppercase', color: 'var(--color-text-secondary)' }}>Único</span>
+                                            ) : null}
+                                        </div>
+                                        <span className="pos-product-meta">{product.sku}</span>
+                                        <span className="pos-product-price">{formatCurrency(product.sale_price)}</span>
+                                        
+                                        {/* Stock Badge */}
+                                        {product.stock > 0 ? (
+                                            <span className={`pos-product-stock ${
+                                                product.is_unique ? 'in-stock' :
+                                                product.stock <= product.min_stock ? 'low-stock' : 'in-stock'
+                                            }`}>
+                                                {product.is_unique ? 'Único disponible' :
+                                                 product.stock <= product.min_stock ? `¡${product.stock} uds!` :
+                                                 `${product.stock} uds`}
+                                            </span>
+                                        ) : hasStockOtherBranches ? (
+                                            <span 
+                                                className="pos-product-stock other-branch" 
+                                                title={`Disponible en: ${otherBranchesWithStock.map(b => `${b.branch_name} (${b.stock} uds)`).join(', ')}`}
+                                            >
+                                                <Store size={11} style={{ marginRight: 4, flexShrink: 0 }} />
+                                                <span>{product.other_branches_total} {product.other_branches_total === 1 ? 'ud' : 'uds'} en otra sede</span>
+                                            </span>
+                                        ) : product.is_unique ? (
+                                            <span className="pos-product-stock sold">
+                                                Vendido
+                                            </span>
+                                        ) : (
+                                            <span className="pos-product-stock no-stock">
+                                                Sin stock
+                                            </span>
+                                        )}
                                     </div>
-                                    <span className="pos-product-meta">{product.sku}</span>
-                                    <span className="pos-product-price">{formatCurrency(product.sale_price)}</span>
-                                    <span className={`pos-product-stock ${
-                                        product.stock === 0 ? 'no-stock' :
-                                        product.is_unique ? 'in-stock' :
-                                        product.stock <= product.min_stock ? 'low-stock' : 'in-stock'
-                                    }`}>
-                                        {product.stock === 0 ? 'Sin stock' :
-                                         product.is_unique ? 'Único disponible' :
-                                         product.stock <= product.min_stock ? `¡${product.stock} uds!` :
-                                         `${product.stock} uds`}
-                                    </span>
-                                </div>
-                            ))
+                                );
+                            })
                         ) : (
                             <div className="empty-state" style={{ gridColumn: '1 / -1' }}>
                                 <Package size={40} className="empty-icon" />

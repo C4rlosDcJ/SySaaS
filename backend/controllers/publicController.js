@@ -146,64 +146,86 @@ exports.trackRepair = async (req, res) => {
     }
 };
 
-// Obtener configuración de tema (público, sin auth, basado en el slug del tenant)
+// Obtener configuración de tema (público, sin auth, basado en el slug del tenant o configuración global de la plataforma)
 exports.getTheme = async (req, res) => {
     try {
         const { slug } = req.params;
 
-        // Buscar tenant por slug
-        const [tenants] = await db.query('SELECT id, company_name, logo_url, primary_color FROM tenants WHERE slug = ?', [slug]);
-        if (tenants.length === 0) {
-            return res.status(404).json({ message: 'Empresa no encontrada.' });
+        // Si se solicita un tenant específico por slug
+        if (slug && slug !== 'undefined' && slug !== 'null' && slug !== 'default') {
+            const [tenants] = await db.query('SELECT id, company_name, logo_url, primary_color FROM tenants WHERE slug = ?', [slug]);
+            if (tenants.length > 0) {
+                const tenant = tenants[0];
+                const [rows] = await db.query('SELECT setting_key, setting_value FROM settings WHERE tenant_id = ?', [tenant.id]);
+
+                const theme = {
+                    accent_color: tenant.primary_color || '#4f46e5',
+                    border_radius: '12px',
+                    business_name: tenant.company_name,
+                    business_logo: tenant.logo_url || '',
+                    landing_show_stats: 'true',
+                    landing_show_why: 'true',
+                    landing_show_services: 'true',
+                    landing_show_process: 'true',
+                    landing_show_testimonials: 'true',
+                    landing_show_cta: 'true',
+                    landing_show_contact: 'true'
+                };
+
+                rows.forEach(row => {
+                    theme[row.setting_key] = row.setting_value;
+                });
+
+                // Obtener reseñas reales de clientes del tenant
+                let reviews = [];
+                try {
+                    const [reviewRows] = await db.query(`
+                        SELECT 
+                            CONCAT(u.first_name, ' ', SUBSTRING(u.last_name, 1, 1), '.') as name,
+                            r.review_text as text,
+                            CONCAT(COALESCE(b.name, r.brand_other, 'Equipo'), ' ', r.model) as device,
+                            r.rating
+                        FROM repairs r
+                        JOIN users u ON r.customer_id = u.id
+                        LEFT JOIN brands b ON r.brand_id = b.id
+                        WHERE r.tenant_id = ? AND r.rating IS NOT NULL AND r.review_text IS NOT NULL AND r.review_text != ''
+                        ORDER BY r.updated_at DESC
+                        LIMIT 6
+                    `, [tenant.id]);
+                    reviews = reviewRows;
+                } catch (e) {
+                    console.warn('[PUBLIC] Error al consultar reseñas de base de datos:', e.message);
+                }
+
+                theme.reviews = reviews;
+                return res.json(theme);
+            }
         }
 
-        const tenant = tenants[0];
+        // Si NO viene slug o es la landing/login global de la plataforma, devolver la configuración global SaaS
+        const [globalRows] = await db.query('SELECT setting_key, setting_value FROM settings WHERE tenant_id IS NULL');
+        const globalSettings = globalRows.reduce((acc, curr) => {
+            acc[curr.setting_key] = curr.setting_value;
+            return acc;
+        }, {});
 
-        // Obtener configuraciones de settings de este tenant
-        const [rows] = await db.query('SELECT setting_key, setting_value FROM settings WHERE tenant_id = ?', [tenant.id]);
-
-        const theme = {
-            accent_color: tenant.primary_color || '#e63358',
-            border_radius: '12px',
-            business_name: tenant.company_name,
-            business_logo: tenant.logo_url || '',
+        const platformTheme = {
+            accent_color: globalSettings.accent_color || '#4f46e5',
+            border_radius: globalSettings.border_radius || '12px',
+            business_name: globalSettings.platform_name || 'SySaaS',
+            business_logo: globalSettings.platform_logo || globalSettings.platform_logo_url || '',
+            contact_email: globalSettings.support_email || 'soporte@sysaas.com',
             landing_show_stats: 'true',
             landing_show_why: 'true',
             landing_show_services: 'true',
             landing_show_process: 'true',
             landing_show_testimonials: 'true',
             landing_show_cta: 'true',
-            landing_show_contact: 'true'
+            landing_show_contact: 'true',
+            ...globalSettings
         };
 
-        rows.forEach(row => {
-            theme[row.setting_key] = row.setting_value;
-        });
-
-        // Obtener reseñas reales de clientes del tenant
-        let reviews = [];
-        try {
-            const [reviewRows] = await db.query(`
-                SELECT 
-                    CONCAT(u.first_name, ' ', SUBSTRING(u.last_name, 1, 1), '.') as name,
-                    r.review_text as text,
-                    CONCAT(COALESCE(b.name, r.brand_other, 'Equipo'), ' ', r.model) as device,
-                    r.rating
-                FROM repairs r
-                JOIN users u ON r.customer_id = u.id
-                LEFT JOIN brands b ON r.brand_id = b.id
-                WHERE r.tenant_id = ? AND r.rating IS NOT NULL AND r.review_text IS NOT NULL AND r.review_text != ''
-                ORDER BY r.updated_at DESC
-                LIMIT 6
-            `, [tenant.id]);
-            reviews = reviewRows;
-        } catch (e) {
-            console.warn('[PUBLIC] Error al consultar reseñas de base de datos:', e.message);
-        }
-
-        theme.reviews = reviews;
-
-        res.json(theme);
+        res.json(platformTheme);
     } catch (error) {
         console.error('[PUBLIC] Error al obtener tema:', error);
         res.status(500).json({ message: 'Error al obtener la configuración visual.' });
@@ -218,8 +240,14 @@ exports.getCatalogServices = async (req, res) => {
         const { slug } = req.params;
         const { device_type_id } = req.query;
 
-        // Buscar tenant por slug
-        const [tenants] = await db.query('SELECT id FROM tenants WHERE slug = ?', [slug]);
+        // Buscar tenant por slug o por defecto
+        let tenants = [];
+        if (slug && slug !== 'undefined' && slug !== 'null') {
+            [tenants] = await db.query('SELECT id FROM tenants WHERE slug = ?', [slug]);
+        } else {
+            [tenants] = await db.query('SELECT id FROM tenants ORDER BY id ASC LIMIT 1');
+        }
+
         if (tenants.length === 0) {
             return res.status(404).json({ message: 'Empresa no encontrada.' });
         }
@@ -249,10 +277,13 @@ exports.getCatalogServices = async (req, res) => {
             [tenantId]
         );
 
-        res.json({ services, deviceTypes });
+        res.json({
+            services,
+            device_types: deviceTypes
+        });
     } catch (error) {
-        console.error('[PUBLIC] Error al obtener catálogo de servicios:', error);
-        res.status(500).json({ message: 'Error al obtener servicios.' });
+        console.error('[PUBLIC] Error al obtener servicios:', error);
+        res.status(500).json({ message: 'Error al obtener catálogo de servicios.' });
     }
 };
 
@@ -262,11 +293,17 @@ exports.getCatalogServices = async (req, res) => {
 exports.getCatalogProducts = async (req, res) => {
     try {
         const { slug } = req.params;
-        const { category_id, search, branch_id, page = 1, limit = 24 } = req.query;
+        const { category_id, search, branch_id, page = 1, limit = 50 } = req.query;
         const offset = (page - 1) * limit;
 
-        // Buscar tenant por slug
-        const [tenants] = await db.query('SELECT id FROM tenants WHERE slug = ?', [slug]);
+        // Buscar tenant por slug o por defecto
+        let tenants = [];
+        if (slug && slug !== 'undefined' && slug !== 'null') {
+            [tenants] = await db.query('SELECT id FROM tenants WHERE slug = ?', [slug]);
+        } else {
+            [tenants] = await db.query('SELECT id FROM tenants ORDER BY id ASC LIMIT 1');
+        }
+
         if (tenants.length === 0) {
             return res.status(404).json({ message: 'Empresa no encontrada.' });
         }
@@ -327,5 +364,38 @@ exports.getCatalogProducts = async (req, res) => {
     } catch (error) {
         console.error('[PUBLIC] Error al obtener catálogo de productos:', error);
         res.status(500).json({ message: 'Error al obtener productos.' });
+    }
+};
+
+// Obtener información pública de la plataforma global (SuperAdmin / Branding SaaS)
+exports.getPlatformInfo = async (req, res) => {
+    try {
+        const [rows] = await db.query('SELECT setting_key, setting_value FROM settings WHERE tenant_id IS NULL');
+        const settings = rows.reduce((acc, curr) => {
+            acc[curr.setting_key] = curr.setting_value;
+            return acc;
+        }, {});
+
+        res.json({
+            platform_name: settings.platform_name || 'SySaaS',
+            platform_logo: settings.platform_logo || settings.platform_logo_url || '',
+            support_email: settings.support_email || 'soporte@sysaas.com',
+            frontend_url: settings.frontend_url || '',
+            registration_mode: settings.registration_mode || 'open',
+            maintenance_mode: settings.maintenance_mode === 'true' || settings.maintenance_mode === true,
+            allow_public_store: settings.allow_public_store !== 'false' && settings.allow_public_store !== false,
+            default_trial_days: parseInt(settings.default_trial_days) || 14
+        });
+    } catch (error) {
+        console.error('[PUBLIC] Error al obtener info de plataforma:', error);
+        res.json({
+            platform_name: 'SySaaS',
+            platform_logo: '',
+            support_email: 'soporte@sysaas.com',
+            registration_mode: 'open',
+            maintenance_mode: false,
+            allow_public_store: true,
+            default_trial_days: 14
+        });
     }
 };

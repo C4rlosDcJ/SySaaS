@@ -1,83 +1,117 @@
 import { useState, useEffect } from 'react';
-import { settingsService } from '../../services/api';
+import { settingsService, uploadService, getImageUrl } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
-import { Save, RefreshCw, ShieldCheck, Building, Palette, Check, LayoutGrid, Upload, Trash2, Image, Wrench, Star, Sparkles, Eye, EyeOff } from 'lucide-react';
+import { useTenant } from '../../context/TenantContext';
+import { compressImage } from '../../utils/imageCompressor';
+import {
+    Save,
+    RefreshCw,
+    Building2,
+    Upload,
+    Trash2,
+    Image,
+    Wrench,
+    Bell,
+    LayoutGrid
+} from 'lucide-react';
+import { showAlert } from '../../utils/swal';
 import './SettingsPage.css';
-
-const ACCENT_PALETTE = [
-    { name: 'Nothing Red', value: '#ff003c' },
-    { name: 'Apple Blue', value: '#0070f3' },
-    { name: 'Carbon Black', value: '#1a1a1a' },
-    { name: 'Pure White', value: '#ffffff' },
-    { name: 'Slate Grey', value: '#71717a' }
-];
 
 export default function SettingsPage() {
     const {
-        accentColor,
-        setAccentColor,
+        theme,
         borderRadius,
         setBorderRadius,
         setBusinessName,
-        businessLogo,
-        setBusinessLogo,
-        landingShowStats,
-        setLandingShowStats,
-        landingShowWhy,
-        setLandingShowWhy,
-        landingShowServices,
-        setLandingShowServices,
-        landingShowProcess,
-        setLandingShowProcess,
-        landingShowTestimonials,
-        setLandingShowTestimonials,
-        landingShowCTA,
-        setLandingShowCTA,
-        landingShowContact,
-        setLandingShowContact,
-        contactAddress,
-        setContactAddress,
-        contactSchedule,
-        setContactSchedule,
-        contactEmail,
-        setContactEmail,
-        contactPhone,
-        setContactPhone,
-        landingServices,
-        setLandingServices
+        setBusinessLogo
     } = useTheme();
-    
+
+    const isDark = theme === 'dark';
+    const { tenant, updateTenantInfo } = useTenant();
+    const tenantId = tenant?.id || 'default';
+
+    const [activeTab, setActiveTab] = useState('general'); // 'general' | 'repairs' | 'notifications' | 'branding'
+
     const [settings, setSettings] = useState({
-        default_warranty_days: '30',
-        business_name: 'Sys-Teck',
+        business_name: tenant?.company_name || 'Sys-Teck',
+        tax_id: '',
         contact_email: '',
         contact_phone: '',
         contact_address: '',
         contact_schedule: '',
-        gemini_api_key: ''
+        currency: 'MXN',
+        tax_rate: '16',
+        default_warranty_days: '30',
+        repair_ticket_prefix: 'REP-',
+        ticket_terms_conditions: 'Garantía válida únicamente presentando este comprobante. No aplica por caídas, humedad o manipulación de terceros.',
+        ticket_footer_note: 'Gracias por su confianza. Consulte el estado de su orden en línea.',
+        notify_email_on_status_change: 'true',
+        whatsapp_ready_template: 'Hola {cliente}, tu equipo {modelo} (Folio: {folio}) está listo para entrega en nuestra sucursal. Saludos de {empresa}.',
+        business_logo: tenant?.logo_url || ''
     });
-    
+
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
-    // Formulario de nuevo servicio
-    const [showServiceForm, setShowServiceForm] = useState(false);
-    const [newService, setNewService] = useState({ title: '', description: '', color: '#3b82f6', icon: 'smartphone' });
-    const [showApiKey, setShowApiKey] = useState(false);
+    // Cargar configuraciones exclusivas de este tenant
+    useEffect(() => {
+        fetchSettings();
+    }, [tenantId]);
 
-    const handleLogoUpload = (e) => {
+    const fetchSettings = async () => {
+        try {
+            setLoading(true);
+            const data = await settingsService.getAll();
+            if (data) {
+                setSettings(prev => ({
+                    ...prev,
+                    ...data
+                }));
+                if (updateTenantInfo) {
+                    updateTenantInfo({
+                        company_name: data.business_name || tenant?.company_name,
+                        logo_url: data.business_logo !== undefined ? data.business_logo : tenant?.logo_url
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error al cargar configuraciones:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleLogoUpload = async (e) => {
         const file = e.target.files[0];
-        if (file) {
+        if (!file) return;
+
+        try {
+            const localPreview = URL.createObjectURL(file);
+            setSettings(prev => ({ ...prev, business_logo: localPreview }));
+
+            const compressed = await compressImage(file, { maxWidth: 500, maxHeight: 500, quality: 0.85 });
+            const formData = new FormData();
+            formData.append('image', compressed);
+
+            const res = await uploadService.uploadSingle(formData);
+            if (res?.url) {
+                setSettings(prev => ({ ...prev, business_logo: res.url }));
+                if (updateTenantInfo) {
+                    updateTenantInfo({ logo_url: res.url });
+                }
+            }
+        } catch (err) {
+            console.error('Error subiendo logo de empresa:', err);
+            // Fallback base64
             const reader = new FileReader();
             reader.onload = (event) => {
                 const img = new window.Image();
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 300;
-                    const MAX_HEIGHT = 300;
+                    const MAX_WIDTH = 250;
+                    const MAX_HEIGHT = 250;
                     let width = img.width;
                     let height = img.height;
-
                     if (width > height) {
                         if (width > MAX_WIDTH) {
                             height *= MAX_WIDTH / width;
@@ -93,10 +127,11 @@ export default function SettingsPage() {
                     canvas.height = height;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
-                    
-                    // Convert to base64 with WebP compressed quality (optimal and lighter)
-                    const dataUrl = canvas.toDataURL('image/webp', 0.8);
-                    setBusinessLogo(dataUrl);
+                    const compressedBase64 = canvas.toDataURL('image/png', 0.8);
+                    setSettings(prev => ({ ...prev, business_logo: compressedBase64 }));
+                    if (updateTenantInfo) {
+                        updateTenantInfo({ logo_url: compressedBase64 });
+                    }
                 };
                 img.src = event.target.result;
             };
@@ -104,29 +139,10 @@ export default function SettingsPage() {
         }
     };
 
-    useEffect(() => {
-        fetchSettings();
-    }, []);
-
-    const fetchSettings = async () => {
-        try {
-            setLoading(true);
-            const data = await settingsService.getAll();
-            setSettings(prev => ({
-                ...prev,
-                ...data
-            }));
-            if (data) {
-                if (data.business_name) setBusinessName(data.business_name);
-                if (data.contact_address) setContactAddress(data.contact_address);
-                if (data.contact_schedule) setContactSchedule(data.contact_schedule);
-                if (data.contact_email) setContactEmail(data.contact_email);
-                if (data.contact_phone) setContactPhone(data.contact_phone);
-            }
-        } catch (error) {
-            console.error('Error al cargar configuraciones:', error);
-        } finally {
-            setLoading(false);
+    const handleRemoveLogo = () => {
+        setSettings(prev => ({ ...prev, business_logo: '' }));
+        if (updateTenantInfo) {
+            updateTenantInfo({ logo_url: '' });
         }
     };
 
@@ -143,33 +159,25 @@ export default function SettingsPage() {
         try {
             setSaving(true);
             await settingsService.update(settings);
-            setBusinessName(settings.business_name);
-            setContactAddress(settings.contact_address || '');
-            setContactSchedule(settings.contact_schedule || '');
-            setContactEmail(settings.contact_email || '');
-            setContactPhone(settings.contact_phone || '');
-            alert('Configuraciones globales guardadas correctamente');
+            if (updateTenantInfo) {
+                updateTenantInfo({
+                    company_name: settings.business_name,
+                    logo_url: settings.business_logo
+                });
+            }
+            showAlert({
+                title: 'Configuración Guardada',
+                text: 'Los parámetros y logotipo de tu empresa han sido actualizados con éxito.',
+                icon: 'success'
+            });
         } catch (error) {
-            alert('Error al guardar configuraciones: ' + error.message);
+            showAlert({
+                title: 'Error al Guardar',
+                text: error.message || 'No se pudieron guardar las configuraciones.',
+                icon: 'error'
+            });
         } finally {
             setSaving(false);
-        }
-    };
-
-    // Funciones para agregar/eliminar servicios
-    const handleAddService = (e) => {
-        e.preventDefault();
-        if (!newService.title.trim()) return;
-        const updated = [...landingServices, newService];
-        setLandingServices(updated);
-        setNewService({ title: '', description: '', color: '#3b82f6', icon: 'smartphone' });
-        setShowServiceForm(false);
-    };
-
-    const handleDeleteService = (idx) => {
-        if (window.confirm('¿Estás seguro de eliminar esta especialidad?')) {
-            const updated = landingServices.filter((_, i) => i !== idx);
-            setLandingServices(updated);
         }
     };
 
@@ -179,7 +187,7 @@ export default function SettingsPage() {
                 <main className="dashboard-main">
                     <div className="loading-state">
                         <div className="spinner"></div>
-                        <p>Cargando configuraciones...</p>
+                        <p style={{ marginTop: '12px', fontSize: '13px', color: 'var(--color-text-secondary)' }}>Cargando configuraciones de la empresa...</p>
                     </div>
                 </main>
             </div>
@@ -187,449 +195,448 @@ export default function SettingsPage() {
     }
 
     return (
-        <div className="settings-container animate-fadeIn">
-            <header className="settings-header" style={{ marginBottom: 'var(--sp-6)' }}>
-                <h1 style={{ fontSize: 'var(--font-2xl)', fontWeight: 700 }}>Configuración del Sistema</h1>
-                <p className="text-muted">Gestiona los parámetros globales de la aplicación y el estilo visual</p>
+        <div className="settings-container animate-fadeIn" style={{ paddingTop: 'var(--sp-4)' }}>
+            
+            {/* Header */}
+            <header className="settings-header" style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                    <h1 style={{ fontSize: '24px', fontWeight: 800, margin: 0 }}>Configuración de Empresa</h1>
+                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px', margin: '4px 0 0 0' }}>
+                        Parámetros fiscales, políticas de garantía para tickets y notificaciones a clientes
+                    </p>
+                </div>
+                <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={handleSubmit}
+                    disabled={saving}
+                    style={{ display: 'inline-flex', gap: '6px', alignItems: 'center', padding: '8px 18px', fontWeight: 700 }}
+                >
+                    {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                    <span>{saving ? 'Guardando...' : 'Guardar Todo'}</span>
+                </button>
             </header>
 
-            <div className="settings-grid">
-                {/* Columna Izquierda: Tarjeta Resumen / Configuración Estética y Visual */}
-                <div className="profile-card">
-                    <div className="settings-section">
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-                            {businessLogo ? (
-                                <div className="logo-preview-container" style={{ position: 'relative', width: '80px', height: '80px', borderRadius: '50%', border: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: 'var(--color-bg-elevated)', marginBottom: 'var(--sp-4)', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
-                                    <img src={businessLogo} alt="Business Logo" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                                </div>
-                            ) : (
-                                <div className="logo-preview-placeholder" style={{ width: '80px', height: '80px', borderRadius: '50%', border: '1px dashed var(--color-border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', background: 'var(--color-bg-elevated)', marginBottom: 'var(--sp-4)' }}>
-                                    <Image size={32} />
-                                </div>
-                            )}
-                            <h2 className="profile-name" style={{ fontSize: 'var(--font-base)', fontWeight: 700, marginBottom: '2px' }}>{settings.business_name || 'Sys-Teck'}</h2>
-                            <span className="profile-role" style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-primary)', background: 'var(--color-primary-muted)', padding: '2px 10px', borderRadius: 'var(--radius-full)', fontWeight: 600, display: 'inline-block', marginBottom: 'var(--sp-5)' }}>
-                                Ajustes de Estilo
-                            </span>
-                        </div>
+            {/* Barra de Pestañas Tipo Cápsula (Estilo idéntico a botón Guardar Todo) */}
+            <div style={{
+                display: 'inline-flex',
+                gap: '4px',
+                marginBottom: '24px',
+                background: 'var(--color-bg-card)',
+                padding: '5px',
+                borderRadius: '9999px',
+                border: '1px solid var(--color-border)',
+                flexWrap: 'wrap'
+            }}>
+                {[
+                    { id: 'general', label: 'Datos de Empresa', icon: Building2 },
+                    { id: 'repairs', label: 'Taller & Tickets', icon: Wrench },
+                    { id: 'notifications', label: 'Notificaciones a Clientes', icon: Bell },
+                    { id: 'branding', label: 'Identidad & Logo', icon: LayoutGrid }
+                ].map(tab => {
+                    const isActive = activeTab === tab.id;
+                    const Icon = tab.icon;
 
-                        <div className="input-group" style={{ textAlign: 'left', borderTop: '1px solid var(--color-border)', paddingTop: 'var(--sp-4)' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)', marginBottom: 'var(--sp-2)' }}>
-                                <LayoutGrid size={13} /> Bordes de Componentes
-                            </label>
-                            <div className="radius-selector" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-1.5)' }}>
-                                <button
-                                    type="button"
-                                    className={`radius-btn ${borderRadius === '0px' ? 'selected' : ''}`}
-                                    onClick={() => setBorderRadius('0px')}
-                                    style={{ padding: '6px 4px', fontSize: '10px', textAlign: 'center' }}
-                                >
-                                    Recto
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`radius-btn ${borderRadius === '6px' ? 'selected' : ''}`}
-                                    onClick={() => setBorderRadius('6px')}
-                                    style={{ padding: '6px 4px', fontSize: '10px', textAlign: 'center' }}
-                                >
-                                    Suave (6px)
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`radius-btn ${borderRadius === '12px' ? 'selected' : ''}`}
-                                    onClick={() => setBorderRadius('12px')}
-                                    style={{ padding: '6px 4px', fontSize: '10px', textAlign: 'center' }}
-                                >
-                                    Redond. (12px)
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`radius-btn ${borderRadius === '20px' ? 'selected' : ''}`}
-                                    onClick={() => setBorderRadius('20px')}
-                                    style={{ padding: '6px 4px', fontSize: '10px', textAlign: 'center' }}
-                                >
-                                    Máx (20px)
-                                </button>
-                            </div>
-                        </div>
+                    const activeBg = isDark ? '#ffffff' : '#000000';
+                    const activeColor = isDark ? '#000000' : '#ffffff';
+                    const inactiveColor = isDark ? '#a1a1aa' : '#71717a';
 
-                        <div className="input-group" style={{ textAlign: 'left', marginTop: 'var(--sp-4)', borderTop: '1px solid var(--color-border)', paddingTop: 'var(--sp-4)' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-text-secondary)', marginBottom: 'var(--sp-2)' }}>
-                                <Upload size={13} /> Logotipo del Sistema
-                            </label>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
-                                <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'center', fontSize: '11px', padding: '8px 12px', width: '100%' }}>
-                                    <Upload size={12} /> Seleccionar Imagen
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleLogoUpload}
-                                        style={{ display: 'none' }}
-                                    />
-                                </label>
-                                {businessLogo && (
-                                    <button
-                                        type="button"
-                                        className="btn btn-outline btn-sm"
-                                        style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'center', fontSize: '11px', padding: '8px 12px', width: '100%', color: 'var(--color-error)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
-                                        onClick={() => setBusinessLogo('')}
-                                    >
-                                        <Trash2 size={12} /> Eliminar Logo
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    return (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => setActiveTab(tab.id)}
+                            style={{
+                                padding: '8px 20px',
+                                fontSize: '13px',
+                                fontWeight: isActive ? 800 : 600,
+                                borderRadius: '9999px',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '8px',
+                                background: isActive ? activeBg : 'transparent',
+                                color: isActive ? activeColor : inactiveColor,
+                                boxShadow: isActive ? '0 2px 8px rgba(0, 0, 0, 0.25)' : 'none',
+                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                            }}
+                        >
+                            <Icon size={15} style={{ color: isActive ? activeColor : inactiveColor }} />
+                            <span>{tab.label}</span>
+                        </button>
+                    );
+                })}
+            </div>
 
-                {/* Columna Derecha: Todos los Formularios y Configuración Detallada */}
-                <div className="profile-forms-col">
-                    {/* Secciones de la Página de Inicio */}
-                    <div className="profile-section">
-                        <h2><LayoutGrid size={18} className="text-primary" /> Secciones de la Página de Inicio</h2>
-                        <p className="text-muted" style={{ fontSize: 'var(--font-xs)', marginBottom: 'var(--sp-4)' }}>
-                            Activa o desactiva las secciones visibles para los clientes en la página de inicio.
-                        </p>
-                        
-                        <div className="toggles-list" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)' }}>
-                            {[
-                                { label: 'Barra de Estadísticas', desc: 'Muestra cifras clave como equipos reparados y clientes satisfechos.', value: landingShowStats, setter: setLandingShowStats },
-                                { label: '¿Por qué elegirnos?', desc: 'Muestra las tarjetas con los pilares y fortalezas de tu servicio.', value: landingShowWhy, setter: setLandingShowWhy },
-                                { label: 'Especialidades y Servicios', desc: 'Muestra el listado de categorías de dispositivos que reparas.', value: landingShowServices, setter: setLandingShowServices },
-                                { label: 'Proceso en Cuatro Pasos', desc: 'Describe las fases por las que pasa el dispositivo (Recepción, Diagnóstico, etc.).', value: landingShowProcess, setter: setLandingShowProcess },
-                                { label: 'Opiniones de Clientes (Testimonios)', desc: 'Muestra lo que opinan tus clientes sobre tus reparaciones.', value: landingShowTestimonials, setter: setLandingShowTestimonials },
-                                { label: 'Llamada a la Acción (CTA)', desc: 'Invita al usuario a solicitar una cotización con un botón destacado.', value: landingShowCTA, setter: setLandingShowCTA },
-                                { label: 'Información de Contacto', desc: 'Muestra dirección, teléfono, correo y horario al final de la página.', value: landingShowContact, setter: setLandingShowContact }
-                            ].map((toggle, idx) => (
-                                <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 12px', background: 'var(--color-bg-elevated)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', paddingRight: 'var(--sp-3)' }}>
-                                        <span style={{ fontWeight: 600, fontSize: '12px', color: 'var(--color-text)' }}>{toggle.label}</span>
-                                        <span className="text-muted" style={{ fontSize: '10px', lineHeight: 1.3 }}>{toggle.desc}</span>
-                                    </div>
-                                    <label className="switch-wrapper" style={{ position: 'relative', display: 'inline-block', width: '42px', height: '22px', flexShrink: 0 }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={toggle.value}
-                                            onChange={(e) => toggle.setter(e.target.checked)}
-                                            style={{ opacity: 0, width: 0, height: 0 }}
-                                        />
-                                        <span className="slider" style={{
-                                            position: 'absolute',
-                                            cursor: 'pointer',
-                                            top: 0,
-                                            left: 0,
-                                            right: 0,
-                                            bottom: 0,
-                                            backgroundColor: toggle.value ? 'var(--color-primary)' : 'rgba(255,255,255,0.02)',
-                                            border: `1.5px solid ${toggle.value ? 'var(--color-primary)' : 'var(--color-border-strong)'}`,
-                                            transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                                            borderRadius: '22px'
-                                        }}>
-                                            <span style={{
-                                                position: 'absolute',
-                                                content: '""',
-                                                height: '14px',
-                                                width: '14px',
-                                                left: toggle.value ? '23px' : '3px',
-                                                bottom: '2.5px',
-                                                backgroundColor: toggle.value ? 'var(--color-primary-contrast)' : 'var(--color-text-secondary)',
-                                                transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-                                                borderRadius: '50%'
-                                            }} />
-                                        </span>
-                                    </label>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Ajustes de Garantía e Información del Negocio */}
-                    <div className="profile-section">
-                        <form onSubmit={handleSubmit} className="settings-form">
-                            <section className="settings-section" style={{ borderBottom: 'none', paddingBottom: 0, marginBottom: 0 }}>
-                                <h2><ShieldCheck size={18} className="text-primary" /> Garantías de Reparación</h2>
-                                <div className="grid grid-1">
-                                    <div className="input-group">
-                                        <label htmlFor="default_warranty_days" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-secondary)' }}>Días de garantía por defecto</label>
-                                        <input
-                                            type="number"
-                                            id="default_warranty_days"
-                                            name="default_warranty_days"
-                                            value={settings.default_warranty_days}
-                                            onChange={handleChange}
-                                            className="input"
-                                            min="0"
-                                            required
-                                            style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--color-text)' }}
-                                        />
-                                        <p className="settings-note" style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                                            Este valor se asignará por defecto a los nuevos tickets de reparación.
-                                        </p>
-                                    </div>
-                                </div>
-                            </section>
-
-                            <section className="settings-section" style={{ marginTop: 'var(--sp-5)', borderBottom: 'none', paddingBottom: 0, marginBottom: 0 }}>
-                                <h2><Building size={18} className="text-primary" /> Información de Contacto Comercial</h2>
-                                <div className="grid grid-2">
-                                    <div className="input-group">
-                                        <label htmlFor="business_name" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-secondary)' }}>Nombre de la Empresa</label>
-                                        <input
-                                            type="text"
-                                            id="business_name"
-                                            name="business_name"
-                                            value={settings.business_name}
-                                            onChange={handleChange}
-                                            className="input"
-                                            required
-                                            style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--color-text)' }}
-                                        />
-                                    </div>
-                                    <div className="input-group">
-                                        <label htmlFor="contact_email" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-secondary)' }}>Email del Soporte</label>
-                                        <input
-                                            type="email"
-                                            id="contact_email"
-                                            name="contact_email"
-                                            value={settings.contact_email}
-                                            onChange={handleChange}
-                                            className="input"
-                                            style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--color-text)' }}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="grid grid-2" style={{ marginTop: 'var(--sp-3)' }}>
-                                    <div className="input-group">
-                                        <label htmlFor="contact_phone" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-secondary)' }}>Teléfono de Atención</label>
-                                        <input
-                                            type="text"
-                                            id="contact_phone"
-                                            name="contact_phone"
-                                            value={settings.contact_phone}
-                                            onChange={handleChange}
-                                            className="input"
-                                            style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--color-text)' }}
-                                        />
-                                    </div>
-                                    <div className="input-group">
-                                        <label htmlFor="contact_schedule" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-secondary)' }}>Horario de Servicio</label>
-                                        <input
-                                            type="text"
-                                            id="contact_schedule"
-                                            name="contact_schedule"
-                                            value={settings.contact_schedule || ''}
-                                            onChange={handleChange}
-                                            className="input"
-                                            placeholder="Lun - Sáb: 9AM - 7PM"
-                                            style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--color-text)' }}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="grid grid-1" style={{ marginTop: 'var(--sp-3)' }}>
-                                    <div className="input-group">
-                                        <label htmlFor="contact_address" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-secondary)' }}>Dirección Física (Ubicación)</label>
-                                        <input
-                                            type="text"
-                                            id="contact_address"
-                                            name="contact_address"
-                                            value={settings.contact_address || ''}
-                                            onChange={handleChange}
-                                            className="input"
-                                            placeholder="Av. Principal #123, Ciudad"
-                                            style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--color-text)' }}
-                                        />
-                                    </div>
-                                </div>
-                            </section>
-     
-                            <div className="settings-actions" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--sp-5)' }}>
-                                <button type="submit" className="btn btn-primary" disabled={saving} style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', padding: '10px 24px', borderRadius: 'var(--radius-md)', fontWeight: 600 }}>
-                                    {saving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
-                                    {saving ? 'Guardando...' : 'Guardar Cambios'}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-
-                    {/* Integracion de Inteligencia Artificial */}
-                    <div className="profile-section">
-                        <h2><Sparkles size={18} className="text-primary" /> Inteligencia Artificial (Gemini)</h2>
-                        <p className="text-muted" style={{ fontSize: 'var(--font-xs)', marginBottom: 'var(--sp-4)' }}>
-                            Configura la API Key de Google Gemini para habilitar las funciones de IA del sistema: diagnóstico inteligente y chatbot de soporte.
-                        </p>
-
-                        <div className="input-group">
-                            <label htmlFor="gemini_api_key" style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-secondary)' }}>API Key de Google Gemini</label>
-                            <div style={{ position: 'relative' }}>
-                                <input
-                                    type={showApiKey ? 'text' : 'password'}
-                                    id="gemini_api_key"
-                                    name="gemini_api_key"
-                                    value={settings.gemini_api_key}
-                                    onChange={handleChange}
-                                    className="input"
-                                    placeholder="AIzaSy..."
-                                    style={{ paddingRight: '44px', background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--color-text)', width: '100%' }}
-                                    autoComplete="off"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowApiKey(!showApiKey)}
-                                    style={{
-                                        position: 'absolute',
-                                        right: '8px',
-                                        top: '50%',
-                                        transform: 'translateY(-50%)',
-                                        background: 'none',
-                                        border: 'none',
-                                        color: 'var(--color-text-muted)',
-                                        cursor: 'pointer',
-                                        padding: '4px',
-                                        display: 'flex',
-                                        alignItems: 'center'
-                                    }}
-                                    title={showApiKey ? 'Ocultar clave' : 'Mostrar clave'}
-                                >
-                                    {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                                </button>
-                            </div>
-                            <p className="settings-note" style={{ fontSize: '10px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                                Obtén tu API Key en <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Google AI Studio</a>. Esta clave se almacena de forma segura en la base de datos del servidor.
+            <form onSubmit={handleSubmit}>
+                {/* ══════════════════════════════════════════════════════════
+                    PESTAÑA 1: DATOS DE EMPRESA
+                   ══════════════════════════════════════════════════════════ */}
+                {activeTab === 'general' && (
+                    <div className="card animate-fadeIn" style={{ padding: '24px' }}>
+                        <div style={{ marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid var(--color-border)' }}>
+                            <h2 style={{ fontSize: '16px', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Building2 size={18} className="text-primary" /> Información Comercial & Fiscal
+                            </h2>
+                            <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: '4px 0 0 0' }}>
+                                Estos datos aparecerán en encabezados de recibos, cotizaciones y órdenes de servicio de tu empresa.
                             </p>
                         </div>
 
-                        <div className="settings-actions" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 'var(--sp-4)' }}>
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                disabled={saving}
-                                style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', padding: '10px 24px', borderRadius: 'var(--radius-md)', fontWeight: 600 }}
-                                onClick={async () => {
-                                    try {
-                                        setSaving(true);
-                                        await settingsService.update({ gemini_api_key: settings.gemini_api_key });
-                                        alert('API Key de Gemini guardada correctamente.');
-                                    } catch (error) {
-                                        alert('Error al guardar la API Key: ' + error.message);
-                                    } finally {
-                                        setSaving(false);
-                                    }
-                                }}
-                            >
-                                {saving ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
-                                {saving ? 'Guardando...' : 'Actualizar API Key'}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Administración de Especialidades y Servicios */}
-                    <div className="profile-section">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--sp-4)' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '16px' }}>
                             <div>
-                                <h2 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: 'var(--font-base)', fontWeight: 700 }}><Wrench size={18} className="text-primary" /> Especialidades y Servicios</h2>
-                                <p className="text-muted" style={{ fontSize: 'var(--font-xs)', marginTop: '2px' }}>
-                                    Agrega, edita o elimina los servicios destacados que se muestran en la página principal.
-                                </p>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '6px' }}>
+                                    Nombre Comercial de la Empresa
+                                </label>
+                                <input
+                                    type="text"
+                                    name="business_name"
+                                    value={settings.business_name}
+                                    onChange={handleChange}
+                                    className="input input-sm"
+                                    required
+                                />
                             </div>
-                            <button
-                                type="button"
-                                className="btn btn-secondary btn-sm"
-                                style={{ fontSize: '11px', padding: '6px 12px', height: 'auto' }}
-                                onClick={() => setShowServiceForm(!showServiceForm)}
-                            >
-                                {showServiceForm ? 'Cancelar' : 'Agregar Servicio'}
-                            </button>
+
+                            <div>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '6px' }}>
+                                    RFC / Identificación Fiscal (Tax ID)
+                                </label>
+                                <input
+                                    type="text"
+                                    name="tax_id"
+                                    placeholder="XAXX010101000"
+                                    value={settings.tax_id || ''}
+                                    onChange={handleChange}
+                                    className="input input-sm"
+                                />
+                            </div>
                         </div>
 
-                        {showServiceForm && (
-                            <form onSubmit={handleAddService} className="settings-form animate-fadeIn" style={{ background: 'var(--color-bg-elevated)', padding: 'var(--sp-4)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border-strong)', marginBottom: 'var(--sp-4)' }}>
-                                <h3 style={{ fontSize: 'var(--font-sm)', fontWeight: 600, marginBottom: 'var(--sp-3)' }}>Nuevo Servicio</h3>
-                                <div className="grid grid-2">
-                                    <div className="input-group">
-                                        <label style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-secondary)' }}>Título</label>
-                                        <input
-                                            type="text"
-                                            className="input"
-                                            value={newService.title}
-                                            onChange={(e) => setNewService({ ...newService, title: e.target.value })}
-                                            placeholder="Ej. Consolas de Videojuegos"
-                                            required
-                                            style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--color-text)' }}
-                                        />
-                                    </div>
-                                    <div className="input-group">
-                                        <label style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-secondary)' }}>Icono</label>
-                                        <select
-                                            className="input"
-                                            value={newService.icon}
-                                            onChange={(e) => setNewService({ ...newService, icon: e.target.value })}
-                                            style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--color-text)', height: '42px' }}
-                                        >
-                                            <option value="smartphone">Celular / Smartphone</option>
-                                            <option value="laptop">Laptop / Portátil</option>
-                                            <option value="monitor">Computadora / Desktop</option>
-                                            <option value="gamepad">Consola / Videojuegos</option>
-                                            <option value="watch">Reloj / Smartwatch</option>
-                                            <option value="tablet">Tablet</option>
-                                            <option value="wrench">Herramienta (Por defecto)</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <div className="grid grid-2" style={{ marginTop: 'var(--sp-3)' }}>
-                                    <div className="input-group">
-                                        <label style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-secondary)' }}>Descripción</label>
-                                        <input
-                                            type="text"
-                                            className="input"
-                                            value={newService.description}
-                                            onChange={(e) => setNewService({ ...newService, description: e.target.value })}
-                                            placeholder="Ej. Cambio de puertos HDMI, láser, etc."
-                                            required
-                                            style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px', color: 'var(--color-text)' }}
-                                        />
-                                    </div>
-                                    <div className="input-group">
-                                        <label style={{ fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--color-text-secondary)' }}>Color de Acento (Hexadecimal)</label>
-                                        <input
-                                            type="color"
-                                            className="input"
-                                            style={{ height: '42px', padding: '4px', background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}
-                                            value={newService.color}
-                                            onChange={(e) => setNewService({ ...newService, color: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-                                <button type="submit" className="btn btn-primary btn-sm" style={{ marginTop: 'var(--sp-3)', padding: '8px 16px', fontSize: '11px' }}>
-                                    Guardar Servicio
-                                </button>
-                            </form>
-                        )}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+                            <div>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '6px' }}>
+                                    Correo de Contacto / Soporte
+                                </label>
+                                <input
+                                    type="email"
+                                    name="contact_email"
+                                    placeholder="soporte@empresa.com"
+                                    value={settings.contact_email}
+                                    onChange={handleChange}
+                                    className="input input-sm"
+                                />
+                            </div>
 
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'var(--sp-3)' }}>
-                            {(landingServices || []).map((service, idx) => (
-                                <div key={idx} style={{ display: 'flex', gap: 'var(--sp-3)', padding: 'var(--sp-3)', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', position: 'relative' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', borderRadius: 'var(--radius-sm)', flexShrink: 0 }}>
-                                        <Wrench size={18} />
-                                    </div>
-                                    <div style={{ flexGrow: 1, paddingRight: 'var(--sp-6)' }}>
-                                        <h4 style={{ fontWeight: 600, fontSize: 'var(--font-sm)' }}>{service.title}</h4>
-                                        <p className="text-muted" style={{ fontSize: 'var(--font-xs)', marginTop: '2px', lineHeight: 1.4 }}>{service.description}</p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleDeleteService(idx)}
-                                        className="service-delete-btn"
-                                        style={{ position: 'absolute', top: 'var(--sp-2)', right: 'var(--sp-2)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}
-                                        title="Eliminar especialidad"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
-                            ))}
+                            <div>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '6px' }}>
+                                    Teléfono Principal de Atención
+                                </label>
+                                <input
+                                    type="text"
+                                    name="contact_phone"
+                                    placeholder="55 1234 5678"
+                                    value={settings.contact_phone}
+                                    onChange={handleChange}
+                                    className="input input-sm"
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '16px' }}>
+                            <div>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '6px' }}>
+                                    Dirección Matriz / Ubicación
+                                </label>
+                                <input
+                                    type="text"
+                                    name="contact_address"
+                                    placeholder="Av. Principal #123, Ciudad"
+                                    value={settings.contact_address || ''}
+                                    onChange={handleChange}
+                                    className="input input-sm"
+                                />
+                            </div>
+
+                            <div>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '6px' }}>
+                                    Horario de Servicio
+                                </label>
+                                <input
+                                    type="text"
+                                    name="contact_schedule"
+                                    placeholder="Lun - Sáb: 9:00 AM - 7:00 PM"
+                                    value={settings.contact_schedule || ''}
+                                    onChange={handleChange}
+                                    className="input input-sm"
+                                />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                            <div>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '6px' }}>
+                                    Moneda del Sistema
+                                </label>
+                                <select
+                                    name="currency"
+                                    value={settings.currency || 'MXN'}
+                                    onChange={handleChange}
+                                    className="select select-sm"
+                                >
+                                    <option value="MXN">MXN - Peso Mexicano ($)</option>
+                                    <option value="USD">USD - Dólar Estadounidense ($)</option>
+                                    <option value="EUR">EUR - Euro (€)</option>
+                                    <option value="COP">COP - Peso Colombiano ($)</option>
+                                    <option value="CLP">CLP - Peso Chileno ($)</option>
+                                    <option value="PEN">PEN - Sol Peruano (S/)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '6px' }}>
+                                    Tasa de Impuesto / IVA (%)
+                                </label>
+                                <input
+                                    type="number"
+                                    name="tax_rate"
+                                    min="0"
+                                    max="100"
+                                    step="0.5"
+                                    value={settings.tax_rate || '16'}
+                                    onChange={handleChange}
+                                    className="input input-sm"
+                                />
+                            </div>
                         </div>
                     </div>
-                </div>
-            </div>
+                )}
+
+                {/* ══════════════════════════════════════════════════════════
+                    PESTAÑA 2: TALLER & TICKETS
+                   ══════════════════════════════════════════════════════════ */}
+                {activeTab === 'repairs' && (
+                    <div className="card animate-fadeIn" style={{ padding: '24px' }}>
+                        <div style={{ marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid var(--color-border)' }}>
+                            <h2 style={{ fontSize: '16px', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Wrench size={18} className="text-primary" /> Parámetros de Taller & Impresión
+                            </h2>
+                            <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: '4px 0 0 0' }}>
+                                Configura los folios, garantías por defecto y las leyendas legales en tickets de reparación.
+                            </p>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+                            <div>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '6px' }}>
+                                    Días de Garantía por Defecto
+                                </label>
+                                <input
+                                    type="number"
+                                    name="default_warranty_days"
+                                    min="0"
+                                    value={settings.default_warranty_days}
+                                    onChange={handleChange}
+                                    className="input input-sm"
+                                    required
+                                />
+                                <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', display: 'block' }}>
+                                    Plazo asignado automáticamente al entregar una orden.
+                                </span>
+                            </div>
+
+                            <div>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '6px' }}>
+                                    Prefijo de Ticket de Orden
+                                </label>
+                                <input
+                                    type="text"
+                                    name="repair_ticket_prefix"
+                                    placeholder="REP-"
+                                    value={settings.repair_ticket_prefix || 'REP-'}
+                                    onChange={handleChange}
+                                    className="input input-sm"
+                                />
+                                <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '4px', display: 'block' }}>
+                                    Ejemplo: REP-000123
+                                </span>
+                            </div>
+                        </div>
+
+                        <div style={{ marginBottom: '18px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '6px' }}>
+                                Términos & Condiciones Legales (Al reverso/pie de orden)
+                            </label>
+                            <textarea
+                                name="ticket_terms_conditions"
+                                rows="3"
+                                value={settings.ticket_terms_conditions || ''}
+                                onChange={handleChange}
+                                className="input"
+                                style={{ width: '100%', fontSize: '12px', resize: 'vertical' }}
+                                placeholder="Garantía válida únicamente presentando este comprobante..."
+                            />
+                        </div>
+
+                        <div>
+                            <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '6px' }}>
+                                Nota de Agradecimiento / Pie de Ticket
+                            </label>
+                            <input
+                                type="text"
+                                name="ticket_footer_note"
+                                value={settings.ticket_footer_note || ''}
+                                onChange={handleChange}
+                                className="input input-sm"
+                                placeholder="Gracias por su preferencia. Consulte su estado en línea."
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* ══════════════════════════════════════════════════════════
+                    PESTAÑA 3: NOTIFICACIONES A CLIENTES
+                   ══════════════════════════════════════════════════════════ */}
+                {activeTab === 'notifications' && (
+                    <div className="card animate-fadeIn" style={{ padding: '24px' }}>
+                        <div style={{ marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid var(--color-border)' }}>
+                            <h2 style={{ fontSize: '16px', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Bell size={18} className="text-primary" /> Mensajería & Notificaciones Automáticas
+                            </h2>
+                            <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: '4px 0 0 0' }}>
+                                Automatiza el contacto con tus clientes cuando su equipo cambie de estado o esté listo para entrega.
+                            </p>
+                        </div>
+
+                        <div style={{ marginBottom: '20px' }}>
+                            <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '8px' }}>
+                                Plantilla de WhatsApp / SMS (Orden Lista para Entrega)
+                            </label>
+                            <textarea
+                                name="whatsapp_ready_template"
+                                rows="3"
+                                value={settings.whatsapp_ready_template || ''}
+                                onChange={handleChange}
+                                className="input"
+                                style={{ width: '100%', fontSize: '12px', resize: 'vertical' }}
+                                placeholder="Hola {cliente}, tu equipo {modelo} (Folio: {folio}) está listo para entrega..."
+                            />
+                            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                                <span className="badge-neutral" style={{ fontSize: '10px' }}>{'{cliente}'} = Nombre del Cliente</span>
+                                <span className="badge-neutral" style={{ fontSize: '10px' }}>{'{modelo}'} = Modelo del Dispositivo</span>
+                                <span className="badge-neutral" style={{ fontSize: '10px' }}>{'{folio}'} = Folio del Ticket</span>
+                                <span className="badge-neutral" style={{ fontSize: '10px' }}>{'{empresa}'} = Nombre de la Empresa</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ══════════════════════════════════════════════════════════
+                    PESTAÑA 4: IDENTIDAD & LOGO
+                   ══════════════════════════════════════════════════════════ */}
+                {activeTab === 'branding' && (
+                    <div className="card animate-fadeIn" style={{ padding: '24px' }}>
+                        <div style={{ marginBottom: '20px', paddingBottom: '12px', borderBottom: '1px solid var(--color-border)' }}>
+                            <h2 style={{ fontSize: '16px', fontWeight: 800, margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <LayoutGrid size={18} className="text-primary" /> Logotipo & Estilo Visual de tu Empresa
+                            </h2>
+                            <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: '4px 0 0 0' }}>
+                                Este logotipo pertenece exclusivamente a tu organización y aparecerá en tus tickets y reportes.
+                            </p>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px' }}>
+                            {/* Logo */}
+                            <div>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '8px' }}>
+                                    Logotipo de la Empresa
+                                </label>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
+                                    {settings.business_logo ? (
+                                        <div style={{
+                                            width: '80px', height: '80px', borderRadius: 'var(--radius-md)',
+                                            border: '1px solid var(--color-border)', display: 'flex',
+                                            alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                                            background: 'var(--color-bg-tertiary)'
+                                        }}>
+                                            <img 
+                                                src={getImageUrl(settings.business_logo)} 
+                                                alt="Logo" 
+                                                style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                                                onError={(e) => { e.target.style.display = 'none'; }}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div style={{
+                                            width: '80px', height: '80px', borderRadius: 'var(--radius-md)',
+                                            border: '1px dashed var(--color-border)', display: 'flex',
+                                            alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)',
+                                            background: 'var(--color-bg-tertiary)'
+                                        }}>
+                                            <Image size={32} />
+                                        </div>
+                                    )}
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                        <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                            <Upload size={14} /> Seleccionar Imagen
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={handleLogoUpload}
+                                                style={{ display: 'none' }}
+                                            />
+                                        </label>
+
+                                        {settings.business_logo && (
+                                            <button
+                                                type="button"
+                                                className="btn btn-secondary btn-sm"
+                                                style={{ color: '#ef4444', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                                onClick={handleRemoveLogo}
+                                            >
+                                                <Trash2 size={14} /> Eliminar Logo
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Bordes */}
+                            <div>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '8px' }}>
+                                    Curvatura de Bordes en Interfaz
+                                </label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '8px' }}>
+                                    {[
+                                        { id: '0px', label: 'Recto (0px)' },
+                                        { id: '6px', label: 'Suave (6px)' },
+                                        { id: '12px', label: 'Redondeado (12px)' },
+                                        { id: '20px', label: 'Máximo (20px)' }
+                                    ].map(b => (
+                                        <button
+                                            key={b.id}
+                                            type="button"
+                                            onClick={() => setBorderRadius(b.id)}
+                                            style={{
+                                                padding: '8px', fontSize: '12px', fontWeight: 600,
+                                                borderRadius: 'var(--radius-sm)',
+                                                border: borderRadius === b.id ? '1px solid var(--color-border-strong)' : '1px solid var(--color-border)',
+                                                background: borderRadius === b.id ? 'var(--color-bg-tertiary)' : 'transparent',
+                                                color: borderRadius === b.id ? 'var(--color-text)' : 'var(--color-text-secondary)',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            {b.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </form>
         </div>
     );
 }

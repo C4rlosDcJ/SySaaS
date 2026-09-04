@@ -1,9 +1,9 @@
 -- =====================================================
--- SysTeck -- SaaS Multi-Tenant & Multi-Branch Migration
+-- SySaaS -- SaaS Multi-Tenant & Multi-Branch Migration
 -- Run this AFTER all existing migrations
 -- =====================================================
 
-USE systeck;
+USE sysaas;
 
 -- =====================================================
 -- PASO 1: Planes de suscripcion SaaS
@@ -188,7 +188,7 @@ DEALLOCATE PREPARE alterIfNotExists;
 -- Expandir ENUM de role en users
 ALTER TABLE users MODIFY COLUMN role ENUM(
     'superadmin','tenant_admin','branch_manager',
-    'technician','cashier','client',
+    'technician','cashier','salesperson','client',
     'admin'
 ) DEFAULT 'client';
 

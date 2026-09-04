@@ -149,11 +149,40 @@ export default function RepairsListPage() {
                                             </p>
                                         )}
                                         
-                                        <div className="progress-bar-indicator">
-                                            <div className="bar-track">
-                                                <div className="bar-fill" style={{ width: `${progress}%` }}></div>
-                                            </div>
-                                            <span className="progress-text">Progreso: {progress}%</span>
+                                        {/* Stepper Visual de Reparación */}
+                                        <div className="repair-timeline-stepper">
+                                            {[
+                                                { key: 'received', label: 'Recibido' },
+                                                { key: 'diagnosing', label: 'Diagnóstico' },
+                                                { key: 'repairing', label: 'Reparación' },
+                                                { key: 'quality_check', label: 'Calidad' },
+                                                { key: 'ready', label: 'Listo' }
+                                            ].map((step, idx) => {
+                                                const stepOrder = {
+                                                    received: 1,
+                                                    diagnosing: 2,
+                                                    waiting_approval: 2,
+                                                    waiting_parts: 3,
+                                                    repairing: 3,
+                                                    quality_check: 4,
+                                                    ready: 5,
+                                                    delivered: 5,
+                                                    cancelled: 0
+                                                };
+                                                const currentOrder = stepOrder[repair.status] || 0;
+                                                const stepIndex = idx + 1;
+                                                const isCompleted = currentOrder > stepIndex || repair.status === 'delivered';
+                                                const isCurrent = currentOrder === stepIndex;
+
+                                                return (
+                                                    <div key={step.key} className={`timeline-step ${isCompleted ? 'step-completed' : ''} ${isCurrent ? 'step-current' : ''}`}>
+                                                        <div className="timeline-dot">
+                                                            {isCompleted ? '✓' : stepIndex}
+                                                        </div>
+                                                        <span className="timeline-label">{step.label}</span>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
 
                                         <div className="meta-footer-details">
@@ -166,7 +195,7 @@ export default function RepairsListPage() {
                                             </span>
                                             {repair.total_cost > 0 && (
                                                 <span className="meta-cost">
-                                                    ${repair.total_cost.toLocaleString('es-MX')}
+                                                    ${parseFloat(repair.total_cost).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                                                 </span>
                                             )}
                                         </div>

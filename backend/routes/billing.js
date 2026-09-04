@@ -14,4 +14,7 @@ router.post('/checkout', auth, tenantContext, isTenantAdmin, billingController.c
 // Crear sesión del portal de Stripe
 router.post('/portal', auth, tenantContext, isTenantAdmin, billingController.createPortalSession);
 
+// Contratar / Activar suscripción directamente
+router.post('/subscribe-plan', auth, tenantContext, isTenantAdmin, billingController.subscribePlan);
+
 module.exports = router;

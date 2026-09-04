@@ -12,7 +12,7 @@ router.get('/', auth, tenantContext, subscriptionGuard, isBranchManagerOrAbove, 
 router.post('/', auth, tenantContext, subscriptionGuard, isBranchManagerOrAbove, transferController.createTransfer);
 
 // Aprobar traspaso
-router.put('/:id(\\d+)/approve', auth, tenantContext, subscriptionGuard, isTenantAdmin, transferController.approveTransfer);
+router.put('/:id(\\d+)/approve', auth, tenantContext, subscriptionGuard, isBranchManagerOrAbove, transferController.approveTransfer);
 
 // Completar traspaso (confirmar recepcion)
 router.put('/:id(\\d+)/complete', auth, tenantContext, subscriptionGuard, isBranchManagerOrAbove, transferController.completeTransfer);

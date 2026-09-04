@@ -56,7 +56,7 @@ export default function CatalogSection({ embedded = false, showCartButton = true
 
     // Cart
     const [cart, setCart] = useState(() => {
-        const saved = localStorage.getItem('systeck_cart');
+        const saved = localStorage.getItem('sysaas_cart');
         return saved ? JSON.parse(saved) : [];
     });
     const [cartOpen, setCartOpen] = useState(false);
@@ -66,16 +66,16 @@ export default function CatalogSection({ embedded = false, showCartButton = true
 
     // Editing order state
     const [editingOrder, setEditingOrder] = useState(() => {
-        const id = localStorage.getItem('systeck_editing_order_id');
-        const num = localStorage.getItem('systeck_editing_order_number');
+        const id = localStorage.getItem('sysaas_editing_order_id');
+        const num = localStorage.getItem('sysaas_editing_order_number');
         return id ? { id, order_number: num } : null;
     });
 
     const cancelEditing = () => {
         if (!confirm('¿Deseas cancelar la edición de este pedido? Se vaciará tu carrito actual.')) return;
-        localStorage.removeItem('systeck_editing_order_id');
-        localStorage.removeItem('systeck_editing_order_number');
-        localStorage.removeItem('systeck_cart');
+        localStorage.removeItem('sysaas_editing_order_id');
+        localStorage.removeItem('sysaas_editing_order_number');
+        localStorage.removeItem('sysaas_cart');
         setEditingOrder(null);
         setCart([]);
     };
@@ -84,7 +84,7 @@ export default function CatalogSection({ embedded = false, showCartButton = true
 
     // Save cart to localStorage
     useEffect(() => {
-        localStorage.setItem('systeck_cart', JSON.stringify(cart));
+        localStorage.setItem('sysaas_cart', JSON.stringify(cart));
     }, [cart]);
 
     // Load data
@@ -209,8 +209,8 @@ export default function CatalogSection({ embedded = false, showCartButton = true
                     order_number: editingOrder.order_number,
                     total: cartTotal
                 });
-                localStorage.removeItem('systeck_editing_order_id');
-                localStorage.removeItem('systeck_editing_order_number');
+                localStorage.removeItem('sysaas_editing_order_id');
+                localStorage.removeItem('sysaas_editing_order_number');
                 setEditingOrder(null);
             } else {
                 const result = await orderService.create({ items, notes: cartNotes || null });
@@ -218,7 +218,7 @@ export default function CatalogSection({ embedded = false, showCartButton = true
             }
             setCart([]);
             setCartNotes('');
-            localStorage.removeItem('systeck_cart');
+            localStorage.removeItem('sysaas_cart');
             setCartOpen(false);
         } catch (err) {
             alert(err.message || 'Error al procesar el pedido');

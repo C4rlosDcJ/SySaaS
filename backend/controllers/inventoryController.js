@@ -57,15 +57,43 @@ exports.updateCategory = async (req, res) => {
     }
 };
 
+exports.deleteCategory = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const tenantId = req.tenantCtx.tenantId;
+
+        const [result] = await db.query(
+            'UPDATE product_categories SET is_active = FALSE WHERE id = ? AND tenant_id = ?',
+            [id, tenantId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: 'Categoría no encontrada.' });
+        }
+
+        res.json({ message: 'Categoría eliminada.' });
+    } catch (error) {
+        console.error('[INVENTORY] Error al eliminar categoría:', error);
+        res.status(500).json({ message: 'Error al eliminar categoría.' });
+    }
+};
+
+
 // =====================================================
 // Productos (SaaS & Multi-Branch Scoped)
 // =====================================================
 exports.getProducts = async (req, res) => {
     try {
-        const { category_id, search, low_stock, page = 1, limit = 50 } = req.query;
+        const { category_id, search, low_stock, branch_id: filterBranchId, page = 1, limit = 50 } = req.query;
         const offset = (page - 1) * limit;
         const tenantId = req.tenantCtx.tenantId;
-        const branchId = req.tenantCtx.branchId;
+        const activeBranchId = req.tenantCtx.branchId;
+
+        const isAdmin = ['tenant_admin', 'admin', 'superadmin'].includes(req.user.role);
+        const isAllBranches = isAdmin && filterBranchId === 'all';
+        const branchId = (isAdmin && filterBranchId && filterBranchId !== 'all') 
+            ? parseInt(filterBranchId, 10) 
+            : activeBranchId;
 
         let query = `
             SELECT p.*, pc.name as category_name, pc.color as category_color,
@@ -88,13 +116,58 @@ exports.getProducts = async (req, res) => {
             params.push(term, term, term);
         }
         if (low_stock === 'true') {
-            query += ' AND COALESCE(bi.stock, 0) <= COALESCE(bi.min_stock, p.min_stock)';
+            query += ' AND (p.is_unique IS FALSE OR p.is_unique = 0) AND COALESCE(bi.stock, 0) <= COALESCE(bi.min_stock, p.min_stock) AND COALESCE(bi.stock, 0) > 0';
         }
 
         query += ' ORDER BY p.name ASC LIMIT ? OFFSET ?';
         params.push(parseInt(limit), parseInt(offset));
 
         const [products] = await db.query(query, params);
+
+        // Obtener desglose de stock de los productos en todas las sucursales de la empresa
+        if (products.length > 0) {
+            const productIds = products.map(p => p.id);
+            const [allBranchStocks] = await db.query(`
+                SELECT 
+                    bi.product_id,
+                    b.id as branch_id,
+                    b.name as branch_name,
+                    b.code as branch_code,
+                    b.is_main,
+                    COALESCE(bi.stock, 0) as stock,
+                    COALESCE(bi.min_stock, 0) as min_stock
+                FROM branches b
+                JOIN products p ON p.id IN (?)
+                LEFT JOIN branch_inventory bi ON bi.branch_id = b.id AND bi.product_id = p.id
+                WHERE b.tenant_id = ? AND b.is_active = TRUE
+                ORDER BY b.is_main DESC, b.name ASC
+            `, [productIds, tenantId]);
+
+            // Mapear por product_id
+            const stockMap = {};
+            for (const row of allBranchStocks) {
+                if (!stockMap[row.product_id]) {
+                    stockMap[row.product_id] = [];
+                }
+                stockMap[row.product_id].push({
+                    branch_id: row.branch_id,
+                    branch_name: row.branch_name,
+                    branch_code: row.branch_code,
+                    is_main: !!row.is_main,
+                    stock: parseInt(row.stock || 0, 10),
+                    min_stock: parseInt(row.min_stock || 0, 10)
+                });
+            }
+
+            // Adjuntar datos enriquecidos a cada producto
+            products.forEach(p => {
+                const bStock = stockMap[p.id] || [];
+                p.branches_stock = bStock;
+                p.other_branches_stock = bStock.filter(bs => bs.branch_id !== branchId);
+                p.other_branches_total = p.other_branches_stock.reduce((sum, bs) => sum + bs.stock, 0);
+                p.total_company_stock = bStock.reduce((sum, bs) => sum + bs.stock, 0);
+            });
+        }
 
         // Contar total
         let countQuery = `
@@ -153,7 +226,37 @@ exports.getProductById = async (req, res) => {
         if (products.length === 0) {
             return res.status(404).json({ message: 'Producto no encontrado.' });
         }
-        res.json(products[0]);
+
+        const product = products[0];
+
+        // Obtener stock en todas las sucursales
+        const [allBranchStocks] = await db.query(`
+            SELECT 
+                b.id as branch_id,
+                b.name as branch_name,
+                b.code as branch_code,
+                b.is_main,
+                COALESCE(bi.stock, 0) as stock,
+                COALESCE(bi.min_stock, 0) as min_stock
+            FROM branches b
+            LEFT JOIN branch_inventory bi ON bi.branch_id = b.id AND bi.product_id = ?
+            WHERE b.tenant_id = ? AND b.is_active = TRUE
+            ORDER BY b.is_main DESC, b.name ASC
+        `, [id, tenantId]);
+
+        product.branches_stock = allBranchStocks.map(bs => ({
+            branch_id: bs.branch_id,
+            branch_name: bs.branch_name,
+            branch_code: bs.branch_code,
+            is_main: !!bs.is_main,
+            stock: parseInt(bs.stock || 0, 10),
+            min_stock: parseInt(bs.min_stock || 0, 10)
+        }));
+        product.other_branches_stock = product.branches_stock.filter(bs => bs.branch_id !== branchId);
+        product.other_branches_total = product.other_branches_stock.reduce((sum, bs) => sum + bs.stock, 0);
+        product.total_company_stock = product.branches_stock.reduce((sum, bs) => sum + bs.stock, 0);
+
+        res.json(product);
     } catch (error) {
         console.error('[INVENTORY] Error al obtener producto:', error);
         res.status(500).json({ message: 'Error al obtener producto.' });
@@ -165,9 +268,10 @@ exports.createProduct = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        const { sku, barcode, name, description, category_id, purchase_price, sale_price, stock, min_stock, is_unique, location_in_store } = req.body;
+        const { sku, barcode, name, description, category_id, purchase_price, sale_price, stock, min_stock, is_unique, location_in_store, image_url, target_branch_id } = req.body;
         const tenantId = req.tenantCtx.tenantId;
-        const branchId = req.tenantCtx.branchId;
+        const isAdmin = ['tenant_admin', 'admin', 'superadmin', 'branch_manager'].includes(req.user.role);
+        const branchId = (isAdmin && target_branch_id) ? parseInt(target_branch_id, 10) : req.tenantCtx.branchId;
 
         if (!name || !sale_price) {
             return res.status(400).json({ message: 'Nombre y precio de venta son obligatorios.' });
@@ -181,15 +285,15 @@ exports.createProduct = async (req, res) => {
 
         // 1. Insertar el producto base
         const [result] = await connection.query(
-            `INSERT INTO products (tenant_id, sku, barcode, name, description, category_id, purchase_price, sale_price, stock, min_stock, is_unique)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT INTO products (tenant_id, sku, barcode, name, description, category_id, purchase_price, sale_price, stock, min_stock, is_unique, image_url)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [tenantId, finalSku, finalBarcode, name, description || null, category_id || null,
-             purchase_price || 0, sale_price, stock || 0, min_stock || 5, is_unique ? 1 : 0]
+             purchase_price || 0, sale_price, stock || 0, min_stock || 5, is_unique ? 1 : 0, image_url || null]
         );
 
         const newProductId = result.insertId;
 
-        // 2. Crear registro de stock para la sucursal activa
+        // 2. Crear registro de stock para la sucursal asignada
         await connection.query(
             `INSERT INTO branch_inventory (product_id, branch_id, stock, min_stock, location_in_store)
              VALUES (?, ?, ?, ?, ?)`,
@@ -225,9 +329,10 @@ exports.updateProduct = async (req, res) => {
         await connection.beginTransaction();
 
         const { id } = req.params;
-        const { sku, barcode, name, description, category_id, purchase_price, sale_price, stock, min_stock, is_unique, location_in_store } = req.body;
+        const { sku, barcode, name, description, category_id, purchase_price, sale_price, stock, min_stock, is_unique, location_in_store, image_url, target_branch_id } = req.body;
         const tenantId = req.tenantCtx.tenantId;
-        const branchId = req.tenantCtx.branchId;
+        const isAdmin = ['tenant_admin', 'admin', 'superadmin', 'branch_manager'].includes(req.user.role);
+        const branchId = (isAdmin && target_branch_id) ? parseInt(target_branch_id, 10) : req.tenantCtx.branchId;
 
         // Obtener stock actual de esta sucursal
         const [existing] = await connection.query(
@@ -245,9 +350,9 @@ exports.updateProduct = async (req, res) => {
         // Actualizar datos del producto base
         const [prodResult] = await connection.query(
             `UPDATE products SET sku = ?, barcode = ?, name = ?, description = ?, category_id = ?,
-             purchase_price = ?, sale_price = ?, is_unique = ? WHERE id = ? AND tenant_id = ?`,
+             purchase_price = ?, sale_price = ?, is_unique = ?, image_url = ? WHERE id = ? AND tenant_id = ?`,
             [sku, barcode || null, name, description || null, category_id || null,
-             purchase_price || 0, sale_price, is_unique ? 1 : 0, id, tenantId]
+             purchase_price || 0, sale_price, is_unique ? 1 : 0, image_url !== undefined ? image_url : null, id, tenantId]
         );
 
         if (prodResult.affectedRows === 0) {
@@ -317,6 +422,51 @@ exports.deleteProduct = async (req, res) => {
 };
 
 // =====================================================
+// Acciones en lote (Bulk Actions)
+// =====================================================
+exports.bulkDeleteProducts = async (req, res) => {
+    try {
+        const { product_ids } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
+
+        if (!product_ids || !Array.isArray(product_ids) || product_ids.length === 0) {
+            return res.status(400).json({ message: 'No se enviaron productos para eliminar.' });
+        }
+
+        await db.query(
+            'UPDATE products SET is_active = FALSE WHERE id IN (?) AND tenant_id = ?',
+            [product_ids, tenantId]
+        );
+
+        res.json({ message: `${product_ids.length} producto(s) desactivado(s) exitosamente.` });
+    } catch (error) {
+        console.error('[INVENTORY] Error en bulkDelete:', error);
+        res.status(500).json({ message: 'Error al eliminar productos en lote.' });
+    }
+};
+
+exports.bulkUpdateCategory = async (req, res) => {
+    try {
+        const { product_ids, category_id } = req.body;
+        const tenantId = req.tenantCtx.tenantId;
+
+        if (!product_ids || !Array.isArray(product_ids) || product_ids.length === 0) {
+            return res.status(400).json({ message: 'No se enviaron productos.' });
+        }
+
+        await db.query(
+            'UPDATE products SET category_id = ? WHERE id IN (?) AND tenant_id = ?',
+            [category_id || null, product_ids, tenantId]
+        );
+
+        res.json({ message: `Categoría actualizada para ${product_ids.length} producto(s).` });
+    } catch (error) {
+        console.error('[INVENTORY] Error en bulkUpdateCategory:', error);
+        res.status(500).json({ message: 'Error al actualizar categoría en lote.' });
+    }
+};
+
+// =====================================================
 // Stock Movements (SaaS & Multi-Branch)
 // =====================================================
 exports.addStockMovement = async (req, res) => {
@@ -324,9 +474,10 @@ exports.addStockMovement = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        const { product_id, type, quantity, reference, notes } = req.body;
+        const { product_id, type, quantity, reference, notes, target_branch_id } = req.body;
         const tenantId = req.tenantCtx.tenantId;
-        const branchId = req.tenantCtx.branchId;
+        const isAdmin = ['tenant_admin', 'admin', 'superadmin', 'branch_manager'].includes(req.user.role);
+        const branchId = (isAdmin && target_branch_id) ? parseInt(target_branch_id, 10) : req.tenantCtx.branchId;
 
         if (!product_id || !type || !quantity) {
             return res.status(400).json({ message: 'Producto, tipo y cantidad son obligatorios.' });
@@ -410,6 +561,29 @@ exports.getStockMovements = async (req, res) => {
     }
 };
 
+exports.getProductMovements = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const tenantId = req.tenantCtx.tenantId;
+
+        const [movements] = await db.query(`
+            SELECT sm.*, b.name as branch_name, b.code as branch_code,
+                   u.first_name, u.last_name
+            FROM stock_movements sm
+            JOIN branches b ON sm.branch_id = b.id
+            LEFT JOIN users u ON sm.created_by = u.id
+            WHERE sm.product_id = ? AND sm.tenant_id = ?
+            ORDER BY sm.created_at DESC
+            LIMIT 100
+        `, [id, tenantId]);
+
+        res.json(movements);
+    } catch (error) {
+        console.error('[INVENTORY] Error al obtener movimientos del producto:', error);
+        res.status(500).json({ message: 'Error al obtener historial de movimientos.' });
+    }
+};
+
 // =====================================================
 // Estadísticas de inventario
 // =====================================================
@@ -428,7 +602,9 @@ exports.getInventoryStats = async (req, res) => {
              FROM products p
              LEFT JOIN branch_inventory bi ON p.id = bi.product_id AND bi.branch_id = ?
              WHERE p.tenant_id = ? AND p.is_active = TRUE 
-             AND COALESCE(bi.stock, 0) <= COALESCE(bi.min_stock, p.min_stock)`,
+             AND (p.is_unique IS FALSE OR p.is_unique = 0)
+             AND COALESCE(bi.stock, 0) <= COALESCE(bi.min_stock, p.min_stock)
+             AND COALESCE(bi.stock, 0) > 0`,
             [branchId, tenantId]
         );
         
@@ -437,6 +613,7 @@ exports.getInventoryStats = async (req, res) => {
              FROM products p
              LEFT JOIN branch_inventory bi ON p.id = bi.product_id AND bi.branch_id = ?
              WHERE p.tenant_id = ? AND p.is_active = TRUE 
+             AND (p.is_unique IS FALSE OR p.is_unique = 0)
              AND COALESCE(bi.stock, 0) = 0`,
             [branchId, tenantId]
         );

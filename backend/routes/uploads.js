@@ -68,6 +68,23 @@ router.post('/repair/:repairId', auth, upload.array('images', 10), async (req, r
     }
 });
 
+// Subir una sola imagen general (productos, perfiles, etc.)
+router.post('/single', auth, upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ message: 'No se subió ningún archivo.' });
+        }
+        res.status(201).json({
+            message: 'Imagen subida exitosamente.',
+            url: `/uploads/${req.file.filename}`,
+            filename: req.file.filename
+        });
+    } catch (error) {
+        console.error('[UPLOAD] Error al subir imagen individual:', error);
+        res.status(500).json({ message: 'Error al subir imagen.' });
+    }
+});
+
 // Eliminar imagen
 router.delete('/:imageId', auth, async (req, res) => {
     try {

@@ -103,20 +103,88 @@ export function AuthProvider({ children }) {
         }
     };
 
+    const registerCompany = async (companyData) => {
+        try {
+            setError(null);
+            const response = await authService.registerCompany(companyData);
+            localStorage.setItem('token', response.token);
+            setUser(response.user);
+            
+            if (response.tenant) {
+                setTenantData(response.tenant, response.branches, response.default_branch_id);
+            } else {
+                clearTenantData();
+            }
+
+            return response;
+        } catch (err) {
+            setError(err.message);
+            throw err;
+        }
+    };
+
+    const impersonateTenant = async (tenantId) => {
+        try {
+            setError(null);
+            // Guardar token original de SuperAdmin para poder regresar
+            const originalToken = localStorage.getItem('token');
+            localStorage.setItem('superadmin_token', originalToken);
+            
+            const response = await authService.impersonateTenant(tenantId);
+            localStorage.setItem('token', response.token);
+            setUser(response.user);
+            
+            if (response.tenant) {
+                setTenantData(response.tenant, response.branches, response.default_branch_id);
+            } else {
+                clearTenantData();
+            }
+
+            return response;
+        } catch (err) {
+            setError(err.message);
+            throw err;
+        }
+    };
+
+    const exitImpersonation = async () => {
+        try {
+            const superadminToken = localStorage.getItem('superadmin_token');
+            if (!superadminToken) {
+                throw new Error('No se encontro sesion de SuperAdmin para restaurar.');
+            }
+            localStorage.setItem('token', superadminToken);
+            localStorage.removeItem('superadmin_token');
+            clearTenantData();
+            await checkAuth();
+        } catch (err) {
+            setError(err.message);
+            throw err;
+        }
+    };
+
+    const isImpersonating = !!localStorage.getItem('superadmin_token');
+
     const value = {
         user,
         loading,
         error,
         isAuthenticated: !!user,
         isSuperAdmin: user?.role === 'superadmin',
-        isTenantAdmin: user?.role === 'tenant_admin' || user?.role === 'superadmin',
-        isAdmin: ['admin', 'tenant_admin', 'branch_manager', 'superadmin'].includes(user?.role),
+        isTenantAdmin: user?.role === 'tenant_admin' || user?.role === 'admin' || user?.role === 'superadmin',
+        isAdmin: ['admin', 'tenant_admin', 'branch_manager', 'superadmin', 'technician', 'salesperson', 'cashier'].includes(user?.role),
+        isStaff: ['admin', 'tenant_admin', 'branch_manager', 'superadmin', 'technician', 'salesperson', 'cashier'].includes(user?.role),
         isBranchManager: user?.role === 'branch_manager',
         isTechnician: user?.role === 'technician',
-        isCashier: user?.role === 'cashier',
+        isSalesperson: user?.role === 'salesperson',
+        isCashier: user?.role === 'cashier' || user?.role === 'salesperson',
         isClient: user?.role === 'client',
+        isImpersonating,
         login,
         register,
+        registerCompany,
+        impersonateTenant,
+        exitImpersonation,
         logout,
         updateProfile,
         checkAuth

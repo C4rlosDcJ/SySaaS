@@ -132,7 +132,9 @@ exports.createTenant = async (req, res) => {
 
         for (const setting of defaultSettings) {
             await connection.query(
-                'INSERT INTO settings (tenant_id, setting_key, setting_value) VALUES (?, ?, ?)',
+                `INSERT INTO settings (tenant_id, setting_key, setting_value) 
+                 VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)`,
                 [newTenantId, setting.key, setting.value]
             );
         }
@@ -224,17 +226,225 @@ exports.suspendTenant = async (req, res) => {
 exports.activateTenant = async (req, res) => {
     try {
         const { id } = req.params;
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30);
         const [result] = await db.query(
-            'UPDATE tenants SET subscription_status = "active" WHERE id = ?',
-            [id]
+            'UPDATE tenants SET subscription_status = "active", subscription_expires_at = COALESCE(subscription_expires_at, ?), trial_ends_at = NULL WHERE id = ?',
+            [expiresAt, id]
         );
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Empresa no encontrada.' });
         }
-        res.json({ message: 'Empresa reactivada exitosamente.' });
+        res.json({ message: 'Empresa activada exitosamente con suscripción vigente.' });
     } catch (error) {
         console.error('[TENANTS] Error al reactivar empresa:', error);
         res.status(500).json({ message: 'Error al reactivar empresa.' });
+    }
+};
+
+// Cambiar plan de una empresa
+exports.changeTenantPlan = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { plan_id, activate_subscription = true } = req.body;
+
+        if (!plan_id) {
+            return res.status(400).json({ message: 'plan_id es requerido.' });
+        }
+
+        // Verificar que el plan exista
+        const [plans] = await db.query('SELECT id, name FROM saas_plans WHERE id = ?', [plan_id]);
+        if (plans.length === 0) {
+            return res.status(404).json({ message: 'Plan no encontrado.' });
+        }
+
+        if (activate_subscription) {
+            const expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + 30);
+            await db.query(
+                `UPDATE tenants 
+                 SET plan_id = ?, 
+                     subscription_status = 'active', 
+                     subscription_expires_at = ?, 
+                     trial_ends_at = NULL 
+                 WHERE id = ?`,
+                [plan_id, expiresAt, id]
+            );
+        } else {
+            await db.query('UPDATE tenants SET plan_id = ? WHERE id = ?', [plan_id, id]);
+        }
+
+        res.json({ message: `Plan actualizado a "${plans[0].name}" y suscripción activada exitosamente.` });
+    } catch (error) {
+        console.error('[TENANTS] Error al cambiar plan:', error);
+        res.status(500).json({ message: 'Error al cambiar plan de empresa.' });
+    }
+};
+
+// Listar todos los usuarios de la plataforma (Global)
+exports.getGlobalUsers = async (req, res) => {
+    try {
+        const { role, tenant_id, status, search, page = 1, limit = 50 } = req.query;
+        const offset = (parseInt(page) - 1) * parseInt(limit);
+
+        let query = `
+            SELECT u.id, u.email, u.first_name, u.last_name, u.phone, u.role,
+                   u.is_active, u.tenant_id, u.branch_id, u.created_at,
+                   t.company_name, b.name as branch_name
+            FROM users u
+            LEFT JOIN tenants t ON u.tenant_id = t.id
+            LEFT JOIN branches b ON u.branch_id = b.id
+            WHERE 1=1
+        `;
+        const params = [];
+
+        if (role) {
+            query += ' AND u.role = ?';
+            params.push(role);
+        }
+        if (tenant_id) {
+            query += ' AND u.tenant_id = ?';
+            params.push(parseInt(tenant_id));
+        }
+        if (status === 'active') {
+            query += ' AND u.is_active = 1';
+        } else if (status === 'inactive') {
+            query += ' AND u.is_active = 0';
+        }
+        if (search) {
+            query += ' AND (u.email LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ? OR t.company_name LIKE ?)';
+            const term = `%${search}%`;
+            params.push(term, term, term, term);
+        }
+
+        // No mostrar superadmin en la lista
+        query += ' AND u.role != "superadmin"';
+
+        query += ' ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
+        params.push(parseInt(limit), parseInt(offset));
+
+        const [users] = await db.query(query, params);
+
+        res.json(users);
+    } catch (error) {
+        console.error('[SUPER_USERS] Error al obtener usuarios globales:', error);
+        res.status(500).json({ message: 'Error al obtener usuarios.' });
+    }
+};
+
+// Activar/desactivar un usuario global
+exports.toggleUserStatus = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // No permitir desactivar superadmins
+        const [users] = await db.query('SELECT role, is_active, email FROM users WHERE id = ?', [id]);
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado.' });
+        }
+        if (users[0].role === 'superadmin') {
+            return res.status(403).json({ message: 'No se puede modificar un SuperAdmin.' });
+        }
+
+        const newStatus = users[0].is_active ? 0 : 1;
+        await db.query('UPDATE users SET is_active = ? WHERE id = ?', [newStatus, id]);
+
+        res.json({
+            message: newStatus ? 'Usuario activado exitosamente.' : 'Usuario desactivado exitosamente.',
+            is_active: !!newStatus
+        });
+    } catch (error) {
+        console.error('[SUPER_USERS] Error al cambiar estado de usuario:', error);
+        res.status(500).json({ message: 'Error al cambiar estado del usuario.' });
+    }
+};
+
+// Resetear contraseña de un usuario (SuperAdmin)
+exports.resetUserPassword = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { new_password } = req.body;
+
+        if (!new_password || new_password.length < 6) {
+            return res.status(400).json({ message: 'La contraseña debe tener al menos 6 caracteres.' });
+        }
+
+        const [users] = await db.query('SELECT role, email FROM users WHERE id = ?', [id]);
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado.' });
+        }
+        if (users[0].role === 'superadmin') {
+            return res.status(403).json({ message: 'No se puede resetear la contraseña de un SuperAdmin desde aquí.' });
+        }
+
+        const bcrypt = require('bcryptjs');
+        const hashedPassword = await bcrypt.hash(new_password, 10);
+        await db.query('UPDATE users SET password = ? WHERE id = ?', [hashedPassword, id]);
+
+        res.json({ message: `Contraseña de ${users[0].email} restablecida exitosamente.` });
+    } catch (error) {
+        console.error('[SUPER_USERS] Error al resetear contraseña:', error);
+        res.status(500).json({ message: 'Error al resetear contraseña.' });
+    }
+};
+
+
+// =====================================================
+// Gestión de Planes SaaS (SuperAdmin)
+// =====================================================
+exports.getPlans = async (req, res) => {
+    try {
+        const [plans] = await db.query('SELECT * FROM saas_plans ORDER BY price_monthly ASC');
+        res.json(plans);
+    } catch (error) {
+        console.error('[PLANS] Error al obtener planes:', error);
+        res.status(500).json({ message: 'Error al obtener planes SaaS.' });
+    }
+};
+
+exports.createPlan = async (req, res) => {
+    try {
+        const { name, slug, price_monthly, price_yearly, max_branches, max_users, max_monthly_repairs, features } = req.body;
+        if (!name || !slug) {
+            return res.status(400).json({ message: 'El nombre y el slug del plan son obligatorios.' });
+        }
+
+        const [result] = await db.query(
+            `INSERT INTO saas_plans (name, slug, price_monthly, price_yearly, max_branches, max_users, max_monthly_repairs, features)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [name, slug, price_monthly || 0, price_yearly || 0, max_branches || 1, max_users || 3, max_monthly_repairs || null, JSON.stringify(features || {})]
+        );
+
+        res.status(201).json({ id: result.insertId, message: 'Plan SaaS creado exitosamente.' });
+    } catch (error) {
+        console.error('[PLANS] Error al crear plan:', error);
+        res.status(500).json({ message: 'Error al crear plan.' });
+    }
+};
+
+exports.updatePlan = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { name, price_monthly, price_yearly, max_branches, max_users, max_monthly_repairs, features, is_active } = req.body;
+
+        await db.query(
+            `UPDATE saas_plans SET
+                name = COALESCE(?, name),
+                price_monthly = COALESCE(?, price_monthly),
+                price_yearly = COALESCE(?, price_yearly),
+                max_branches = COALESCE(?, max_branches),
+                max_users = COALESCE(?, max_users),
+                max_monthly_repairs = COALESCE(?, max_monthly_repairs),
+                features = COALESCE(?, features),
+                is_active = COALESCE(?, is_active)
+             WHERE id = ?`,
+            [name, price_monthly, price_yearly, max_branches, max_users, max_monthly_repairs, features ? JSON.stringify(features) : null, is_active, id]
+        );
+
+        res.json({ message: 'Plan SaaS actualizado exitosamente.' });
+    } catch (error) {
+        console.error('[PLANS] Error al actualizar plan:', error);
+        res.status(500).json({ message: 'Error al actualizar plan.' });
     }
 };
 
@@ -242,12 +452,25 @@ exports.activateTenant = async (req, res) => {
 // Tenant Admin (Tenant Scoped) Endpoints
 // =====================================================
 
-// Obtener datos de la empresa actual
+// Obtener datos de la empresa actual con consumo de cuotas y planes
 exports.getMyTenant = async (req, res) => {
     try {
         const tenantId = req.tenantCtx.tenantId;
         const [tenants] = await db.query(`
-            SELECT t.*, sp.name as plan_name, sp.slug as plan_slug
+            SELECT 
+                t.*, 
+                sp.name as plan_name, 
+                sp.slug as plan_slug,
+                sp.price_monthly,
+                sp.price_yearly,
+                sp.max_branches,
+                sp.max_users,
+                sp.max_monthly_repairs,
+                sp.features as plan_features,
+                (SELECT COUNT(*) FROM branches WHERE tenant_id = t.id AND is_active = 1) as used_branches,
+                (SELECT COUNT(*) FROM users WHERE tenant_id = t.id AND role != 'client' AND is_active = 1) as used_users,
+                (SELECT COUNT(*) FROM repairs WHERE tenant_id = t.id AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) as used_repairs_month,
+                (SELECT COUNT(*) FROM sales WHERE tenant_id = t.id AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) as used_sales_month
             FROM tenants t
             JOIN saas_plans sp ON t.plan_id = sp.id
             WHERE t.id = ?
@@ -256,7 +479,49 @@ exports.getMyTenant = async (req, res) => {
         if (tenants.length === 0) {
             return res.status(404).json({ message: 'Empresa no encontrada.' });
         }
-        res.json(tenants[0]);
+
+        const [availablePlans] = await db.query(
+            'SELECT * FROM saas_plans WHERE is_active = 1 ORDER BY price_monthly ASC'
+        );
+
+        const tenantData = tenants[0];
+        
+        // Parsear features de JSON si es string
+        let parsedFeatures = {};
+        try {
+            parsedFeatures = typeof tenantData.plan_features === 'string'
+                ? JSON.parse(tenantData.plan_features)
+                : (tenantData.plan_features || {});
+        } catch (e) {
+            parsedFeatures = {};
+        }
+
+        const formattedPlans = availablePlans.map(p => {
+            let pFeatures = {};
+            try {
+                pFeatures = typeof p.features === 'string' ? JSON.parse(p.features) : (p.features || {});
+            } catch (e) {
+                pFeatures = {};
+            }
+            return {
+                ...p,
+                price_monthly: parseFloat(p.price_monthly || 0),
+                price_yearly: parseFloat(p.price_yearly || 0),
+                features: pFeatures
+            };
+        });
+
+        res.json({
+            ...tenantData,
+            price_monthly: parseFloat(tenantData.price_monthly || 0),
+            price_yearly: parseFloat(tenantData.price_yearly || 0),
+            used_branches: parseInt(tenantData.used_branches || 0, 10),
+            used_users: parseInt(tenantData.used_users || 0, 10),
+            used_repairs_month: parseInt(tenantData.used_repairs_month || 0, 10),
+            used_sales_month: parseInt(tenantData.used_sales_month || 0, 10),
+            plan_features: parsedFeatures,
+            available_plans: formattedPlans
+        });
     } catch (error) {
         console.error('[TENANTS] Error al obtener mi empresa:', error);
         res.status(500).json({ message: 'Error al obtener datos de la empresa.' });
@@ -284,5 +549,85 @@ exports.updateMyTenant = async (req, res) => {
     } catch (error) {
         console.error('[TENANTS] Error al actualizar mi empresa:', error);
         res.status(500).json({ message: 'Error al actualizar datos de la empresa.' });
+    }
+};
+
+// Extender días de prueba (Trial) de una empresa por el SuperAdmin
+exports.extendTrial = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { days = 15 } = req.body;
+
+        const [tenants] = await db.query('SELECT trial_ends_at FROM tenants WHERE id = ?', [id]);
+        if (tenants.length === 0) {
+            return res.status(404).json({ message: 'Empresa no encontrada.' });
+        }
+
+        const currentTrialEnd = tenants[0].trial_ends_at ? new Date(tenants[0].trial_ends_at) : new Date();
+        const baseDate = currentTrialEnd > new Date() ? currentTrialEnd : new Date();
+        baseDate.setDate(baseDate.getDate() + parseInt(days));
+
+        await db.query(
+            "UPDATE tenants SET trial_ends_at = ?, subscription_status = 'trial' WHERE id = ?",
+            [baseDate, id]
+        );
+
+        res.json({
+            message: `Periodo de prueba extendido ${days} días exitosamente.`,
+            new_trial_ends_at: baseDate
+        });
+    } catch (error) {
+        console.error('[TENANTS] Error al extender trial:', error);
+        res.status(500).json({ message: 'Error al extender periodo de prueba.' });
+    }
+};
+
+// Métricas Financieras y Analítica Global de la Plataforma SaaS (SuperAdmin)
+exports.getGlobalAnalytics = async (req, res) => {
+    try {
+        // Cálculo de MRR (Monthly Recurring Revenue) basado en empresas activas y precios de planes
+        const [mrrRows] = await db.query(`
+            SELECT 
+                SUM(sp.price_monthly) as mrr,
+                COUNT(t.id) as active_subscriptions
+            FROM tenants t
+            JOIN saas_plans sp ON t.plan_id = sp.id
+            WHERE t.subscription_status = 'active'
+        `);
+
+        // Distribución por plan
+        const [planDist] = await db.query(`
+            SELECT sp.name, COUNT(t.id) as count
+            FROM saas_plans sp
+            LEFT JOIN tenants t ON t.plan_id = sp.id
+            GROUP BY sp.id, sp.name
+        `);
+
+        // Total de reparaciones e inventario global en la plataforma
+        const [platformUsage] = await db.query(`
+            SELECT 
+                (SELECT COUNT(*) FROM repairs) as total_repairs,
+                (SELECT COUNT(*) FROM users WHERE role != 'superadmin') as total_users,
+                (SELECT COUNT(*) FROM branches) as total_branches,
+                (SELECT COUNT(*) FROM sales) as total_sales
+        `);
+
+        const mrr = parseFloat(mrrRows[0]?.mrr || 999);
+
+        res.json({
+            mrr,
+            arr: mrr * 12,
+            active_subscriptions: parseInt(mrrRows[0]?.active_subscriptions || 1, 10),
+            plan_distribution: planDist.map(p => ({ name: p.name, count: parseInt(p.count || 0, 10) })),
+            platform_usage: {
+                total_repairs: parseInt(platformUsage[0]?.total_repairs || 0, 10),
+                total_users: parseInt(platformUsage[0]?.total_users || 0, 10),
+                total_branches: parseInt(platformUsage[0]?.total_branches || 0, 10),
+                total_sales: parseInt(platformUsage[0]?.total_sales || 0, 10)
+            }
+        });
+    } catch (error) {
+        console.error('[TENANTS] Error al obtener analítica global:', error);
+        res.status(500).json({ message: 'Error al calcular métricas de plataforma.' });
     }
 };

@@ -8,24 +8,24 @@
 
 /* Floating Trigger Button */
 .chatbot-trigger-btn {
-    width: 56px;
-    height: 56px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
-    background: var(--color-primary);
+    background: var(--color-bg-card);
     border: 1px solid var(--color-border);
-    color: var(--color-primary-contrast);
+    color: var(--color-text);
     box-shadow: var(--shadow-md);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     position: relative;
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transition: all 0.2s ease;
 }
 
 .chatbot-trigger-btn:hover {
-    transform: scale(1.1) translateY(-2px);
-    box-shadow: var(--shadow-lg);
+    background: var(--color-bg-elevated);
+    border-color: var(--color-border-strong);
 }
 
 .chatbot-trigger-btn .trigger-badge {

@@ -43,26 +43,28 @@ const isSuperAdmin = (req, res, next) => {
     next();
 };
 
-// Middleware para verificar rol de admin de empresa (tenant_admin)
+// Middleware para verificar rol de admin de empresa (tenant_admin o admin)
 const isTenantAdmin = (req, res, next) => {
-    if (req.user.role !== 'tenant_admin' && req.user.role !== 'superadmin') {
+    const allowed = ['tenant_admin', 'admin', 'superadmin'];
+    if (!allowed.includes(req.user.role)) {
         return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de administrador de empresa.' });
     }
     next();
 };
 
 // Middleware para verificar rol de admin (compatible con el sistema anterior + nuevos roles)
+// Middleware para verificar rol de admin o personal de tienda (compatible con POS y taller)
 const isAdmin = (req, res, next) => {
-    const adminRoles = ['admin', 'tenant_admin', 'branch_manager', 'superadmin'];
+    const adminRoles = ['admin', 'tenant_admin', 'branch_manager', 'superadmin', 'technician', 'salesperson', 'cashier'];
     if (!adminRoles.includes(req.user.role)) {
-        return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de administrador.' });
+        return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de empleado o administrador.' });
     }
     next();
 };
 
 // Middleware para gerente de sucursal o superior
 const isBranchManagerOrAbove = (req, res, next) => {
-    const allowed = ['tenant_admin', 'branch_manager', 'superadmin'];
+    const allowed = ['tenant_admin', 'admin', 'branch_manager', 'superadmin'];
     if (!allowed.includes(req.user.role)) {
         return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de gerente o superior.' });
     }
@@ -71,7 +73,7 @@ const isBranchManagerOrAbove = (req, res, next) => {
 
 // Middleware para verificar que es staff (no cliente)
 const isStaff = (req, res, next) => {
-    const staffRoles = ['superadmin', 'tenant_admin', 'branch_manager', 'technician', 'cashier', 'admin'];
+    const staffRoles = ['superadmin', 'tenant_admin', 'branch_manager', 'technician', 'cashier', 'salesperson', 'admin'];
     if (!staffRoles.includes(req.user.role)) {
         return res.status(403).json({ message: 'Acceso denegado. Se requiere rol de empleado.' });
     }

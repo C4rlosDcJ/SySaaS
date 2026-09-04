@@ -73,7 +73,7 @@
 }
 
 .auth-visual .logo-text {
-    color: #ffffff !important;
+    color: var(--color-text);
 }
 
 .auth-visual-content h1 {
@@ -84,13 +84,12 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
     margin-bottom: var(--sp-5);
-    color: #ffffff !important;
-    -webkit-text-fill-color: #ffffff !important;
+    color: var(--color-text);
 }
 
 .auth-visual-content p {
     font-size: var(--font-md);
-    color: rgba(255, 255, 255, 0.7) !important;
+    color: var(--color-text-secondary);
     line-height: 1.6;
     margin-bottom: var(--sp-8);
 }
@@ -111,12 +110,12 @@
     width: 44px;
     height: 44px;
     border-radius: var(--radius-md);
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: var(--color-bg-tertiary);
+    border: 1px solid var(--color-border);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-text-secondary);
+    color: var(--color-primary);
 }
 
 .feature:hover .feature-icon-wrapper {
@@ -131,7 +130,7 @@
 }
 
 .auth-visual .feature span {
-    color: rgba(255, 255, 255, 0.7) !important;
+    color: var(--color-text-secondary);
 }
 
 .feature:hover span {
@@ -139,7 +138,7 @@
 }
 
 .auth-visual .feature:hover span {
-    color: #ffffff !important;
+    color: var(--color-text);
 }
 
 /* ── Right Side: Form Container ── */

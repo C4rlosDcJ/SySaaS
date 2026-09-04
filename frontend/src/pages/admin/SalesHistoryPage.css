@@ -1,37 +1,44 @@
 /* =====================================================
-   Sales History Page Styles
+   Sales History Page Styles - Clean Minimalist Dark/Light
    ===================================================== */
 
-.sales-page {
+.sales-history-page {
     padding: var(--sp-5) var(--sp-6);
-    animation: fadeIn 0.3s ease;
-}
-
-/* Stats row */
-.sales-stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--sp-3);
-    margin-bottom: var(--sp-5);
+    animation: fadeIn 0.25s ease;
 }
 
 @media (max-width: 768px) {
-    .sales-stats { grid-template-columns: 1fr; }
+    .sales-history-page {
+        padding: var(--sp-3);
+    }
+}
+
+/* Stats Cards */
+.sales-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-5);
 }
 
 .sales-stat-card {
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    padding: var(--sp-4);
+    padding: var(--sp-4) var(--sp-5);
     display: flex;
     align-items: center;
-    gap: var(--sp-3);
+    gap: var(--sp-4);
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.sales-stat-card:hover {
+    border-color: var(--color-border-strong);
 }
 
 .sales-stat-icon {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border-radius: var(--radius-md);
     display: flex;
     align-items: center;
@@ -40,141 +47,224 @@
 }
 
 .sales-stat-value {
-    font-size: var(--font-2xl);
+    font-size: 1.5rem;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 1.1;
+    color: var(--color-text);
+    letter-spacing: -0.01em;
 }
 
 .sales-stat-count {
     font-size: var(--font-xs);
     color: var(--color-text-secondary);
+    margin-top: 3px;
 }
 
 .sales-stat-label {
-    font-size: var(--font-xs);
-    color: var(--color-text-muted);
-}
-
-/* Filters */
-.sales-filters {
-    display: flex;
-    gap: var(--sp-3);
-    margin-bottom: var(--sp-4);
-    flex-wrap: wrap;
-    align-items: center;
-}
-
-.sales-filters .date-input {
-    width: 150px;
-}
-
-/* Table */
-.sale-number {
-    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 0.7rem;
     font-weight: 600;
-    font-size: var(--font-xs);
-    color: var(--color-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    margin-top: 2px;
 }
 
-.payment-badge {
+/* Filter Toolbar */
+.sales-filters-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 16px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.sales-filters-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.sales-search-box {
+    position: relative;
+    flex: 1;
+    min-width: 240px;
+}
+
+.sales-search-box .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-muted);
+    pointer-events: none;
+}
+
+.sales-search-input {
+    width: 100% !important;
+    padding-left: 36px !important;
+}
+
+.sales-presets-group {
     display: inline-flex;
     align-items: center;
-    gap: var(--sp-1-5);
-    padding: 2px var(--sp-2);
-    border-radius: var(--radius-sm);
-    font-size: var(--font-xs);
-    font-weight: 600;
+    gap: 2px;
+    background: var(--color-bg-secondary);
+    padding: 3px;
+    border-radius: var(--radius-md);
     border: 1px solid var(--color-border);
-    background: var(--color-bg-elevated);
+}
+
+.preset-pill {
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    border: none;
+    cursor: pointer;
+    background: transparent;
+    color: var(--color-text-secondary);
+    transition: all 0.15s ease;
+}
+
+.preset-pill:hover {
+    color: var(--color-text);
+}
+
+.preset-pill.active {
+    background: var(--color-primary);
+    color: #ffffff;
+}
+
+.sales-filters-bottom {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding-top: 12px;
+    border-top: 1px solid var(--color-border);
+}
+
+.sales-date-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--color-bg-secondary);
+    padding: 3px 10px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+}
+
+.sales-date-input {
+    width: 125px !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 4px 2px !important;
+    font-size: 12px !important;
+    color: var(--color-text) !important;
+    box-shadow: none !important;
+}
+
+.sales-date-input:focus {
+    outline: none !important;
+}
+
+.sales-filter-select {
+    width: 170px !important;
+    min-width: 150px !important;
+    max-width: 180px !important;
+    flex: 0 0 auto !important;
+}
+
+/* Sale Method Pill (Subtle, Clean & Minimal) */
+.sale-method-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 500;
     color: var(--color-text-secondary);
 }
 
-.payment-badge::before {
-    content: '';
-    display: inline-block;
+.sale-method-pill .method-icon {
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+}
+
+/* Status Indicator (Subtle Dot + Text) */
+.sale-status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12.5px;
+    font-weight: 500;
+}
+
+.sale-status-indicator .status-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
 }
 
-.payment-cash::before { background: #10b981; }
-.payment-card::before { background: #3b82f6; }
-.payment-transfer::before { background: #f59e0b; }
-
-.payment-cash, .payment-card, .payment-transfer {
-    background: var(--color-bg-elevated);
-    color: var(--color-text-secondary);
+.sale-status-indicator.status-completed {
+    color: var(--color-text);
 }
 
-.sale-status-completed {
-    color: var(--color-success);
-    font-weight: 600;
-    font-size: var(--font-xs);
+.sale-status-indicator.status-completed .status-dot {
+    background-color: #22c55e;
 }
 
-.sale-status-cancelled {
-    color: var(--color-error);
-    font-weight: 600;
-    font-size: var(--font-xs);
+.sale-status-indicator.status-cancelled {
+    color: var(--color-text-muted);
     text-decoration: line-through;
 }
 
-/* Sale detail modal */
-.sale-detail-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--sp-3);
-    margin-bottom: var(--sp-4);
+.sale-status-indicator.status-cancelled .status-dot {
+    background-color: #ef4444;
 }
 
-.sale-detail-label {
-    font-size: var(--font-xs);
-    color: var(--color-text-muted);
-}
-
-.sale-detail-value {
-    font-size: var(--font-sm);
-    font-weight: 600;
-}
-
-.sale-items-list {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    margin-bottom: var(--sp-4);
-}
-
-.sale-items-list .table th {
-    font-size: 0.65rem;
-}
-
-.sale-items-list .table td {
-    font-size: var(--font-sm);
-    padding: var(--sp-2) var(--sp-3);
-}
-
-.sale-total-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--sp-1);
-    text-align: right;
-    padding: var(--sp-3);
-    background: var(--color-bg-elevated);
-    border-radius: var(--radius-md);
-}
-
-.sale-total-row {
-    display: flex;
-    justify-content: space-between;
-    font-size: var(--font-sm);
-    color: var(--color-text-secondary);
-}
-
-.sale-total-row.grand {
-    font-size: var(--font-lg);
-    font-weight: 700;
+.sale-status-indicator.status-pending {
     color: var(--color-text);
-    padding-top: var(--sp-2);
-    border-top: 1px solid var(--color-border);
+}
+
+.sale-status-indicator.status-pending .status-dot {
+    background-color: #f59e0b;
+}
+
+/* Table Clean Styling */
+.sales-history-page .table th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    background: var(--color-bg-secondary);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.sales-history-page .table td {
+    padding: 14px 16px;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.sales-history-page .table tbody tr:hover {
+    background-color: var(--color-bg-hover);
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }

@@ -4,7 +4,7 @@ const mysql = require('mysql2/promise');
 require('dotenv').config();
 
 async function dbInit() {
-    const dbName = process.env.DB_NAME || 'systeck_db';
+    const dbName = process.env.DB_NAME || 'sysaas_db';
     
     // Configuración para conectarse al servidor MySQL (sin base de datos específica)
     const configWithoutDb = {
@@ -153,6 +153,22 @@ async function dbInit() {
         console.log(`[DB-INIT] Asegurando que la columna "setting_value" en tabla "settings" soporte datos largos (LONGTEXT)...`);
         await connection.query(`ALTER TABLE settings MODIFY COLUMN setting_value LONGTEXT`);
 
+        // 9.1. Asegurar que la columna "logo_url" en "tenants" soporte datos largos (LONGTEXT)
+        console.log(`[DB-INIT] Asegurando que la columna "logo_url" en tabla "tenants" soporte datos largos (LONGTEXT)...`);
+        try {
+            await connection.query(`ALTER TABLE tenants MODIFY COLUMN logo_url LONGTEXT`);
+        } catch (e) {
+            console.warn(`[DB-INIT] No se pudo modificar columna logo_url en tenants:`, e.message);
+        }
+
+        // 9.2. Asegurar que la columna "details" en "activity_logs" soporte datos largos (LONGTEXT)
+        console.log(`[DB-INIT] Asegurando que la columna "details" en tabla "activity_logs" soporte datos largos (LONGTEXT)...`);
+        try {
+            await connection.query(`ALTER TABLE activity_logs MODIFY COLUMN details LONGTEXT`);
+        } catch (e) {
+            console.warn(`[DB-INIT] No se pudo modificar columna details en activity_logs:`, e.message);
+        }
+
         // 10. Asegurar que las columnas de la tabla 'sales' tengan la estructura necesaria para pedidos web
         console.log(`[DB-INIT] Verificando y alterando tabla "sales" para soportar pedidos web...`);
         try {
@@ -166,13 +182,19 @@ async function dbInit() {
             console.error(`[DB-INIT] Error al alterar la tabla sales:`, e.message);
         }
 
-        // 11. Asegurar que la columna is_unique exista en la tabla products
-        console.log(`[DB-INIT] Verificando columna "is_unique" en tabla "products"...`);
+        // 11. Asegurar que las columnas is_unique e image_url existan en la tabla products
+        console.log(`[DB-INIT] Verificando columnas "is_unique" e "image_url" en tabla "products"...`);
         try {
             const [isUniqueCol] = await connection.query(`SHOW COLUMNS FROM products LIKE 'is_unique'`);
             if (isUniqueCol.length === 0) {
                 await connection.query(`ALTER TABLE products ADD COLUMN is_unique BOOLEAN DEFAULT FALSE`);
                 console.log(`[DB-INIT] Columna is_unique añadida a la tabla products.`);
+            }
+
+            const [imageUrlCol] = await connection.query(`SHOW COLUMNS FROM products LIKE 'image_url'`);
+            if (imageUrlCol.length === 0) {
+                await connection.query(`ALTER TABLE products ADD COLUMN image_url VARCHAR(500) NULL`);
+                console.log(`[DB-INIT] Columna image_url añadida a la tabla products.`);
             }
         } catch (e) {
             console.error(`[DB-INIT] Error al verificar/alterar la tabla products:`, e.message);
@@ -245,6 +267,34 @@ async function dbInit() {
                     await connection.query(saasDataSql);
                     console.log(`[DB-INIT] Migracion de datos SaaS aplicada exitosamente.`);
                 }
+            }
+        }
+
+        // 15. Migración de Funcionalidades Extendidas (Proveedores, Órdenes de Compra, Cupones)
+        console.log(`[DB-INIT] Verificando tablas de funcionalidades extendidas (suppliers, coupons)...`);
+        const [suppliersTable] = await connection.query(`SHOW TABLES LIKE 'suppliers'`);
+        if (suppliersTable.length === 0) {
+            const featuresExpansionPath = path.join(__dirname, '../../database/features_expansion.sql');
+            if (fs.existsSync(featuresExpansionPath)) {
+                console.log(`[DB-INIT] Leyendo ${path.basename(featuresExpansionPath)}...`);
+                let featuresSql = fs.readFileSync(featuresExpansionPath, 'utf8');
+                featuresSql = featuresSql.replace(/USE\s+\w+/gi, `USE \`${dbName}\``);
+                await connection.query(featuresSql);
+                console.log(`[DB-INIT] Migración de funcionalidades extendidas aplicada exitosamente.`);
+            }
+        }
+
+        // 16. Migración de SuperAdmin Expansion (Anuncios Globales)
+        console.log(`[DB-INIT] Verificando tabla de comunicados del sistema (system_broadcasts)...`);
+        const [broadcastsTable] = await connection.query(`SHOW TABLES LIKE 'system_broadcasts'`);
+        if (broadcastsTable.length === 0) {
+            const superadminPath = path.join(__dirname, '../../database/superadmin_expansion.sql');
+            if (fs.existsSync(superadminPath)) {
+                console.log(`[DB-INIT] Leyendo ${path.basename(superadminPath)}...`);
+                let saSql = fs.readFileSync(superadminPath, 'utf8');
+                saSql = saSql.replace(/USE\s+\w+/gi, `USE \`${dbName}\``);
+                await connection.query(saSql);
+                console.log(`[DB-INIT] Migración SuperAdmin expansion aplicada exitosamente.`);
             }
         }
 

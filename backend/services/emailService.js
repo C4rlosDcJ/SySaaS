@@ -18,7 +18,7 @@ const settingsController = require('../controllers/settingsController');
 
 // Helper para obtener nombre del negocio
 async function getBusinessName() {
-  return await settingsController.getSettingValue('business_name', 'SysTeck');
+  return await settingsController.getSettingValue('business_name', 'SySaaS');
 }
 
 // Templates de email (ahora son funciones async o reciben businessName)
@@ -186,7 +186,7 @@ async function sendEmail(to, template, data) {
     const emailContent = emailTemplates[template](data.repair, data.customer, data.newStatus || null, businessName);
 
     const info = await transporter.sendMail({
-      from: process.env.EMAIL_FROM || `"${businessName}" <noreply@systeck.com>`,
+      from: process.env.EMAIL_FROM || `"${businessName}" <noreply@sysaas.com>`,
       to: to,
       subject: emailContent.subject,
       html: emailContent.html
@@ -223,7 +223,7 @@ async function sendPasswordResetEmail(to, token, customer) {
     `;
 
     const info = await transporter.sendMail({
-      from: process.env.EMAIL_FROM || `"${businessName}" <noreply@systeck.com>`,
+      from: process.env.EMAIL_FROM || `"${businessName}" <noreply@sysaas.com>`,
       to: to,
       subject: `${businessName} - Restablecer tu contraseña`,
       html: htmlContent

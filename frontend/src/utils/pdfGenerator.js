@@ -27,17 +27,17 @@ export const generateServiceTicket = async (repair, settings = {}) => {
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
     
-    // Theme Colors (Modern Premium Slate & Red Accents matching SysTeck)
+    // Theme Colors (Modern Premium Slate & Red Accents matching SySaaS)
     const primaryColor = [30, 41, 59];   // Slate 800 (#1e293b)
     const accentColor = [79, 70, 229];    // Índigo Imperial (#4f46e5)
     const darkColor = [15, 23, 42];      // Slate 900 (#0f172a)
     const mutedColor = [100, 116, 139];  // Slate 500 (#64748b)
     const lightBg = [248, 250, 252];     // Slate 50 (#f8fafc)
 
-    const businessName = settings.business_name || 'SysTeck';
-    const contactEmail = settings.contact_email || '';
-    const contactPhone = settings.contact_phone || '';
-    const contactAddress = settings.business_address || '';
+    const businessName = settings.business_name || settings.company_name || repair.company_name || repair.tenant_name || 'Mi Empresa';
+    const contactEmail = settings.contact_email || repair.tenant_email || '';
+    const contactPhone = settings.contact_phone || repair.tenant_phone || '';
+    const contactAddress = settings.business_address || repair.tenant_address || '';
 
     let currentY = 16;
 

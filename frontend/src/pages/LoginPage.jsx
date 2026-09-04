@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Wrench, Mail, Lock, Eye, EyeOff, ArrowLeft, Bell, History, Smartphone } from 'lucide-react';
+import { getImageUrl } from '../services/api';
+import { Wrench, Mail, Lock, Eye, EyeOff, ArrowLeft, Bell, History, Smartphone, Sun, Moon } from 'lucide-react';
 import './AuthPages.css';
 
 export default function LoginPage() {
@@ -17,7 +18,7 @@ export default function LoginPage() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const { login } = useAuth();
-    const { businessLogo, businessName } = useTheme();
+    const { businessLogo, businessName, theme, toggleTheme } = useTheme();
     const navigate = useNavigate();
 
     const handleChange = (e) => {
@@ -36,7 +37,9 @@ export default function LoginPage() {
         try {
             const response = await login(formData.email, formData.password);
             // Redirigir según el rol o parámetro redirect
-            if (response.user.role === 'admin') {
+            if (response.user.role === 'superadmin') {
+                navigate(redirectUrl || '/superadmin');
+            } else if (['admin', 'tenant_admin', 'branch_manager', 'technician', 'salesperson', 'cashier'].includes(response.user.role)) {
                 navigate(redirectUrl || '/admin');
             } else {
                 navigate(redirectUrl || '/dashboard');
@@ -69,7 +72,13 @@ export default function LoginPage() {
                     <div className="auth-visual-content">
                         <div className="auth-logo">
                             {businessLogo ? (
-                                <img src={businessLogo} alt="Logo" className="logo-img-auth" style={{ width: '36px', height: '36px', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} />
+                                <img 
+                                    src={getImageUrl(businessLogo)} 
+                                    alt="Logo" 
+                                    className="logo-img-auth" 
+                                    style={{ width: '36px', height: '36px', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }}
+                                    onError={(e) => { e.target.style.display = 'none'; }}
+                                />
                             ) : (
                                 <div className="logo-icon">
                                     <Wrench size={20} />
@@ -77,26 +86,26 @@ export default function LoginPage() {
                             )}
                             <span className="logo-text">{renderBusinessName()}</span>
                         </div>
-                        <h1>Bienvenido de vuelta</h1>
-                        <p>Accede a tu cuenta para gestionar tus reparaciones y seguir el estado de tus dispositivos en tiempo real.</p>
+                        <h1>Acceso a la plataforma</h1>
+                        <p>Inicia sesión en tu cuenta administrativa de taller o accede al panel de cliente para ver el progreso de tus órdenes de servicio técnico.</p>
                         <div className="auth-features">
                             <div className="feature">
                                 <div className="feature-icon-wrapper">
                                     <Smartphone size={20} />
                                 </div>
-                                <span>Seguimiento en tiempo real</span>
+                                <span>Control multi-sucursal activo</span>
                             </div>
                             <div className="feature">
                                 <div className="feature-icon-wrapper">
                                     <Bell size={20} />
                                 </div>
-                                <span>Notificaciones automáticas</span>
+                                <span>Notificaciones automatizadas</span>
                             </div>
                             <div className="feature">
                                 <div className="feature-icon-wrapper">
                                     <History size={20} />
                                 </div>
-                                <span>Historial y garantías</span>
+                                <span>Inventario y órdenes centralizados</span>
                             </div>
                         </div>
                     </div>
@@ -104,7 +113,33 @@ export default function LoginPage() {
                 </div>
 
                 <div className="auth-form-container">
-                    <div className="auth-form-wrapper">
+                    <div className="auth-form-wrapper" style={{ position: 'relative' }}>
+                        <button
+                            type="button"
+                            onClick={toggleTheme}
+                            className="btn btn-outline btn-sm"
+                            title={`Cambiar a modo ${theme === 'dark' ? 'claro' : 'oscuro'}`}
+                            style={{ 
+                                position: 'absolute', 
+                                top: '-8px', 
+                                right: '0', 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '6px', 
+                                padding: '6px 12px', 
+                                borderRadius: 'var(--radius-full)',
+                                border: '1px solid var(--color-border)',
+                                background: 'var(--color-bg-tertiary)',
+                                color: 'var(--color-text)',
+                                cursor: 'pointer',
+                                fontSize: '12px',
+                                fontWeight: 500
+                            }}
+                        >
+                            {theme === 'dark' ? <Sun size={14} className="text-warning" /> : <Moon size={14} className="text-primary" />}
+                            <span>{theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}</span>
+                        </button>
+
                         <h2>Iniciar Sesión</h2>
                         <p className="auth-subtitle">
                             ¿No tienes cuenta? <Link to="/register">Regístrate aquí</Link>
