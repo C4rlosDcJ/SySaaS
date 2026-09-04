@@ -21,9 +21,14 @@ async function dbInit() {
         console.log(`[DB-INIT] Conectando a MySQL en ${configWithoutDb.host}:${configWithoutDb.port}...`);
         connection = await mysql.createConnection(configWithoutDb);
 
-        // 1. Crear base de datos si no existe
+        // 1. Crear base de datos si no existe (con manejo seguro para bases de datos cloud como TiDB/PlanetScale/AWS)
         console.log(`[DB-INIT] Verificando existencia de la base de datos "${dbName}"...`);
-        await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+        try {
+            await connection.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+            console.log(`[DB-INIT] Base de datos "${dbName}" verificada/creada.`);
+        } catch (createErr) {
+            console.warn(`[DB-INIT] Aviso: No se pudo ejecutar CREATE DATABASE (habitual en cloud DB con permisos restringidos): ${createErr.message}`);
+        }
         
         // 2. Usar la base de datos seleccionada
         await connection.query(`USE \`${dbName}\``);
@@ -39,9 +44,9 @@ async function dbInit() {
                 console.log(`[DB-INIT] Leyendo ${path.basename(schemaPath)}...`);
                 let schemaSql = fs.readFileSync(schemaPath, 'utf8');
                 
-                // Reemplazar nombres de bases de datos por el configurado en .env
-                schemaSql = schemaSql.replace(/CREATE DATABASE IF NOT EXISTS\s+\w+/gi, `CREATE DATABASE IF NOT EXISTS \`${dbName}\``);
-                schemaSql = schemaSql.replace(/USE\s+\w+/gi, `USE \`${dbName}\``);
+                // Eliminar cualquier CREATE DATABASE del dump para evitar fallos de permisos
+                schemaSql = schemaSql.replace(/CREATE DATABASE IF NOT EXISTS[^\n;]+;?/gi, '');
+                schemaSql = schemaSql.replace(/USE\s+[^\n;]+;?/gi, `USE \`${dbName}\`;`);
 
                 console.log(`[DB-INIT] Ejecutando comandos de schema.sql...`);
                 await connection.query(schemaSql);
