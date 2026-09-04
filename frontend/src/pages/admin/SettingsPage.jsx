@@ -28,7 +28,8 @@ export default function SettingsPage() {
 
     const isDark = theme === 'dark';
     const { tenant, updateTenantInfo } = useTenant();
-    const tenantId = tenant?.id || 'default';
+    // Use only a real numeric tenant id so the effect does not fire before the tenant loads
+    const tenantId = tenant?.id ?? null;
 
     const [activeTab, setActiveTab] = useState('general'); // 'general' | 'repairs' | 'notifications' | 'branding'
 
@@ -54,7 +55,9 @@ export default function SettingsPage() {
     const [saving, setSaving] = useState(false);
 
     // Cargar configuraciones exclusivas de este tenant
+    // Only run when we have a real tenant id to prevent fetching with wrong context
     useEffect(() => {
+        if (!tenantId) return;
         fetchSettings();
     }, [tenantId]);
 
@@ -67,12 +70,11 @@ export default function SettingsPage() {
                     ...prev,
                     ...data
                 }));
-                if (updateTenantInfo) {
-                    updateTenantInfo({
-                        company_name: data.business_name || tenant?.company_name,
-                        logo_url: data.business_logo !== undefined ? data.business_logo : tenant?.logo_url
-                    });
-                }
+                // NOTE: Do NOT call updateTenantInfo here.
+                // Mutating the global TenantContext on every settings load causes
+                // the active tenant to be overwritten with potentially wrong data,
+                // which then persists across all other modules. The tenant context
+                // is managed exclusively by AuthContext via the JWT token.
             }
         } catch (error) {
             console.error('Error al cargar configuraciones:', error);
@@ -159,11 +161,13 @@ export default function SettingsPage() {
         try {
             setSaving(true);
             await settingsService.update(settings);
+            // Only update TenantContext after a successful explicit save by the user.
+            // Limit the update to visible branding fields to avoid contaminating other tenant data.
             if (updateTenantInfo) {
-                updateTenantInfo({
-                    company_name: settings.business_name,
-                    logo_url: settings.business_logo
-                });
+                const patch = {};
+                if (settings.business_name) patch.company_name = settings.business_name;
+                if (settings.business_logo !== undefined) patch.logo_url = settings.business_logo;
+                if (Object.keys(patch).length > 0) updateTenantInfo(patch);
             }
             showAlert({
                 title: 'Configuración Guardada',
