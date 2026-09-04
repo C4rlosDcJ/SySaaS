@@ -3,6 +3,17 @@ const path = require('path');
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+function cleanSql(rawSql, targetDb) {
+    let sql = rawSql;
+    // Eliminar sentencias CREATE DATABASE (de una o múltiples líneas hasta el ;)
+    sql = sql.replace(/CREATE DATABASE IF NOT EXISTS[\s\S]*?;/gi, '');
+    // Reemplazar sentencias USE por la base de datos configurada
+    sql = sql.replace(/USE\s+[`\w]+;?/gi, `USE \`${targetDb}\`;`);
+    // Limpiar comentarios defectuosos
+    sql = sql.replace(/^N--/gm, '--');
+    return sql;
+}
+
 async function dbInit() {
     const dbName = process.env.DB_NAME || 'sysaas_db';
     
@@ -42,11 +53,7 @@ async function dbInit() {
             const schemaPath = path.join(__dirname, '../../database/schema.sql');
             if (fs.existsSync(schemaPath)) {
                 console.log(`[DB-INIT] Leyendo ${path.basename(schemaPath)}...`);
-                let schemaSql = fs.readFileSync(schemaPath, 'utf8');
-                
-                // Eliminar cualquier CREATE DATABASE del dump para evitar fallos de permisos
-                schemaSql = schemaSql.replace(/CREATE DATABASE IF NOT EXISTS[^\n;]+;?/gi, '');
-                schemaSql = schemaSql.replace(/USE\s+[^\n;]+;?/gi, `USE \`${dbName}\`;`);
+                const schemaSql = cleanSql(fs.readFileSync(schemaPath, 'utf8'), dbName);
 
                 console.log(`[DB-INIT] Ejecutando comandos de schema.sql...`);
                 await connection.query(schemaSql);
@@ -59,9 +66,7 @@ async function dbInit() {
             const posMigrationPath = path.join(__dirname, '../../database/pos_migration.sql');
             if (fs.existsSync(posMigrationPath)) {
                 console.log(`[DB-INIT] Leyendo ${path.basename(posMigrationPath)}...`);
-                let posMigrationSql = fs.readFileSync(posMigrationPath, 'utf8');
-                
-                posMigrationSql = posMigrationSql.replace(/USE\s+\w+/gi, `USE \`${dbName}\``);
+                const posMigrationSql = cleanSql(fs.readFileSync(posMigrationPath, 'utf8'), dbName);
 
                 console.log(`[DB-INIT] Ejecutando comandos de pos_migration.sql...`);
                 await connection.query(posMigrationSql);
@@ -80,9 +85,7 @@ async function dbInit() {
             const ecommerceMigrationPath = path.join(__dirname, '../../database/ecommerce_migration.sql');
             if (fs.existsSync(ecommerceMigrationPath)) {
                 console.log(`[DB-INIT] Leyendo ${path.basename(ecommerceMigrationPath)}...`);
-                let ecommerceMigrationSql = fs.readFileSync(ecommerceMigrationPath, 'utf8');
-                ecommerceMigrationSql = ecommerceMigrationSql.replace(/^N--/gm, '--');
-                ecommerceMigrationSql = ecommerceMigrationSql.replace(/USE\s+\w+/gi, `USE \`${dbName}\``);
+                const ecommerceMigrationSql = cleanSql(fs.readFileSync(ecommerceMigrationPath, 'utf8'), dbName);
                 await connection.query(ecommerceMigrationSql);
                 console.log(`[DB-INIT] Migración E-commerce (orders) aplicada exitosamente.`);
             } else {
@@ -260,8 +263,7 @@ async function dbInit() {
             const saasMigrationPath = path.join(__dirname, '../../database/saas_migration.sql');
             if (fs.existsSync(saasMigrationPath)) {
                 console.log(`[DB-INIT] Leyendo ${path.basename(saasMigrationPath)}...`);
-                let saasMigrationSql = fs.readFileSync(saasMigrationPath, 'utf8');
-                saasMigrationSql = saasMigrationSql.replace(/USE\s+\w+/gi, `USE \`${dbName}\``);
+                const saasMigrationSql = cleanSql(fs.readFileSync(saasMigrationPath, 'utf8'), dbName);
                 await connection.query(saasMigrationSql);
                 console.log(`[DB-INIT] Migracion SaaS (schema) aplicada exitosamente.`);
             } else {
@@ -272,8 +274,7 @@ async function dbInit() {
             const saasDataPath = path.join(__dirname, '../../database/saas_data_migration.sql');
             if (fs.existsSync(saasDataPath)) {
                 console.log(`[DB-INIT] Leyendo ${path.basename(saasDataPath)}...`);
-                let saasDataSql = fs.readFileSync(saasDataPath, 'utf8');
-                saasDataSql = saasDataSql.replace(/USE\s+\w+/gi, `USE \`${dbName}\``);
+                const saasDataSql = cleanSql(fs.readFileSync(saasDataPath, 'utf8'), dbName);
                 await connection.query(saasDataSql);
                 console.log(`[DB-INIT] Migracion SaaS (datos) aplicada exitosamente.`);
             } else {
@@ -290,8 +291,7 @@ async function dbInit() {
             const featuresExpansionPath = path.join(__dirname, '../../database/features_expansion.sql');
             if (fs.existsSync(featuresExpansionPath)) {
                 console.log(`[DB-INIT] Leyendo ${path.basename(featuresExpansionPath)}...`);
-                let featuresSql = fs.readFileSync(featuresExpansionPath, 'utf8');
-                featuresSql = featuresSql.replace(/USE\s+\w+/gi, `USE \`${dbName}\``);
+                const featuresSql = cleanSql(fs.readFileSync(featuresExpansionPath, 'utf8'), dbName);
                 await connection.query(featuresSql);
                 console.log(`[DB-INIT] Migración de funcionalidades extendidas aplicada exitosamente.`);
             }
@@ -304,8 +304,7 @@ async function dbInit() {
             const superadminPath = path.join(__dirname, '../../database/superadmin_expansion.sql');
             if (fs.existsSync(superadminPath)) {
                 console.log(`[DB-INIT] Leyendo ${path.basename(superadminPath)}...`);
-                let saSql = fs.readFileSync(superadminPath, 'utf8');
-                saSql = saSql.replace(/USE\s+\w+/gi, `USE \`${dbName}\``);
+                const saSql = cleanSql(fs.readFileSync(superadminPath, 'utf8'), dbName);
                 await connection.query(saSql);
                 console.log(`[DB-INIT] Migración SuperAdmin expansion aplicada exitosamente.`);
             }

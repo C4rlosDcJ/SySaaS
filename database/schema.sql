@@ -1,11 +1,5 @@
 -- SySaaS - Sistema de Gestión de Reparaciones
 
-CREATE DATABASE IF NOT EXISTS sysaas
-CHARACTER SET utf8mb4
-COLLATE utf8mb4_unicode_ci;
-
-USE sysaas;
-
 -- =====================================================
 -- TABLA: users - Usuarios del sistema
 -- =====================================================
