@@ -5,6 +5,15 @@ const getStripe = () => {
     return require('stripe')(process.env.STRIPE_SECRET_KEY);
 };
 
+// Obtener URL de frontend considerando headers de origen de la solicitud o variable de entorno
+function getFrontendUrl(req) {
+    const clientOrigin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
+    const configuredFrontend = process.env.FRONTEND_URL && !process.env.FRONTEND_URL.includes('localhost')
+        ? process.env.FRONTEND_URL
+        : null;
+    return (configuredFrontend || clientOrigin || process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+}
+
 // Crear Checkout Session (Stripe Hosted Checkout)
 exports.createCheckoutSession = async (req, res) => {
     try {
@@ -74,7 +83,7 @@ exports.createCheckoutSession = async (req, res) => {
             };
         }
 
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const frontendUrl = getFrontendUrl(req);
 
         const session = await stripe.checkout.sessions.create({
             customer: stripeCustomerId,
@@ -206,7 +215,7 @@ exports.createPortalSession = async (req, res) => {
             return res.status(400).json({ message: 'No tienes una cuenta de facturacion activa en Stripe.' });
         }
 
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const frontendUrl = getFrontendUrl(req);
         const session = await stripe.billingPortal.sessions.create({
             customer: tenants[0].stripe_customer_id,
             return_url: `${frontendUrl}/admin/suscripcion`
