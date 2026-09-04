@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { customerService } from '../../services/api';
+import { customerService, branchService } from '../../services/api';
+import { useTenant } from '../../context/TenantContext';
 import {
     Search,
     RefreshCw,
@@ -8,6 +9,7 @@ import {
     Mail,
     Phone,
     Eye,
+    EyeOff,
     Plus,
     Edit2,
     X,
@@ -15,11 +17,18 @@ import {
     ArrowUpDown,
     Check,
     Copy,
-    AlertCircle
+    AlertCircle,
+    Trash2,
+    Lock,
+    Key,
+    Sparkles
 } from 'lucide-react';
 import './AdminCustomers.css';
 
 export default function AdminCustomers() {
+    const { activeBranchId, branches: tenantBranches } = useTenant();
+    const [branchesList, setBranchesList] = useState([]);
+
     const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -50,20 +59,52 @@ export default function AdminCustomers() {
     const [tempPassword, setTempPassword] = useState('');
     const [copied, setCopied] = useState(false);
 
+    // Password creation mode for New Customer: 'auto' | 'manual'
+    const [passwordMode, setPasswordMode] = useState('auto');
+    const [manualPassword, setManualPassword] = useState('');
+    const [showManualPassword, setShowManualPassword] = useState(false);
+
+    // Password change for Edit Customer
+    const [editPassword, setEditPassword] = useState('');
+    const [showEditPassword, setShowEditPassword] = useState(false);
+
     // Form Data States
     const [newCustomer, setNewCustomer] = useState({
         email: '',
         first_name: '',
         last_name: '',
         phone: '',
-        address: ''
+        address: '',
+        branch_id: ''
     });
     const [editingCustomer, setEditingCustomer] = useState(null);
 
+    const generateRandomPassword = () => {
+        const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+        let pass = '';
+        for (let i = 0; i < 8; i++) {
+            pass += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return pass;
+    };
+
     useEffect(() => {
         fetchCustomers();
+        fetchBranches();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page]);
+
+    const fetchBranches = async () => {
+        try {
+            const data = await branchService.getAll();
+            setBranchesList(Array.isArray(data) ? data : (data?.branches || []));
+        } catch (err) {
+            console.warn('Error al cargar sucursales:', err);
+            if (tenantBranches?.length > 0) {
+                setBranchesList(tenantBranches);
+            }
+        }
+    };
 
     const fetchCustomers = async () => {
         setLoading(true);
@@ -87,20 +128,59 @@ export default function AdminCustomers() {
         fetchCustomers();
     };
 
+    const openAddModal = () => {
+        setTempPassword('');
+        setModalError('');
+        setPasswordMode('auto');
+        setManualPassword('');
+        setShowManualPassword(false);
+        const defaultBranch = activeBranchId ? String(activeBranchId) : (branchesList[0]?.id ? String(branchesList[0].id) : '');
+        setNewCustomer({
+            email: '',
+            first_name: '',
+            last_name: '',
+            phone: '',
+            address: '',
+            branch_id: defaultBranch
+        });
+        setShowAddModal(true);
+    };
+
     const handleAddCustomer = async (e) => {
         e.preventDefault();
         setModalLoading(true);
         setModalError('');
         try {
-            const response = await customerService.create(newCustomer);
-            setTempPassword(response.customer?.temp_password || '');
+            if (passwordMode === 'manual') {
+                if (!manualPassword.trim()) {
+                    setModalError('Por favor escribe la contraseña manual o elige el modo automático.');
+                    setModalLoading(false);
+                    return;
+                }
+                if (manualPassword.trim().length < 6) {
+                    setModalError('La contraseña manual debe tener al menos 6 caracteres.');
+                    setModalLoading(false);
+                    return;
+                }
+            }
+
+            const payload = {
+                ...newCustomer,
+                branch_id: newCustomer.branch_id ? parseInt(newCustomer.branch_id, 10) : undefined,
+                password: passwordMode === 'manual' ? manualPassword.trim() : undefined
+            };
+            const response = await customerService.create(payload);
+            setTempPassword(response.customer?.temp_password || (passwordMode === 'manual' ? manualPassword.trim() : ''));
+            const defaultBranch = activeBranchId ? String(activeBranchId) : (branchesList[0]?.id ? String(branchesList[0].id) : '');
             setNewCustomer({
                 email: '',
                 first_name: '',
                 last_name: '',
                 phone: '',
-                address: ''
+                address: '',
+                branch_id: defaultBranch
             });
+            setManualPassword('');
             fetchCustomers();
         } catch (err) {
             setModalError(err.message || 'Error al registrar cliente');
@@ -114,14 +194,27 @@ export default function AdminCustomers() {
         setModalLoading(true);
         setModalError('');
         try {
-            await customerService.update(editingCustomer.id, {
+            if (editPassword && editPassword.trim().length < 6) {
+                setModalError('La nueva contraseña debe tener al menos 6 caracteres.');
+                setModalLoading(false);
+                return;
+            }
+
+            const payload = {
                 first_name: editingCustomer.first_name,
                 last_name: editingCustomer.last_name,
                 phone: editingCustomer.phone,
-                address: editingCustomer.address
-            });
+                address: editingCustomer.address,
+                branch_id: editingCustomer.branch_id ? parseInt(editingCustomer.branch_id, 10) : null
+            };
+            if (editPassword && editPassword.trim()) {
+                payload.password = editPassword.trim();
+            }
+
+            await customerService.update(editingCustomer.id, payload);
             setShowEditModal(false);
             setEditingCustomer(null);
+            setEditPassword('');
             fetchCustomers();
         } catch (err) {
             setModalError(err.message || 'Error al actualizar cliente');
@@ -137,10 +230,25 @@ export default function AdminCustomers() {
             first_name: customer.first_name,
             last_name: customer.last_name,
             phone: customer.phone || '',
-            address: customer.address || ''
+            address: customer.address || '',
+            branch_id: customer.branch_id ? String(customer.branch_id) : ''
         });
+        setEditPassword('');
+        setShowEditPassword(false);
         setModalError('');
         setShowEditModal(true);
+    };
+
+    const handleDeleteCustomer = async (customer) => {
+        if (!confirm(`¿Estás seguro de que deseas eliminar o dar de baja al cliente ${customer.first_name} ${customer.last_name}?`)) {
+            return;
+        }
+        try {
+            await customerService.delete(customer.id);
+            fetchCustomers();
+        } catch (err) {
+            alert(err.message || 'Error al eliminar cliente');
+        }
     };
 
     const copyToClipboard = (text) => {
@@ -194,7 +302,7 @@ export default function AdminCustomers() {
                     <p className="text-muted">Administra y registra la información de clientes</p>
                 </div>
                 <div className="header-actions">
-                    <button onClick={() => { setTempPassword(''); setShowAddModal(true); }} className="btn btn-primary">
+                    <button onClick={openAddModal} className="btn btn-primary">
                         <Plus size={16} />
                         <span>Nuevo Cliente</span>
                     </button>
@@ -284,10 +392,23 @@ export default function AdminCustomers() {
                                             >
                                                 <Edit2 size={14} />
                                             </button>
+                                            <button 
+                                                onClick={() => handleDeleteCustomer(customer)} 
+                                                className="btn btn-ghost btn-sm icon-btn"
+                                                title="Eliminar cliente"
+                                                style={{ color: '#ef4444' }}
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
                                         </div>
                                     </div>
                                     <div className="customer-info">
                                         <h3>{customer.first_name} {customer.last_name}</h3>
+                                        {customer.branch_name && (
+                                            <span style={{ fontSize: '11px', background: 'var(--color-bg-secondary)', padding: '2px 8px', borderRadius: '4px', border: '1px solid var(--color-border)', color: 'var(--color-text-secondary)', display: 'inline-block', marginBottom: '6px' }}>
+                                                {customer.branch_name}
+                                            </span>
+                                        )}
                                         <div className="customer-contact">
                                             <span className="contact-item">
                                                 <Mail size={14} />
@@ -447,6 +568,102 @@ export default function AdminCustomers() {
                                             placeholder="Calle, Número, Ciudad"
                                         />
                                     </div>
+                                    <div className="input-group">
+                                        <label>Sucursal Asignada *</label>
+                                        <select
+                                            value={newCustomer.branch_id}
+                                            onChange={(e) => setNewCustomer({ ...newCustomer, branch_id: e.target.value })}
+                                            className="input"
+                                            required
+                                        >
+                                            <option value="">Seleccionar Sucursal...</option>
+                                            {branchesList.map(b => (
+                                                <option key={b.id} value={b.id}>
+                                                    {b.name} {b.is_main ? '(Matriz)' : ''}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* Opciones de Contraseña: Crear sola o a mano */}
+                                    <div className="input-group" style={{ gridColumn: '1 / -1', marginTop: '4px' }}>
+                                        <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <span>Contraseña de Acceso *</span>
+                                            <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                                                Para que el cliente ingrese a su portal
+                                            </span>
+                                        </label>
+
+                                        <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', marginTop: '4px' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPasswordMode('auto')}
+                                                className={`btn btn-sm ${passwordMode === 'auto' ? 'btn-primary' : 'btn-ghost'}`}
+                                                style={{ flex: 1, borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}
+                                            >
+                                                <Sparkles size={14} /> Crear Sola (Automática)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setPasswordMode('manual');
+                                                    if (!manualPassword) setManualPassword(generateRandomPassword());
+                                                }}
+                                                className={`btn btn-sm ${passwordMode === 'manual' ? 'btn-primary' : 'btn-ghost'}`}
+                                                style={{ flex: 1, borderRadius: '6px', fontSize: '12px', fontWeight: 600 }}
+                                            >
+                                                <Key size={14} /> Crear a Mano (Personalizada)
+                                            </button>
+                                        </div>
+
+                                        {passwordMode === 'manual' ? (
+                                            <div style={{ position: 'relative' }}>
+                                                <input
+                                                    type={showManualPassword ? 'text' : 'password'}
+                                                    value={manualPassword}
+                                                    onChange={(e) => setManualPassword(e.target.value)}
+                                                    className="input"
+                                                    placeholder="Escribe la contraseña (mínimo 6 caracteres)"
+                                                    style={{ paddingRight: '72px' }}
+                                                    required
+                                                />
+                                                <div style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: '4px' }}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setManualPassword(generateRandomPassword())}
+                                                        className="btn btn-ghost btn-sm"
+                                                        style={{ padding: '4px 6px', fontSize: '11px', height: '26px' }}
+                                                        title="Generar contraseña aleatoria"
+                                                    >
+                                                        <Sparkles size={13} />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowManualPassword(prev => !prev)}
+                                                        className="btn btn-ghost btn-sm"
+                                                        style={{ padding: '4px 6px', fontSize: '11px', height: '26px' }}
+                                                        title={showManualPassword ? 'Ocultar' : 'Mostrar'}
+                                                    >
+                                                        {showManualPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div style={{
+                                                padding: '8px 12px',
+                                                background: 'var(--color-bg-secondary)',
+                                                borderRadius: '6px',
+                                                fontSize: '12px',
+                                                color: 'var(--color-text-secondary)',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '8px'
+                                            }}>
+                                                <Lock size={14} />
+                                                <span>El sistema creará automáticamente una contraseña segura y te la mostrará en pantalla.</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                                 <div className="modal-actions">
                                     <button type="button" onClick={() => setShowAddModal(false)} className="btn btn-secondary" disabled={modalLoading}>
@@ -523,6 +740,66 @@ export default function AdminCustomers() {
                                         onChange={(e) => setEditingCustomer({ ...editingCustomer, address: e.target.value })}
                                         className="input"
                                     />
+                                </div>
+                                <div className="input-group">
+                                    <label>Sucursal Asignada</label>
+                                    <select
+                                        value={editingCustomer.branch_id || ''}
+                                        onChange={(e) => setEditingCustomer({ ...editingCustomer, branch_id: e.target.value })}
+                                        className="input"
+                                    >
+                                        <option value="">Sin sucursal asignada</option>
+                                        {branchesList.map(b => (
+                                            <option key={b.id} value={b.id}>
+                                                {b.name} {b.is_main ? '(Matriz)' : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* Cambio de Contraseña Opcional */}
+                                <div className="input-group" style={{ gridColumn: '1 / -1', marginTop: '6px', borderTop: '1px solid var(--color-border)', paddingTop: '12px' }}>
+                                    <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span>Nueva Contraseña (Opcional)</span>
+                                        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                                            Dejar en blanco para conservar la actual
+                                        </span>
+                                    </label>
+                                    <div style={{ position: 'relative' }}>
+                                        <input
+                                            type={showEditPassword ? 'text' : 'password'}
+                                            value={editPassword}
+                                            onChange={(e) => setEditPassword(e.target.value)}
+                                            className="input"
+                                            placeholder="Escribe la nueva contraseña si deseas cambiarla (mín. 6 caracteres)"
+                                            style={{ paddingRight: '72px' }}
+                                        />
+                                        <div style={{ position: 'absolute', right: '6px', top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: '4px' }}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setEditPassword(generateRandomPassword())}
+                                                className="btn btn-ghost btn-sm"
+                                                style={{ padding: '4px 6px', fontSize: '11px', height: '26px' }}
+                                                title="Generar contraseña sugerida"
+                                            >
+                                                <Sparkles size={13} />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowEditPassword(prev => !prev)}
+                                                className="btn btn-ghost btn-sm"
+                                                style={{ padding: '4px 6px', fontSize: '11px', height: '26px' }}
+                                                title={showEditPassword ? 'Ocultar' : 'Mostrar'}
+                                            >
+                                                {showEditPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {editPassword && (
+                                        <small style={{ fontSize: '11px', color: 'var(--color-primary)', marginTop: '4px', display: 'block' }}>
+                                            Al guardar cambios, la contraseña del cliente se actualizará a este valor.
+                                        </small>
+                                    )}
                                 </div>
                             </div>
                             <div className="modal-actions">

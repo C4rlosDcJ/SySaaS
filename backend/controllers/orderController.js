@@ -21,7 +21,15 @@ exports.createOrder = async (req, res) => {
         const { items, notes } = req.body;
         const customerId = req.user.id;
         const tenantId = req.user.tenant_id;
-        const branchId = req.user.branch_id; // Clientes tienen branch_id directo en la tabla users
+        let branchId = req.user.branch_id || req.tenantCtx?.branchId;
+
+        if (!branchId) {
+            const [mainBranches] = await connection.query(
+                'SELECT id FROM branches WHERE tenant_id = ? AND is_main = TRUE LIMIT 1',
+                [tenantId]
+            );
+            branchId = mainBranches.length > 0 ? mainBranches[0].id : null;
+        }
 
         if (!items || items.length === 0) {
             return res.status(400).json({ message: 'El pedido debe tener al menos un ítem.' });
@@ -160,7 +168,7 @@ exports.getOrders = async (req, res) => {
         `;
         const params = [tenantId];
 
-        if (branchId) {
+        if (branchId && isStaffUser) {
             query += ' AND s.branch_id = ?';
             params.push(branchId);
         }

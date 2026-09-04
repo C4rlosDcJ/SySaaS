@@ -269,6 +269,16 @@ function AppRoutes() {
           <ProfilePage />
         </DashboardLayout>
       } />
+      <Route path="/dashboard/pedidos" element={
+        <DashboardLayout>
+          <ClientOrdersPage />
+        </DashboardLayout>
+      } />
+      <Route path="/dashboard/tienda" element={
+        <DashboardLayout>
+          <ClientStorePage />
+        </DashboardLayout>
+      } />
       <Route path="/dashboard/pagos" element={
         <DashboardLayout>
           <ClientPaymentsPage />

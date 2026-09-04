@@ -205,6 +205,9 @@ export const customerService = {
     update: (id, data) => fetchAPI(`/customers/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data)
+    }),
+    delete: (id) => fetchAPI(`/customers/${id}`, {
+        method: 'DELETE'
     })
 };
 

@@ -106,11 +106,13 @@ export default function RepairDetailPage() {
     useEffect(() => {
         const loadData = async () => {
             await fetchRepairData();
-            await fetchTechnicians();
-            await fetchSettings();
+            if (isAdmin) {
+                await fetchTechnicians();
+                await fetchSettings();
+            }
         };
         loadData();
-    }, [id]);
+    }, [id, isAdmin]);
 
     const fetchSettings = async () => {
         try { setSettings(await settingsService.getAll()); } catch (err) {}

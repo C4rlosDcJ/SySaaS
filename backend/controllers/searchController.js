@@ -40,16 +40,17 @@ exports.search = async (req, res) => {
 
         const [repairs] = await db.query(repairsQuery, repairsParams);
 
-        // Buscar clientes asignados a la sucursal actual del tenant
+        // Buscar clientes del tenant
+        const isGlobalAdmin = ['tenant_admin', 'admin', 'superadmin'].includes(req.user.role);
         let customersQuery = `
             SELECT id, first_name, last_name, email, phone,
                 (SELECT COUNT(*) FROM repairs WHERE customer_id = users.id AND tenant_id = ?) as total_repairs
             FROM users
-            WHERE role = 'client' AND tenant_id = ?
+            WHERE role = 'client' AND tenant_id = ? AND is_active = TRUE
         `;
         const customersParams = [tenantId, tenantId];
-        if (branchId) {
-            customersQuery += ' AND branch_id = ?';
+        if (!isGlobalAdmin && branchId) {
+            customersQuery += ' AND (branch_id = ? OR branch_id IS NULL)';
             customersParams.push(branchId);
         }
         customersQuery += `

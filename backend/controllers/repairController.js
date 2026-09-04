@@ -20,7 +20,10 @@ exports.getAll = async (req, res) => {
         const isGlobalAdmin = ['tenant_admin', 'admin', 'superadmin'].includes(req.user.role);
         let branchId = null;
 
-        if (!isGlobalAdmin && req.tenantCtx.branchId) {
+        if (req.user.role === 'client') {
+            // El cliente debe ver todas sus reparaciones dentro del tenant
+            branchId = null;
+        } else if (!isGlobalAdmin && req.tenantCtx.branchId) {
             branchId = req.tenantCtx.branchId;
         } else if (req.query.branch_id) {
             branchId = parseInt(req.query.branch_id, 10);
@@ -263,7 +266,15 @@ exports.create = async (req, res) => {
         } = req.body;
 
         const tenantId = req.tenantCtx.tenantId;
-        const branchId = req.tenantCtx.branchId;
+        let branchId = req.body.branch_id || req.tenantCtx.branchId;
+
+        if (!branchId) {
+            const [mainBranches] = await db.query(
+                'SELECT id FROM branches WHERE tenant_id = ? AND is_main = TRUE LIMIT 1',
+                [tenantId]
+            );
+            branchId = mainBranches.length > 0 ? mainBranches[0].id : null;
+        }
 
         // Obtener garantía por defecto si no se especifica
         let finalWarrantyDays = warranty_days;

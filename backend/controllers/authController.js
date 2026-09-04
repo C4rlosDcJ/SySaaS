@@ -172,85 +172,9 @@ exports.registerCompany = async (req, res) => {
 
 // Registro de usuario cliente (multi-tenant)
 exports.register = async (req, res) => {
-    try {
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            return res.status(400).json({ errors: errors.array() });
-        }
-
-        const { email, password, first_name, last_name, phone, address, tenant_slug, branch_id } = req.body;
-
-        // Verificar si el email ya existe
-        const [existingUsers] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
-        if (existingUsers.length > 0) {
-            return res.status(400).json({ message: 'El correo electrónico ya está registrado.' });
-        }
-
-        // Resolver tenant por slug (si se proporciona)
-        let tenantId = null;
-        let resolvedBranchId = branch_id || null;
-
-        if (tenant_slug) {
-            const [tenants] = await db.query('SELECT id FROM tenants WHERE slug = ?', [tenant_slug]);
-            if (tenants.length === 0) {
-                return res.status(400).json({ message: 'Empresa no encontrada.' });
-            }
-            tenantId = tenants[0].id;
-
-            // Si no se especifica branch, usar la sucursal principal
-            if (!resolvedBranchId) {
-                const [mainBranch] = await db.query(
-                    'SELECT id FROM branches WHERE tenant_id = ? AND is_main = TRUE LIMIT 1',
-                    [tenantId]
-                );
-                if (mainBranch.length > 0) {
-                    resolvedBranchId = mainBranch[0].id;
-                }
-            }
-        } else {
-            // No se proporcionó tenant_slug -- los clientes SIEMPRE deben registrarse
-            // bajo una empresa específica. No se hace fallback al primer tenant de la BD
-            // para evitar que usuarios se asignen a la empresa equivocada.
-            return res.status(400).json({
-                message: 'Se requiere el identificador de empresa (tenant_slug) para el registro de clientes.'
-            });
-        }
-
-        // Encriptar contraseña
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Crear usuario con tenant_id y branch_id
-        const [result] = await db.query(
-            `INSERT INTO users (email, password, first_name, last_name, phone, address, role, tenant_id, branch_id) 
-             VALUES (?, ?, ?, ?, ?, ?, 'client', ?, ?)`,
-            [email, hashedPassword, first_name, last_name, phone || null, address || null, tenantId, resolvedBranchId]
-        );
-
-        // Generar token
-        const token = jwt.sign(
-            { id: result.insertId, tenant_id: tenantId },
-            process.env.JWT_SECRET,
-            { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-        );
-
-        res.status(201).json({
-            message: 'Usuario registrado exitosamente.',
-            token,
-            user: {
-                id: result.insertId,
-                email,
-                first_name,
-                last_name,
-                phone,
-                role: 'client',
-                tenant_id: tenantId,
-                branch_id: resolvedBranchId
-            }
-        });
-    } catch (error) {
-        console.error('[AUTH] Error en registro:', error);
-        res.status(500).json({ message: 'Error al registrar usuario.' });
-    }
+    return res.status(403).json({
+        message: 'El autoregistro de clientes no está habilitado. Los clientes deben ser registrados por un administrador desde el panel de control en el módulo de Clientes.'
+    });
 };
 
 // Inicio de sesión (multi-tenant)

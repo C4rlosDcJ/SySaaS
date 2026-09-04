@@ -29,6 +29,7 @@ export function AuthProvider({ children }) {
                 first_name: userData.first_name,
                 last_name: userData.last_name,
                 phone: userData.phone,
+                address: userData.address,
                 role: userData.role,
                 tenant_id: userData.tenant_id,
                 branch_id: userData.branch_id

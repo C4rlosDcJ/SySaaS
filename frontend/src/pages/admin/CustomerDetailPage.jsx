@@ -13,7 +13,9 @@ import {
     DollarSign,
     ExternalLink,
     AlertCircle,
-    User
+    User,
+    Building2,
+    Trash2
 } from 'lucide-react';
 import './CustomerDetailPage.css';
 
@@ -45,6 +47,16 @@ export default function CustomerDetailPage() {
             setError(err.message || 'No se pudieron cargar los datos del cliente.');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!confirm(`¿Estás seguro de eliminar o dar de baja a ${customer.first_name} ${customer.last_name}?`)) return;
+        try {
+            await customerService.delete(id);
+            navigate('/admin/clientes');
+        } catch (err) {
+            alert(err.message || 'Error al eliminar cliente');
         }
     };
 
@@ -114,16 +126,24 @@ export default function CustomerDetailPage() {
 
     return (
         <div className="customer-detail-container">
-            <header className="page-header">
-                <div className="header-nav">
-                    <Link to="/admin/clientes" className="back-link-btn">
-                        <ArrowLeft size={18} />
-                        Volver a Clientes
-                    </Link>
+            <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                    <div className="header-nav">
+                        <Link to="/admin/clientes" className="back-link-btn">
+                            <ArrowLeft size={18} />
+                            Volver a Clientes
+                        </Link>
+                    </div>
+                    <div className="header-main-info" style={{ marginTop: '8px' }}>
+                        <h1>Detalle del Cliente</h1>
+                        <p className="text-muted">Visualiza el historial completo del cliente</p>
+                    </div>
                 </div>
-                <div className="header-main-info">
-                    <h1>Detalle del Cliente</h1>
-                    <p className="text-muted">Visualiza el historial completo del cliente</p>
+                <div>
+                    <button onClick={handleDelete} className="btn btn-outline btn-sm" style={{ color: '#ef4444', borderColor: 'rgba(239,68,68,0.3)' }}>
+                        <Trash2 size={16} />
+                        Eliminar Cliente
+                    </button>
                 </div>
             </header>
 
@@ -158,6 +178,15 @@ export default function CustomerDetailPage() {
                                 <span className="value">{customer.address || 'Sin dirección registrada'}</span>
                             </div>
                         </div>
+                        {customer.branch_name && (
+                            <div className="meta-item">
+                                <Building2 size={16} />
+                                <div className="meta-text">
+                                    <span className="label">Sucursal</span>
+                                    <span className="value">{customer.branch_name} ({customer.branch_code || 'SUC'})</span>
+                                </div>
+                            </div>
+                        )}
                         <div className="meta-item">
                             <Calendar size={16} />
                             <div className="meta-text">

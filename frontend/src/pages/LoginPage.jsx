@@ -142,7 +142,7 @@ export default function LoginPage() {
 
                         <h2>Iniciar Sesión</h2>
                         <p className="auth-subtitle">
-                            ¿No tienes cuenta? <Link to="/register">Regístrate aquí</Link>
+                            ¿Tienes una empresa o taller? <Link to="/register">Regístrate aquí</Link>
                         </p>
 
                         <form onSubmit={handleSubmit} className="auth-form">

@@ -14,7 +14,9 @@ import {
     Shield,
     PieChart as PieIcon,
     DollarSign,
-    TrendingUp
+    TrendingUp,
+    Package,
+    ShoppingBag
 } from 'lucide-react';
 import {
     BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
@@ -46,6 +48,7 @@ const getProgressPercent = (status) => {
 export default function ClientDashboard() {
     const { user } = useAuth();
     const [repairs, setRepairs] = useState([]);
+    const [allRepairsList, setAllRepairsList] = useState([]);
     const [stats, setStats] = useState({
         active: 0,
         completed: 0,
@@ -68,6 +71,7 @@ export default function ClientDashboard() {
             const active = all.filter(r => !['delivered', 'cancelled'].includes(r.status)).length;
             const completed = all.filter(r => r.status === 'delivered').length;
 
+            setAllRepairsList(all);
             setRepairs(all.slice(0, 5));
             setStats({ active, completed, total: all.length });
         } catch (error) {
@@ -77,20 +81,15 @@ export default function ClientDashboard() {
         }
     };
 
-    // Calcular total gastado y historial mensual de gastos
-    const allRepairs = useMemo(() => {
-        // repairs solo tiene las 5 mas recientes; usamos stats.total para la cuenta
-        return repairs;
-    }, [repairs]);
-
+    // Calcular total gastado y historial mensual de gastos sobre TODAS las reparaciones
     const totalSpent = useMemo(() => {
-        return repairs.reduce((sum, r) => sum + parseFloat(r.total_cost || 0), 0);
-    }, [repairs]);
+        return allRepairsList.reduce((sum, r) => sum + parseFloat(r.total_cost || 0), 0);
+    }, [allRepairsList]);
 
     const monthlySpending = useMemo(() => {
         const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
         const grouped = {};
-        repairs.forEach(r => {
+        allRepairsList.forEach(r => {
             if (!r.created_at) return;
             const d = new Date(r.created_at);
             const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -104,7 +103,7 @@ export default function ClientDashboard() {
                 const [y, m] = key.split('-');
                 return { label: `${months[parseInt(m) - 1]} '${y.slice(-2)}`, amount };
             });
-    }, [repairs]);
+    }, [allRepairsList]);
 
     const getGreeting = () => {
         const hour = currentTime.getHours();
@@ -331,6 +330,28 @@ export default function ClientDashboard() {
                             <div className="action-item-text">
                                 <h4>Ver Mis Dispositivos</h4>
                                 <p>Rastrea el progreso en tiempo real</p>
+                            </div>
+                            <ChevronRight size={16} className="chevron" />
+                        </Link>
+
+                        <Link to="/dashboard/pedidos" className="quick-action-item">
+                            <div className="action-item-icon">
+                                <Package size={20} />
+                            </div>
+                            <div className="action-item-text">
+                                <h4>Mis Pedidos</h4>
+                                <p>Revisa tus compras de refacciones y tienda</p>
+                            </div>
+                            <ChevronRight size={16} className="chevron" />
+                        </Link>
+
+                        <Link to="/dashboard/tienda" className="quick-action-item">
+                            <div className="action-item-icon">
+                                <ShoppingBag size={20} />
+                            </div>
+                            <div className="action-item-text">
+                                <h4>Catálogo de Tienda</h4>
+                                <p>Productos, accesorios y servicios en línea</p>
                             </div>
                             <ChevronRight size={16} className="chevron" />
                         </Link>

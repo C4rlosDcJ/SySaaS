@@ -103,8 +103,9 @@ export default function Sidebar({ isOpen, toggleMenu }) {
         { to: '/dashboard', icon: LayoutDashboard, label: 'Inicio', exact: true },
         { to: '/dashboard/reparaciones', icon: Wrench, label: 'Mis Reparaciones' },
         { to: '/dashboard/nueva-cotizacion', icon: FileText, label: 'Nueva Cotización' },
+        { to: '/dashboard/pedidos', icon: Package, label: 'Mis Pedidos' },
         { to: '/dashboard/pagos', icon: DollarSign, label: 'Mis Pagos' },
-        { to: '/tienda', icon: ShoppingBag, label: 'Tienda' },
+        { to: '/dashboard/tienda', icon: ShoppingBag, label: 'Tienda' },
         { to: '/dashboard/perfil', icon: User, label: 'Mi Perfil' },
     ];
 
@@ -141,6 +142,7 @@ export default function Sidebar({ isOpen, toggleMenu }) {
                 { type: 'separator', label: 'Ventas & Compras' },
                 { to: '/admin/pos', icon: ShoppingCart, label: 'Punto de Venta' },
                 { to: '/admin/ventas', icon: Receipt, label: 'Historial Ventas' },
+                { to: '/admin/pedidos', icon: ShoppingBag, label: 'Pedidos Web' },
                 { to: '/admin/inventario', icon: Package, label: 'Inventario' },
                 { to: '/admin/proveedores', icon: Truck, label: 'Proveedores & OC' },
                 { to: '/admin/cupones', icon: Tag, label: 'Cupones Descuento' },
@@ -156,7 +158,7 @@ export default function Sidebar({ isOpen, toggleMenu }) {
         }
 
         if (user?.role === 'branch_manager') {
-            // Gerente de Sucursal: Gestión Operativa, Inventario y Personal de Sede (Sin Suscripción, Configuración, Sucursales, Proveedores, Cupones)
+            // Gerente de Sucursal: Gestión Operativa, Inventario y Personal de Sede
             return [
                 { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', exact: true },
                 { to: '/admin/reparaciones', icon: Wrench, label: 'Reparaciones' },
@@ -167,6 +169,7 @@ export default function Sidebar({ isOpen, toggleMenu }) {
                 { type: 'separator', label: 'Ventas & Stock' },
                 { to: '/admin/pos', icon: ShoppingCart, label: 'Punto de Venta' },
                 { to: '/admin/ventas', icon: Receipt, label: 'Historial Ventas' },
+                { to: '/admin/pedidos', icon: ShoppingBag, label: 'Pedidos Web' },
                 { to: '/admin/inventario', icon: Package, label: 'Inventario' },
                 { to: '/admin/traslados', icon: ArrowLeftRight, label: 'Traspasos Stock' },
 
