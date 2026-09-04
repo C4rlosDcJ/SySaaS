@@ -2,6 +2,35 @@ const db = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
 const { sendSubscriptionReminder } = require('../services/emailService');
 
+const getStripe = () => {
+    if (!process.env.STRIPE_SECRET_KEY) return null;
+    return require('stripe')(process.env.STRIPE_SECRET_KEY);
+};
+
+function getStripeSubscriptionDetails(sub) {
+    if (!sub) return { periodEnd: null, interval: 'monthly' };
+    let periodEnd = null;
+    let interval = 'monthly';
+    if (sub.current_period_end && typeof sub.current_period_end === 'number') {
+        periodEnd = new Date(sub.current_period_end * 1000);
+    }
+    if (sub.items && Array.isArray(sub.items.data) && sub.items.data.length > 0) {
+        const item = sub.items.data[0];
+        if (!periodEnd && item.current_period_end && typeof item.current_period_end === 'number') {
+            periodEnd = new Date(item.current_period_end * 1000);
+        }
+        const recurring = item.price?.recurring || item.plan;
+        if (recurring && recurring.interval === 'year') {
+            interval = 'yearly';
+        } else if (recurring && recurring.interval === 'month') {
+            interval = 'monthly';
+        }
+    }
+    if (sub.plan && sub.plan.interval === 'year') interval = 'yearly';
+    if (sub.metadata && sub.metadata.billing_cycle) interval = sub.metadata.billing_cycle;
+    return { periodEnd, interval };
+}
+
 // =====================================================
 // SuperAdmin Endpoints
 // =====================================================
@@ -227,11 +256,13 @@ exports.suspendTenant = async (req, res) => {
 exports.activateTenant = async (req, res) => {
     try {
         const { id } = req.params;
+        const { billing_cycle = 'monthly' } = req.body || {};
+        const days = billing_cycle === 'yearly' ? 365 : 30;
         const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 30);
+        expiresAt.setDate(expiresAt.getDate() + days);
         const [result] = await db.query(
-            'UPDATE tenants SET subscription_status = "active", subscription_expires_at = COALESCE(subscription_expires_at, ?), trial_ends_at = NULL WHERE id = ?',
-            [expiresAt, id]
+            'UPDATE tenants SET subscription_status = "active", subscription_expires_at = COALESCE(subscription_expires_at, ?), billing_cycle = ?, trial_ends_at = NULL WHERE id = ?',
+            [expiresAt, billing_cycle, id]
         );
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Empresa no encontrada.' });
@@ -247,7 +278,7 @@ exports.activateTenant = async (req, res) => {
 exports.changeTenantPlan = async (req, res) => {
     try {
         const { id } = req.params;
-        const { plan_id, activate_subscription = true } = req.body;
+        const { plan_id, activate_subscription = true, billing_cycle = 'monthly' } = req.body;
 
         if (!plan_id) {
             return res.status(400).json({ message: 'plan_id es requerido.' });
@@ -260,16 +291,18 @@ exports.changeTenantPlan = async (req, res) => {
         }
 
         if (activate_subscription) {
+            const days = billing_cycle === 'yearly' ? 365 : 30;
             const expiresAt = new Date();
-            expiresAt.setDate(expiresAt.getDate() + 30);
+            expiresAt.setDate(expiresAt.getDate() + days);
             await db.query(
                 `UPDATE tenants 
                  SET plan_id = ?, 
                      subscription_status = 'active', 
                      subscription_expires_at = ?, 
+                     billing_cycle = ?,
                      trial_ends_at = NULL 
                  WHERE id = ?`,
-                [plan_id, expiresAt, id]
+                [plan_id, expiresAt, billing_cycle, id]
             );
         } else {
             await db.query('UPDATE tenants SET plan_id = ? WHERE id = ?', [plan_id, id]);
@@ -512,10 +545,40 @@ exports.getMyTenant = async (req, res) => {
             };
         });
 
+        // Sincronizar automáticamente con Stripe si tiene suscripción activa vinculada
+        if (tenantData.stripe_subscription_id && tenantData.subscription_status === 'active') {
+            const currentExp = tenantData.subscription_expires_at ? new Date(tenantData.subscription_expires_at) : null;
+            const now = new Date();
+            const daysRemaining = currentExp ? Math.ceil((currentExp.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+
+            // Sincronizar si no tiene fecha, o si dice menos de 45 días pero tiene ciclo yearly o pagos anuales
+            if (!currentExp || (daysRemaining <= 45 && tenantData.billing_cycle === 'yearly')) {
+                try {
+                    const stripe = getStripe();
+                    if (stripe) {
+                        const sub = await stripe.subscriptions.retrieve(tenantData.stripe_subscription_id);
+                        const details = getStripeSubscriptionDetails(sub);
+                        if (details.periodEnd && !isNaN(details.periodEnd.getTime())) {
+                            tenantData.subscription_expires_at = details.periodEnd;
+                            tenantData.billing_cycle = details.interval || tenantData.billing_cycle;
+                            const customerId = typeof sub.customer === 'string' ? sub.customer : (sub.customer?.id || null);
+                            await db.query(
+                                'UPDATE tenants SET subscription_expires_at = ?, billing_cycle = ?, stripe_customer_id = COALESCE(?, stripe_customer_id) WHERE id = ?',
+                                [details.periodEnd, tenantData.billing_cycle, customerId, tenantId]
+                            );
+                        }
+                    }
+                } catch (stripeErr) {
+                    console.warn('[TENANT] Aviso al sincronizar suscripcion con Stripe:', stripeErr.message);
+                }
+            }
+        }
+
         // Asegurar que suscripción activa tenga fecha de expiración calculada si era null
         if (tenantData.subscription_status === 'active' && !tenantData.subscription_expires_at) {
             const autoExp = new Date();
-            autoExp.setDate(autoExp.getDate() + 30);
+            const daysToAdd = tenantData.billing_cycle === 'yearly' ? 365 : 30;
+            autoExp.setDate(autoExp.getDate() + daysToAdd);
             tenantData.subscription_expires_at = autoExp;
             await db.query('UPDATE tenants SET subscription_expires_at = ? WHERE id = ?', [autoExp, tenantId]);
         }

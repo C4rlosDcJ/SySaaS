@@ -326,6 +326,45 @@ async function dbInit() {
                 await connection.query(`ALTER TABLE subscription_payments ADD COLUMN stripe_invoice_id VARCHAR(100) NULL AFTER stripe_payment_id`);
                 console.log(`[DB-INIT] Columna stripe_invoice_id añadida a subscription_payments.`);
             }
+
+            const [billingCycleCol] = await connection.query(`SHOW COLUMNS FROM tenants LIKE 'billing_cycle'`);
+            if (billingCycleCol.length === 0) {
+                await connection.query(`ALTER TABLE tenants ADD COLUMN billing_cycle VARCHAR(20) DEFAULT 'monthly' AFTER subscription_status`);
+                console.log(`[DB-INIT] Columna billing_cycle añadida a tenants.`);
+            }
+
+            // Sincronizar y corregir inquilinos que contrataron suscripción anual
+            // Si el monto de su último pago fue >= 2000 MXN o se especificó yearly
+            const [yearlyPayments] = await connection.query(`
+                SELECT tenant_id, stripe_invoice_id, amount, created_at 
+                FROM subscription_payments 
+                WHERE amount >= 2000 AND status = 'succeeded'
+            `);
+            for (const yp of yearlyPayments) {
+                const [tRows] = await connection.query('SELECT subscription_expires_at, billing_cycle FROM tenants WHERE id = ?', [yp.tenant_id]);
+                if (tRows.length > 0) {
+                    const currentExp = tRows[0].subscription_expires_at ? new Date(tRows[0].subscription_expires_at) : null;
+                    const paymentDate = new Date(yp.created_at);
+                    const expectedExp = new Date(paymentDate);
+                    expectedExp.setFullYear(expectedExp.getFullYear() + 1);
+
+                    // Si la fecha actual de expiracion esta a menos de 60 dias del pago o es null
+                    if (!currentExp || (currentExp.getTime() - paymentDate.getTime() < 60 * 24 * 60 * 60 * 1000)) {
+                        await connection.query(
+                            `UPDATE tenants 
+                             SET billing_cycle = 'yearly', subscription_expires_at = ? 
+                             WHERE id = ?`,
+                            [expectedExp, yp.tenant_id]
+                        );
+                        console.log(`[DB-INIT] Corrección aplicada: Empresa ID ${yp.tenant_id} actualizada a suscripción anual con vencimiento ${expectedExp.toISOString()}`);
+                    } else if (tRows[0].billing_cycle !== 'yearly') {
+                        await connection.query(
+                            `UPDATE tenants SET billing_cycle = 'yearly' WHERE id = ?`,
+                            [yp.tenant_id]
+                        );
+                    }
+                }
+            }
         } catch (e) {
             console.error(`[DB-INIT] Error al verificar/alterar columnas de Stripe:`, e.message);
         }

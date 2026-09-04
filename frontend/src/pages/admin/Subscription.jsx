@@ -415,7 +415,19 @@ export default function SubscriptionPage() {
                             </div>
                             <div className="sub-detail-row">
                                 <span>Costo Base:</span>
-                                <strong>{formatCurrency(tenant?.price_monthly || 0)} MXN/mes</strong>
+                                <strong>
+                                    {formatCurrency(
+                                        tenant?.billing_cycle === 'yearly'
+                                            ? (tenant?.price_yearly || (tenant?.price_monthly ? tenant.price_monthly * 10 : 0))
+                                            : (tenant?.price_monthly || 0)
+                                    )} MXN / {tenant?.billing_cycle === 'yearly' ? 'año' : 'mes'}
+                                </strong>
+                            </div>
+                            <div className="sub-detail-row">
+                                <span>Modalidad:</span>
+                                <strong style={{ color: tenant?.billing_cycle === 'yearly' ? 'var(--color-primary)' : 'inherit' }}>
+                                    {tenant?.billing_cycle === 'yearly' ? 'Facturación Anual (12 meses)' : 'Facturación Mensual'}
+                                </strong>
                             </div>
 
                             {/* Tiempo restante en días o meses */}

@@ -14,7 +14,8 @@ exports.registerCompany = async (req, res) => {
         const {
             company_name, slug, email, password, first_name, last_name, phone,
             plan_slug,       // slug del plan elegido (basico, pro, enterprise)
-            is_trial         // true = prueba gratuita 14 dias, false = suscripcion
+            is_trial,        // true = prueba gratuita 30 dias, false = suscripcion
+            billing_cycle = 'monthly'
         } = req.body;
 
         if (!company_name || !email || !password || !first_name || !last_name) {
@@ -69,6 +70,9 @@ exports.registerCompany = async (req, res) => {
             const stripeConfigured = !!process.env.STRIPE_SECRET_KEY;
             if (!stripeConfigured) {
                 subscriptionStatus = 'active';
+                const autoExp = new Date();
+                autoExp.setDate(autoExp.getDate() + (billing_cycle === 'yearly' ? 365 : 30));
+                subscriptionExpiresAt = autoExp;
             } else {
                 subscriptionStatus = 'trial';
                 const trialEnd = new Date();
@@ -81,9 +85,9 @@ exports.registerCompany = async (req, res) => {
         const { v4: uuidv4 } = require('uuid');
         const tenantUuid = uuidv4();
         const [tenantResult] = await connection.query(
-            `INSERT INTO tenants (uuid, company_name, slug, plan_id, subscription_status, trial_ends_at)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [tenantUuid, company_name, finalSlug, plan.id, subscriptionStatus, trialEndsAt]
+            `INSERT INTO tenants (uuid, company_name, slug, plan_id, subscription_status, billing_cycle, trial_ends_at, subscription_expires_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [tenantUuid, company_name, finalSlug, plan.id, subscriptionStatus, billing_cycle, trialEndsAt, subscriptionExpiresAt]
         );
         const tenantId = tenantResult.insertId;
 
@@ -149,6 +153,7 @@ exports.registerCompany = async (req, res) => {
                 plan_slug: plan.slug,
                 plan_features: planFeatures,
                 subscription_status: subscriptionStatus,
+                billing_cycle: billing_cycle,
                 trial_ends_at: trialEndsAt,
                 subscription_expires_at: subscriptionExpiresAt,
                 max_branches: plan.max_branches,

@@ -5,6 +5,43 @@ const getStripe = () => {
     return require('stripe')(process.env.STRIPE_SECRET_KEY);
 };
 
+// Helper para extraer fecha de vencimiento e intervalo de facturacion desde Stripe
+function getStripeSubscriptionDetails(sub) {
+    if (!sub) return { periodEnd: null, interval: 'monthly' };
+
+    let periodEnd = null;
+    let interval = 'monthly';
+
+    // Stripe API clasico (top-level)
+    if (sub.current_period_end && typeof sub.current_period_end === 'number') {
+        periodEnd = new Date(sub.current_period_end * 1000);
+    }
+
+    // Stripe API moderno (items.data[0])
+    if (sub.items && Array.isArray(sub.items.data) && sub.items.data.length > 0) {
+        const item = sub.items.data[0];
+        if (!periodEnd && item.current_period_end && typeof item.current_period_end === 'number') {
+            periodEnd = new Date(item.current_period_end * 1000);
+        }
+        const recurring = item.price?.recurring || item.plan;
+        if (recurring && recurring.interval === 'year') {
+            interval = 'yearly';
+        } else if (recurring && recurring.interval === 'month') {
+            interval = 'monthly';
+        }
+    }
+
+    // Si aun no se detecto el intervalo pero el plan o metadata lo tienen
+    if (sub.plan && sub.plan.interval === 'year') {
+        interval = 'yearly';
+    }
+    if (sub.metadata && sub.metadata.billing_cycle) {
+        interval = sub.metadata.billing_cycle;
+    }
+
+    return { periodEnd, interval };
+}
+
 // Obtener URL de frontend considerando headers de origen de la solicitud o variable de entorno
 function getFrontendUrl(req) {
     const clientOrigin = req.headers.origin || (req.headers.referer ? new URL(req.headers.referer).origin : null);
@@ -129,40 +166,59 @@ exports.verifyCheckoutSession = async (req, res) => {
         }
 
         const session = await stripe.checkout.sessions.retrieve(session_id, {
-            expand: ['subscription']
+            expand: ['subscription', 'customer']
         });
 
         if (session.payment_status !== 'paid' && session.status !== 'complete') {
             return res.status(400).json({ message: 'El pago aun no esta confirmado.', status: session.status });
         }
 
-        const tenantId = session.metadata.tenant_id;
-        const planId = session.metadata.plan_id;
-        const billingCycle = session.metadata.billing_cycle || 'monthly';
+        const tenantId = session.metadata?.tenant_id;
+        const planId = session.metadata?.plan_id;
+        let billingCycle = session.metadata?.billing_cycle;
 
         if (!tenantId || !planId) {
             return res.status(400).json({ message: 'Metadatos de sesion incompletos.' });
         }
 
-        const subscription = session.subscription;
+        let subscription = session.subscription;
         const stripeSubscriptionId = typeof subscription === 'string' ? subscription : subscription?.id;
-        const currentPeriodEnd = typeof subscription === 'object' && subscription?.current_period_end
-            ? new Date(subscription.current_period_end * 1000)
-            : (() => {
-                const d = new Date();
-                d.setMonth(d.getMonth() + (billingCycle === 'yearly' ? 12 : 1));
-                return d;
-            })();
+        const stripeCustomerId = typeof session.customer === 'string' ? session.customer : (session.customer?.id || null);
+
+        let subDetails = getStripeSubscriptionDetails(subscription);
+
+        // Si la suscripcion no vino expandida con items o current_period_end, consultarla directamente
+        if ((!subDetails.periodEnd || !subscription?.items) && stripeSubscriptionId) {
+            try {
+                const fullSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+                subDetails = getStripeSubscriptionDetails(fullSub);
+            } catch (err) {
+                console.warn('[STRIPE] Error al consultar suscripcion en verifyCheckoutSession:', err.message);
+            }
+        }
+
+        if (!billingCycle) {
+            billingCycle = subDetails.interval || 'monthly';
+        }
+
+        let currentPeriodEnd = subDetails.periodEnd;
+        if (!currentPeriodEnd || isNaN(currentPeriodEnd.getTime())) {
+            const d = new Date();
+            d.setMonth(d.getMonth() + (billingCycle === 'yearly' ? 12 : 1));
+            currentPeriodEnd = d;
+        }
 
         await db.query(
             `UPDATE tenants
              SET plan_id = ?,
                  subscription_status = 'active',
                  stripe_subscription_id = ?,
+                 stripe_customer_id = COALESCE(?, stripe_customer_id),
                  subscription_expires_at = ?,
+                 billing_cycle = ?,
                  trial_ends_at = NULL
              WHERE id = ?`,
-            [planId, stripeSubscriptionId || null, currentPeriodEnd, tenantId]
+            [planId, stripeSubscriptionId || null, stripeCustomerId || null, currentPeriodEnd, billingCycle, tenantId]
         );
 
         // Registrar pago en historial
@@ -258,39 +314,60 @@ exports.handleWebhook = async (req, res) => {
         if (event.type === 'checkout.session.completed') {
             const tenantId = obj.metadata?.tenant_id;
             const planId = obj.metadata?.plan_id;
-            const billingCycle = obj.metadata?.billing_cycle || 'monthly';
+            let billingCycle = obj.metadata?.billing_cycle;
             const stripeSubscriptionId = obj.subscription;
+            const stripeCustomerId = obj.customer;
 
             if (tenantId && planId) {
                 let expiresAt = null;
                 if (stripeSubscriptionId) {
                     try {
                         const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-                        expiresAt = new Date(sub.current_period_end * 1000);
+                        const details = getStripeSubscriptionDetails(sub);
+                        expiresAt = details.periodEnd;
+                        if (!billingCycle && details.interval) {
+                            billingCycle = details.interval;
+                        }
                     } catch (e) {
-                        expiresAt = new Date();
-                        expiresAt.setMonth(expiresAt.getMonth() + (billingCycle === 'yearly' ? 12 : 1));
+                        console.error('[STRIPE WEBHOOK] Error al obtener suscripcion:', e.message);
                     }
+                }
+
+                if (!billingCycle) billingCycle = 'monthly';
+
+                if (!expiresAt || isNaN(expiresAt.getTime())) {
+                    expiresAt = new Date();
+                    expiresAt.setMonth(expiresAt.getMonth() + (billingCycle === 'yearly' ? 12 : 1));
                 }
 
                 await db.query(
                     `UPDATE tenants
                      SET plan_id = ?, subscription_status = 'active',
-                         stripe_subscription_id = ?, subscription_expires_at = ?,
+                         stripe_subscription_id = ?,
+                         stripe_customer_id = COALESCE(?, stripe_customer_id),
+                         subscription_expires_at = ?,
+                         billing_cycle = ?,
                          trial_ends_at = NULL
                      WHERE id = ?`,
-                    [planId, stripeSubscriptionId || null, expiresAt, tenantId]
+                    [planId, stripeSubscriptionId || null, stripeCustomerId || null, expiresAt, billingCycle, tenantId]
                 );
 
                 if (obj.amount_total) {
                     await db.query(
-                        `INSERT INTO subscription_payments (tenant_id, stripe_payment_id, stripe_invoice_id, amount, currency, status, description)
-                         VALUES (?, ?, ?, ?, 'mxn', 'succeeded', ?)`,
-                        [tenantId, obj.payment_intent || null, obj.invoice || null, obj.amount_total / 100, `Checkout completado - Plan ID ${planId}`]
+                        `INSERT INTO subscription_payments (tenant_id, stripe_payment_id, stripe_invoice_id, amount, currency, status, description, period_start, period_end)
+                         VALUES (?, ?, ?, ?, 'mxn', 'succeeded', ?, CURDATE(), ?)`,
+                        [
+                            tenantId,
+                            obj.payment_intent || null,
+                            obj.invoice || null,
+                            obj.amount_total / 100,
+                            `Checkout completado - Plan ID ${planId} (${billingCycle})`,
+                            expiresAt
+                        ]
                     );
                 }
 
-                console.log(`[STRIPE] Suscripcion activada para tenant ID: ${tenantId}`);
+                console.log(`[STRIPE] Suscripcion activada para tenant ID: ${tenantId} (${billingCycle}) hasta ${expiresAt.toISOString()}`);
             }
         }
 
@@ -299,31 +376,52 @@ exports.handleWebhook = async (req, res) => {
             const stripeSubscriptionId = obj.subscription;
             if (stripeSubscriptionId) {
                 let expiresAt = null;
-                try {
-                    const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-                    expiresAt = new Date(sub.current_period_end * 1000);
-                } catch (e) {
-                    expiresAt = new Date();
-                    expiresAt.setMonth(expiresAt.getMonth() + 1);
+                let finalCycle = 'monthly';
+                if (stripe) {
+                    try {
+                        const sub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+                        const details = getStripeSubscriptionDetails(sub);
+                        expiresAt = details.periodEnd;
+                        finalCycle = details.interval;
+                    } catch (e) {
+                        console.error('[STRIPE WEBHOOK] Error al obtener suscripcion en invoice:', e.message);
+                    }
                 }
 
+                const [tenantRows] = await db.query('SELECT id, billing_cycle FROM tenants WHERE stripe_subscription_id = ?', [stripeSubscriptionId]);
+                const existingCycle = tenantRows[0]?.billing_cycle;
+                const isYearly = finalCycle === 'yearly' || existingCycle === 'yearly' || (obj.amount_paid && obj.amount_paid >= 200000);
+
+                if (!expiresAt || isNaN(expiresAt.getTime())) {
+                    expiresAt = new Date();
+                    expiresAt.setMonth(expiresAt.getMonth() + (isYearly ? 12 : 1));
+                }
+
+                const cycleToSave = isYearly ? 'yearly' : 'monthly';
+
                 await db.query(
-                    `UPDATE tenants SET subscription_status = 'active', subscription_expires_at = ?
+                    `UPDATE tenants SET subscription_status = 'active', subscription_expires_at = ?, billing_cycle = ?
                      WHERE stripe_subscription_id = ?`,
-                    [expiresAt, stripeSubscriptionId]
+                    [expiresAt, cycleToSave, stripeSubscriptionId]
                 );
 
                 // Buscar tenant para registrar el pago
-                const [ts] = await db.query('SELECT id FROM tenants WHERE stripe_subscription_id = ?', [stripeSubscriptionId]);
-                if (ts.length > 0 && obj.amount_paid) {
+                if (tenantRows.length > 0 && obj.amount_paid) {
                     await db.query(
-                        `INSERT INTO subscription_payments (tenant_id, stripe_payment_id, stripe_invoice_id, amount, currency, status, description)
-                         VALUES (?, ?, ?, ?, 'mxn', 'succeeded', 'Renovacion automatica de suscripcion')`,
-                        [ts[0].id, obj.payment_intent || null, obj.id || null, obj.amount_paid / 100]
+                        `INSERT INTO subscription_payments (tenant_id, stripe_payment_id, stripe_invoice_id, amount, currency, status, description, period_start, period_end)
+                         VALUES (?, ?, ?, ?, 'mxn', 'succeeded', ?, CURDATE(), ?)`,
+                        [
+                            tenantRows[0].id,
+                            obj.payment_intent || null,
+                            obj.id || null,
+                            obj.amount_paid / 100,
+                            `Renovacion de suscripcion (${cycleToSave})`,
+                            expiresAt
+                        ]
                     );
                 }
 
-                console.log(`[STRIPE] Renovacion aplicada a suscripcion: ${stripeSubscriptionId}`);
+                console.log(`[STRIPE] Renovacion aplicada a suscripcion: ${stripeSubscriptionId} (${cycleToSave}) hasta ${expiresAt.toISOString()}`);
             }
         }
 
@@ -353,13 +451,26 @@ exports.handleWebhook = async (req, res) => {
         // Suscripcion actualizada (upgrade/downgrade)
         if (event.type === 'customer.subscription.updated') {
             const stripeSubscriptionId = obj.id;
-            const expiresAt = obj.current_period_end ? new Date(obj.current_period_end * 1000) : null;
+            let details = getStripeSubscriptionDetails(obj);
+            let expiresAt = details.periodEnd;
+
+            if ((!expiresAt || isNaN(expiresAt.getTime())) && stripe) {
+                try {
+                    const fullSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+                    details = getStripeSubscriptionDetails(fullSub);
+                    expiresAt = details.periodEnd;
+                } catch (e) {}
+            }
+
             const newStatus = obj.status === 'active' ? 'active' : (obj.status === 'past_due' ? 'past_due' : 'canceled');
 
             await db.query(
-                `UPDATE tenants SET subscription_status = ?, subscription_expires_at = ?
+                `UPDATE tenants 
+                 SET subscription_status = ?, 
+                     subscription_expires_at = COALESCE(?, subscription_expires_at),
+                     billing_cycle = ?
                  WHERE stripe_subscription_id = ?`,
-                [newStatus, expiresAt, stripeSubscriptionId]
+                [newStatus, expiresAt, details.interval, stripeSubscriptionId]
             );
         }
 
@@ -393,9 +504,11 @@ exports.subscribePlan = async (req, res) => {
         await db.query(
             `UPDATE tenants
              SET plan_id = ?, subscription_status = 'active',
-                 subscription_expires_at = ?, trial_ends_at = NULL
+                 subscription_expires_at = ?,
+                 billing_cycle = ?,
+                 trial_ends_at = NULL
              WHERE id = ?`,
-            [plan.id, expiresAt, tenantId]
+            [plan.id, expiresAt, billing_cycle, tenantId]
         );
 
         res.json({
