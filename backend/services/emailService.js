@@ -237,9 +237,63 @@ async function sendPasswordResetEmail(to, token, customer) {
   }
 }
 
+// Enviar recordatorio de vencimiento de suscripción
+async function sendSubscriptionReminder(to, tenant, daysLeft) {
+  try {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const renewUrl = `${frontendUrl.replace(/\/$/, '')}/admin/suscripcion`;
+    const expDate = tenant.subscription_expires_at || tenant.trial_ends_at;
+    const formattedDate = expDate ? new Date(expDate).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Próximamente';
+
+    const htmlContent = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #171717; color: #EDEDED; padding: 25px; border-radius: 10px; border: 1px solid #333;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h1 style="color: #3b82f6; margin: 0; font-size: 24px;">SySaaS</h1>
+          <p style="color: #888; font-size: 12px; margin-top: 4px;">Aviso de Vigencia de Suscripción</p>
+        </div>
+        <div style="background: rgba(234, 179, 8, 0.1); border-left: 4px solid #eab308; padding: 14px 16px; border-radius: 6px; margin-bottom: 20px;">
+          <h3 style="color: #facc15; margin: 0 0 6px 0; font-size: 15px;">Tu suscripción está por expirar</h3>
+          <p style="margin: 0; font-size: 13px; color: #fef08a;">
+            Hola <strong>${tenant.company_name}</strong>, a tu cuenta le quedan <strong>${daysLeft} ${daysLeft === 1 ? 'día' : 'días'}</strong> de servicio activo.
+          </p>
+        </div>
+        <div style="background: #262626; padding: 16px; border-radius: 8px; margin-bottom: 20px; font-size: 13px;">
+          <p style="margin: 0 0 8px 0;"><strong>Plan Actual:</strong> ${tenant.plan_name || 'Plan Activo'}</p>
+          <p style="margin: 0;"><strong>Fecha límite de renovación:</strong> ${formattedDate}</p>
+        </div>
+        <p style="font-size: 13px; color: #ccc; line-height: 1.5;">
+          Renueva a tiempo para evitar suspensiones temporales en la atención de clientes, punto de venta y gestión de talleres.
+        </p>
+        <div style="text-align: center; margin: 25px 0;">
+          <a href="${renewUrl}" style="background: #3b82f6; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: bold; font-size: 14px; display: inline-block;">
+            Renovar o Gestionar Suscripción
+          </a>
+        </div>
+        <p style="color: #666; font-size: 11px; text-align: center; margin-top: 25px; border-top: 1px solid #333; padding-top: 14px;">
+          Este es un aviso automático de facturación de SySaaS.
+        </p>
+      </div>
+    `;
+
+    const info = await transporter.sendMail({
+      from: process.env.EMAIL_FROM || '"SySaaS Facturación" <noreply@sysaas.com>',
+      to: to,
+      subject: `Aviso: Tu suscripción a SySaaS vence en ${daysLeft} ${daysLeft === 1 ? 'día' : 'días'}`,
+      html: htmlContent
+    });
+
+    console.log(`[EMAIL] Recordatorio de suscripcion enviado a ${to}:`, info.messageId);
+    return { success: true, messageId: info.messageId };
+  } catch (error) {
+    console.error('[EMAIL] Error al enviar recordatorio de suscripcion:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 module.exports = {
   sendEmail,
   sendPasswordResetEmail,
+  sendSubscriptionReminder,
   emailTemplates,
   getStatusLabel
 };

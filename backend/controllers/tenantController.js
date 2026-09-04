@@ -1,5 +1,6 @@
 const db = require('../config/database');
 const { v4: uuidv4 } = require('uuid');
+const { sendSubscriptionReminder } = require('../services/emailService');
 
 // =====================================================
 // SuperAdmin Endpoints
@@ -511,6 +512,94 @@ exports.getMyTenant = async (req, res) => {
             };
         });
 
+        // Asegurar que suscripción activa tenga fecha de expiración calculada si era null
+        if (tenantData.subscription_status === 'active' && !tenantData.subscription_expires_at) {
+            const autoExp = new Date();
+            autoExp.setDate(autoExp.getDate() + 30);
+            tenantData.subscription_expires_at = autoExp;
+            await db.query('UPDATE tenants SET subscription_expires_at = ? WHERE id = ?', [autoExp, tenantId]);
+        }
+
+        // Calcular tiempo restante exacto (meses y días)
+        let timeRemaining = null;
+        const targetExpiration = tenantData.subscription_status === 'trial'
+            ? tenantData.trial_ends_at
+            : tenantData.subscription_expires_at;
+
+        if (targetExpiration) {
+            const expDate = new Date(targetExpiration);
+            const now = new Date();
+            const diffMs = expDate.getTime() - now.getTime();
+
+            if (diffMs <= 0) {
+                timeRemaining = {
+                    expired: true,
+                    total_days: 0,
+                    months: 0,
+                    days: 0,
+                    text: 'Vencida',
+                    is_urgent: true
+                };
+            } else {
+                const totalDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+                if (totalDays > 30) {
+                    const months = Math.floor(totalDays / 30);
+                    const remainderDays = totalDays % 30;
+                    const text = remainderDays > 0
+                        ? `${months} ${months === 1 ? 'mes' : 'meses'} y ${remainderDays} ${remainderDays === 1 ? 'día' : 'días'} restantes`
+                        : `${months} ${months === 1 ? 'mes' : 'meses'} restantes`;
+                    timeRemaining = {
+                        expired: false,
+                        total_days: totalDays,
+                        months,
+                        days: remainderDays,
+                        text,
+                        is_urgent: false
+                    };
+                } else {
+                    timeRemaining = {
+                        expired: false,
+                        total_days: totalDays,
+                        months: 0,
+                        days: totalDays,
+                        text: totalDays === 1 ? '1 día restante' : `${totalDays} días restantes`,
+                        is_urgent: totalDays <= 7
+                    };
+                }
+            }
+
+            // Si está por vencer (<= 7 días) y no ha vencido aún, enviar notificación por email (máx 1 por día)
+            if (timeRemaining && !timeRemaining.expired && timeRemaining.is_urgent) {
+                try {
+                    const todayStr = new Date().toISOString().slice(0, 10);
+                    const [lastAlert] = await db.query(
+                        "SELECT setting_value FROM settings WHERE tenant_id = ? AND setting_key = 'last_expiration_alert_date'",
+                        [tenantId]
+                    );
+
+                    if (lastAlert.length === 0 || lastAlert[0].setting_value !== todayStr) {
+                        await db.query(
+                            "INSERT INTO settings (tenant_id, setting_key, setting_value) VALUES (?, 'last_expiration_alert_date', ?) ON DUPLICATE KEY UPDATE setting_value = ?",
+                            [tenantId, todayStr, todayStr]
+                        );
+
+                        const [adminUsers] = await db.query(
+                            "SELECT email FROM users WHERE tenant_id = ? AND role IN ('tenant_admin', 'admin') AND is_active = 1 LIMIT 1",
+                            [tenantId]
+                        );
+
+                        if (adminUsers.length > 0 && adminUsers[0].email) {
+                            sendSubscriptionReminder(adminUsers[0].email, tenantData, timeRemaining.total_days).catch(err => {
+                                console.warn('[TENANTS] Fallo al enviar email de recordatorio:', err.message);
+                            });
+                        }
+                    }
+                } catch (alertErr) {
+                    console.warn('[TENANTS] Advertencia en envio de alerta de vencimiento:', alertErr.message);
+                }
+            }
+        }
+
         res.json({
             ...tenantData,
             price_monthly: parseFloat(tenantData.price_monthly || 0),
@@ -519,6 +608,7 @@ exports.getMyTenant = async (req, res) => {
             used_users: parseInt(tenantData.used_users || 0, 10),
             used_repairs_month: parseInt(tenantData.used_repairs_month || 0, 10),
             used_sales_month: parseInt(tenantData.used_sales_month || 0, 10),
+            time_remaining: timeRemaining,
             plan_features: parsedFeatures,
             available_plans: formattedPlans
         });

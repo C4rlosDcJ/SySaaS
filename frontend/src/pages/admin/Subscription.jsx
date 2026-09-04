@@ -116,10 +116,42 @@ export default function SubscriptionPage() {
         }
     };
 
-    const isTrialExpired = tenant?.subscription_status === 'trial' && tenant?.trial_ends_at && new Date(tenant.trial_ends_at) < new Date();
-    const daysLeftInTrial = tenant?.subscription_status === 'trial' && tenant?.trial_ends_at
-        ? Math.max(0, Math.ceil((new Date(tenant.trial_ends_at) - new Date()) / (1000 * 60 * 60 * 24)))
-        : null;
+    const targetExpirationDate = tenant?.subscription_status === 'trial'
+        ? tenant?.trial_ends_at
+        : tenant?.subscription_expires_at;
+
+    const getTimeRemaining = () => {
+        if (tenant?.time_remaining) return tenant.time_remaining;
+        if (!targetExpirationDate) return null;
+        const target = new Date(targetExpirationDate);
+        const now = new Date();
+        const diffMs = target.getTime() - now.getTime();
+
+        if (diffMs <= 0) {
+            return { expired: true, total_days: 0, months: 0, days: 0, text: 'Vencida', is_urgent: true };
+        }
+        const totalDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+        if (totalDays > 30) {
+            const months = Math.floor(totalDays / 30);
+            const remainderDays = totalDays % 30;
+            const text = remainderDays > 0
+                ? `${months} ${months === 1 ? 'mes' : 'meses'} y ${remainderDays} ${remainderDays === 1 ? 'día' : 'días'} restantes`
+                : `${months} ${months === 1 ? 'mes' : 'meses'} restantes`;
+            return { expired: false, total_days: totalDays, months, days: remainderDays, text, is_urgent: false };
+        }
+        return {
+            expired: false,
+            total_days: totalDays,
+            months: 0,
+            days: totalDays,
+            text: totalDays === 1 ? '1 día restante' : `${totalDays} días restantes`,
+            is_urgent: totalDays <= 7
+        };
+    };
+
+    const timeRemaining = getTimeRemaining();
+    const isTrialExpired = tenant?.subscription_status === 'trial' && timeRemaining?.expired;
+    const isExpiringSoon = timeRemaining && !timeRemaining.expired && timeRemaining.is_urgent;
 
     const getStatusInfo = (status) => {
         if (status === 'trial' && isTrialExpired) {
@@ -131,6 +163,13 @@ export default function SubscriptionPage() {
         }
         switch (status) {
             case 'active':
+                if (isExpiringSoon) {
+                    return {
+                        label: `Por Vencer (${timeRemaining.days || timeRemaining.total_days} días)`,
+                        className: 'trial',
+                        icon: AlertCircle
+                    };
+                }
                 return {
                     label: 'Suscripcion Activa',
                     className: 'active',
@@ -138,7 +177,7 @@ export default function SubscriptionPage() {
                 };
             case 'trial':
                 return {
-                    label: `Prueba (${daysLeftInTrial} dias)`,
+                    label: `Prueba (${timeRemaining ? timeRemaining.text : 'Activa'})`,
                     className: 'trial',
                     icon: Clock
                 };
@@ -309,7 +348,9 @@ export default function SubscriptionPage() {
                             <Clock size={22} />
                         </div>
                         <div>
-                            <div className="sub-banner-title">Periodo de Prueba Activo: {daysLeftInTrial} dias restantes</div>
+                            <div className="sub-banner-title">
+                                Periodo de Prueba Activo: {timeRemaining ? timeRemaining.text : 'Activo'}
+                            </div>
                             <p className="sub-banner-text">
                                 Cuentas con acceso a todas las caracteristicas de tu plan. Puedes formalizar tu suscripcion en cualquier momento antes del vencimiento.
                             </p>
@@ -317,6 +358,37 @@ export default function SubscriptionPage() {
                     </div>
                 </div>
             ) : null}
+
+            {/* Banner de Suscripción por Vencer */}
+            {isExpiringSoon && tenant?.subscription_status === 'active' && (
+                <div className="sub-banner sub-banner-warning">
+                    <div className="sub-banner-left">
+                        <div className="sub-banner-icon">
+                            <AlertCircle size={22} />
+                        </div>
+                        <div>
+                            <div className="sub-banner-title">
+                                Aviso: Tu suscripción vence pronto ({timeRemaining.text})
+                            </div>
+                            <p className="sub-banner-text">
+                                Tu plan actual concluye el {targetExpirationDate ? new Date(targetExpirationDate).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }) : 'próximamente'}. Para evitar la interrupción de tus servicios y módulos activos, actualiza o renueva tu suscripción.
+                            </p>
+                        </div>
+                    </div>
+                    {tenant?.stripe_customer_id ? (
+                        <button
+                            type="button"
+                            onClick={openStripePortal}
+                            className="sub-refresh-btn"
+                            disabled={actionLoading}
+                            style={{ background: '#eab308', color: '#000', fontWeight: 700 }}
+                        >
+                            <CreditCard size={14} />
+                            <span>Portal de Facturación</span>
+                        </button>
+                    ) : null}
+                </div>
+            )}
 
             {/* Metricas y Estado Actual */}
             <div className="sub-metrics-grid">
@@ -345,19 +417,36 @@ export default function SubscriptionPage() {
                                 <span>Costo Base:</span>
                                 <strong>{formatCurrency(tenant?.price_monthly || 0)} MXN/mes</strong>
                             </div>
-                            {tenant?.subscription_status === 'trial' && tenant?.trial_ends_at && (
-                                <div className="sub-detail-row">
-                                    <span>Vence Prueba:</span>
-                                    <strong style={{ color: isTrialExpired ? 'var(--color-error)' : 'inherit' }}>
-                                        {new Date(tenant.trial_ends_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+
+                            {/* Tiempo restante en días o meses */}
+                            {timeRemaining && (
+                                <div className="sub-detail-row" style={{
+                                    background: timeRemaining.is_urgent ? 'rgba(239, 68, 68, 0.08)' : 'var(--color-bg-tertiary)',
+                                    border: `1px solid ${timeRemaining.is_urgent ? 'rgba(239, 68, 68, 0.3)' : 'var(--color-border)'}`,
+                                    padding: '8px 12px',
+                                    borderRadius: 'var(--radius-sm)',
+                                    marginTop: '4px',
+                                    marginBottom: '4px'
+                                }}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                                        <Clock size={14} style={{ color: timeRemaining.is_urgent ? 'var(--color-error)' : 'var(--color-primary)' }} />
+                                        <span>Tiempo Restante:</span>
+                                    </span>
+                                    <strong style={{
+                                        color: timeRemaining.is_urgent ? 'var(--color-error)' : 'var(--color-text)',
+                                        fontFamily: 'var(--font-mono)',
+                                        fontWeight: 700
+                                    }}>
+                                        {timeRemaining.text}
                                     </strong>
                                 </div>
                             )}
-                            {tenant?.subscription_expires_at && (
+
+                            {targetExpirationDate && (
                                 <div className="sub-detail-row">
-                                    <span>Proxima Renovacion:</span>
-                                    <strong>
-                                        {new Date(tenant.subscription_expires_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    <span>{tenant?.subscription_status === 'trial' ? 'Fin de Prueba:' : 'Próxima Renovación:'}</span>
+                                    <strong style={{ color: timeRemaining?.expired ? 'var(--color-error)' : 'inherit' }}>
+                                        {new Date(targetExpirationDate).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}
                                     </strong>
                                 </div>
                             )}

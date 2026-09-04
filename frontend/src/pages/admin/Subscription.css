@@ -128,6 +128,21 @@
     color: var(--color-error);
 }
 
+.sub-banner-warning {
+    background: rgba(234, 179, 8, 0.08);
+    border: 1px solid rgba(234, 179, 8, 0.3);
+    border-left: 4px solid #eab308;
+}
+
+.sub-banner-warning .sub-banner-icon {
+    background: rgba(234, 179, 8, 0.18);
+    color: #eab308;
+}
+
+.sub-banner-warning .sub-banner-title {
+    color: #eab308;
+}
+
 .sub-banner-text {
     font-size: var(--font-xs);
     color: var(--color-text-secondary);

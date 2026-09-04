@@ -189,6 +189,41 @@ function DashboardLayout({ children, adminOnly = false, superAdminOnly = false, 
           </div>
         )}
 
+        {/* Banner de suscripcion activa por vencer */}
+        {!isSuperAdmin && !isImpersonating && tenant?.subscription_status === 'active' && (() => {
+          const expDate = tenant.subscription_expires_at ? new Date(tenant.subscription_expires_at) : null;
+          if (!expDate) return null;
+          const diffMs = expDate.getTime() - new Date().getTime();
+          const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+          if (daysLeft > 7 || daysLeft < 0) return null;
+          const isUrgent = daysLeft <= 3;
+          return (
+            <div style={{
+              background: isUrgent ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
+              border: `1px solid ${isUrgent ? 'rgba(239,68,68,0.35)' : 'rgba(245,158,11,0.35)'}`,
+              borderRadius: 'var(--radius-md)', padding: '10px 18px', marginBottom: '12px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <AlertCircle size={18} style={{ color: isUrgent ? '#ef4444' : '#f59e0b', flexShrink: 0 }} />
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text)' }}>
+                  {daysLeft === 0 
+                    ? 'Aviso urgente: Tu suscripcion vence hoy. Renueva para evitar el bloqueo del servicio.'
+                    : `Aviso de facturacion: Tu suscripcion vence en ${daysLeft} ${daysLeft === 1 ? 'dia' : 'dias'}. Renueva para mantener tu operacion activa.`}
+                </span>
+              </div>
+              <Link to="/admin/suscripcion" className="btn btn-sm" style={{ 
+                background: isUrgent ? '#ef4444' : '#f59e0b', 
+                color: '#ffffff', 
+                fontWeight: 700, 
+                whiteSpace: 'nowrap' 
+              }}>
+                Renovar Suscripcion
+              </Link>
+            </div>
+          );
+        })()}
+
         {children}
       </div>
     </div>
