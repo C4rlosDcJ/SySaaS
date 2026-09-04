@@ -43,7 +43,7 @@ app.use(cors({
 // Capturar rawBody para verificacion de firma en webhook de Stripe
 // El webhook de Stripe requiere el body crudo antes de que JSON.parse lo consuma
 app.use((req, res, next) => {
-    if (req.path === '/api/billing/webhook') {
+    if (req.path.startsWith('/api/billing/webhook')) {
         let data = '';
         req.setEncoding('utf8');
         req.on('data', (chunk) => { data += chunk; });
