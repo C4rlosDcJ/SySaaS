@@ -6,4 +6,4 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 
 INSERT IGNORE INTO settings (setting_key, setting_value) VALUES ('default_warranty_days', '30');
-INSERT IGNORE INTO settings (setting_key, setting_value) VALUES ('business_name', 'Sys-Teck');
+INSERT IGNORE INTO settings (setting_key, setting_value) VALUES ('business_name', 'SySaaS');

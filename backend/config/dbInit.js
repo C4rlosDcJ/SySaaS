@@ -68,6 +68,25 @@ async function dbInit() {
             console.log(`[DB-INIT] La base de datos "${dbName}" ya cuenta con la tabla "users".`);
         }
 
+        // 5.1. Comprobar si la tabla 'orders' existe en la base de datos
+        console.log(`[DB-INIT] Verificando existencia de la tabla "orders"...`);
+        const [ordersTable] = await connection.query(`SHOW TABLES LIKE 'orders'`);
+        if (ordersTable.length === 0) {
+            const ecommerceMigrationPath = path.join(__dirname, '../../database/ecommerce_migration.sql');
+            if (fs.existsSync(ecommerceMigrationPath)) {
+                console.log(`[DB-INIT] Leyendo ${path.basename(ecommerceMigrationPath)}...`);
+                let ecommerceMigrationSql = fs.readFileSync(ecommerceMigrationPath, 'utf8');
+                ecommerceMigrationSql = ecommerceMigrationSql.replace(/^N--/gm, '--');
+                ecommerceMigrationSql = ecommerceMigrationSql.replace(/USE\s+\w+/gi, `USE \`${dbName}\``);
+                await connection.query(ecommerceMigrationSql);
+                console.log(`[DB-INIT] Migración E-commerce (orders) aplicada exitosamente.`);
+            } else {
+                console.warn(`[DB-INIT] ADVERTENCIA: No se encontró el archivo ${ecommerceMigrationPath}`);
+            }
+        } else {
+            console.log(`[DB-INIT] Tabla "orders" ya existe.`);
+        }
+
         // 6. Crear tabla activity_logs si no existe (siempre se verifica)
         console.log(`[DB-INIT] Verificando existencia de la tabla "activity_logs"...`);
         await connection.query(`
@@ -228,8 +247,9 @@ async function dbInit() {
         // 14. SaaS Multi-Tenant Migration
         console.log(`[DB-INIT] Verificando tablas SaaS multi-tenant...`);
         const [tenantsTable] = await connection.query(`SHOW TABLES LIKE 'tenants'`);
-        if (tenantsTable.length === 0) {
-            console.log(`[DB-INIT] Tablas SaaS no encontradas. Ejecutando migracion SaaS...`);
+        const [productTenantCol] = await connection.query(`SHOW COLUMNS FROM products LIKE 'tenant_id'`);
+        if (tenantsTable.length === 0 || productTenantCol.length === 0) {
+            console.log(`[DB-INIT] Tablas SaaS no encontradas o migración incompleta. Ejecutando migracion SaaS...`);
 
             // Ejecutar saas_migration.sql (schema)
             const saasMigrationPath = path.join(__dirname, '../../database/saas_migration.sql');

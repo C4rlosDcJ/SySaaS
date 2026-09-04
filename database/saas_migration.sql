@@ -264,6 +264,9 @@ DEALLOCATE PREPARE alterIfNotExists;
 -- 8e. orders: tenant_id + branch_id
 SET @columnname = 'tenant_id';
 SET @preparedStatement = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+     WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = 'orders') = 0
+    OR
     (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
      WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = 'orders' AND COLUMN_NAME = @columnname) > 0,
     'SELECT 1',
@@ -275,6 +278,9 @@ DEALLOCATE PREPARE alterIfNotExists;
 
 SET @columnname = 'branch_id';
 SET @preparedStatement = (SELECT IF(
+    (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+     WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = 'orders') = 0
+    OR
     (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
      WHERE TABLE_SCHEMA = @dbname AND TABLE_NAME = 'orders' AND COLUMN_NAME = @columnname) > 0,
     'SELECT 1',
