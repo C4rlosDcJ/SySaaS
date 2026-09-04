@@ -24,5 +24,8 @@ router.get('/products/:slug', publicController.getCatalogProducts);
 // Configuración pública de plataforma SaaS (SuperAdmin branding)
 router.get('/platform', publicController.getPlatformInfo);
 
+// Planes SaaS activos (publico, para registro y landing)
+router.get('/plans', publicController.getPlans);
+
 module.exports = router;
 

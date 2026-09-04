@@ -394,6 +394,16 @@ export const publicService = {
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || 'Error al obtener productos');
         return data;
+    },
+    getPlans: async () => {
+        try {
+            const response = await fetch(`${API_URL}/public/plans`);
+            const data = await response.json();
+            if (!response.ok) return { plans: [] };
+            return data;
+        } catch {
+            return { plans: [] };
+        }
     }
 };
 
@@ -602,9 +612,13 @@ export const analyticsService = {
 
 // Billing & Subscription Service
 export const billingService = {
-    createCheckoutSession: (plan_slug) => fetchAPI('/billing/checkout', {
+    createCheckoutSession: (plan_slug, billing_cycle = 'monthly') => fetchAPI('/billing/checkout', {
         method: 'POST',
-        body: JSON.stringify({ plan_slug })
+        body: JSON.stringify({ plan_slug, billing_cycle })
+    }),
+    verifySession: (session_id) => fetchAPI('/billing/verify-session', {
+        method: 'POST',
+        body: JSON.stringify({ session_id })
     }),
     createPortalSession: () => fetchAPI('/billing/portal', {
         method: 'POST'

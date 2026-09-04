@@ -11,44 +11,83 @@ exports.registerCompany = async (req, res) => {
     try {
         await connection.beginTransaction();
 
-        const { company_name, slug, email, password, first_name, last_name, phone } = req.body;
+        const {
+            company_name, slug, email, password, first_name, last_name, phone,
+            plan_slug,       // slug del plan elegido (basico, pro, enterprise)
+            is_trial         // true = prueba gratuita 14 dias, false = suscripcion
+        } = req.body;
 
         if (!company_name || !email || !password || !first_name || !last_name) {
             return res.status(400).json({ message: 'Todos los campos marcados como obligatorios son requeridos.' });
         }
 
-        // 1. Resolver o formatear slug
-        const finalSlug = slug ? slug.toLowerCase().replace(/[^a-z0-9-]/g, '') : company_name.toLowerCase().replace(/[^a-z0-9]/g, '-');
+        // 1. Resolver slug del tenant
+        const finalSlug = slug
+            ? slug.toLowerCase().replace(/[^a-z0-9-]/g, '')
+            : company_name.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
 
-        // Validar si el slug ya existe
         const [existingTenant] = await connection.query('SELECT id FROM tenants WHERE slug = ?', [finalSlug]);
         if (existingTenant.length > 0) {
             await connection.rollback();
-            return res.status(400).json({ message: 'El identificador de empresa (slug) ya está en uso.' });
+            return res.status(400).json({ message: 'El identificador de empresa (slug) ya esta en uso.' });
         }
 
-        // Validar si el email ya existe
         const [existingUser] = await connection.query('SELECT id FROM users WHERE email = ?', [email]);
         if (existingUser.length > 0) {
             await connection.rollback();
-            return res.status(400).json({ message: 'El correo electrónico ya está registrado.' });
+            return res.status(400).json({ message: 'El correo electronico ya esta registrado.' });
         }
 
-        // 2. Obtener plan trial / inicial por defecto
-        const [defaultPlan] = await connection.query('SELECT id FROM saas_plans ORDER BY id ASC LIMIT 1');
-        const planId = defaultPlan.length > 0 ? defaultPlan[0].id : 1;
+        // 2. Resolver plan: usar el slug enviado o el primer plan activo como default
+        let planQuery;
+        if (plan_slug) {
+            [planQuery] = await connection.query('SELECT * FROM saas_plans WHERE slug = ? AND is_active = 1', [plan_slug]);
+        }
+        if (!planQuery || planQuery.length === 0) {
+            [planQuery] = await connection.query('SELECT * FROM saas_plans WHERE is_active = 1 ORDER BY price_monthly ASC LIMIT 1');
+        }
+        if (planQuery.length === 0) {
+            await connection.rollback();
+            return res.status(500).json({ message: 'No hay planes de suscripcion configurados en el sistema.' });
+        }
+        const plan = planQuery[0];
 
-        // 3. Crear Tenant
+        // 3. Determinar estado de suscripcion y fechas
+        const wantsTrial = is_trial !== false; // por defecto true si no se especifica
+        let subscriptionStatus = 'trial';
+        let trialEndsAt = null;
+        let subscriptionExpiresAt = null;
+
+        if (wantsTrial) {
+            subscriptionStatus = 'trial';
+            const trialEnd = new Date();
+            trialEnd.setDate(trialEnd.getDate() + 30); // 30 dias de prueba
+            trialEndsAt = trialEnd;
+        } else {
+            // Sin trial: queda en trial hasta que paguen via Stripe
+            // Si no hay Stripe configurado, activar directamente (modo desarrollo)
+            const stripeConfigured = !!process.env.STRIPE_SECRET_KEY;
+            if (!stripeConfigured) {
+                subscriptionStatus = 'active';
+            } else {
+                subscriptionStatus = 'trial';
+                const trialEnd = new Date();
+                trialEnd.setDate(trialEnd.getDate() + 1); // 1 dia para que complete el pago
+                trialEndsAt = trialEnd;
+            }
+        }
+
+        // 4. Crear Tenant
         const { v4: uuidv4 } = require('uuid');
         const tenantUuid = uuidv4();
         const [tenantResult] = await connection.query(
-            `INSERT INTO tenants (uuid, company_name, slug, plan_id, subscription_status)
-             VALUES (?, ?, ?, ?, 'active')`,
-            [tenantUuid, company_name, finalSlug, planId]
+            `INSERT INTO tenants (uuid, company_name, slug, plan_id, subscription_status, trial_ends_at)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [tenantUuid, company_name, finalSlug, plan.id, subscriptionStatus, trialEndsAt]
         );
         const tenantId = tenantResult.insertId;
 
-        // 4. Crear Sucursal Principal para la Empresa
+        // 5. Crear Sucursal Principal
         const [branchResult] = await connection.query(
             `INSERT INTO branches (tenant_id, code, name, is_main, phone)
              VALUES (?, 'SUC-001', 'Matriz Principal', TRUE, ?)`,
@@ -56,7 +95,7 @@ exports.registerCompany = async (req, res) => {
         );
         const branchId = branchResult.insertId;
 
-        // 5. Crear Usuario Administrador de la Empresa
+        // 6. Crear Usuario Administrador
         const hashedPassword = await bcrypt.hash(password, 10);
         const [userResult] = await connection.query(
             `INSERT INTO users (email, password, first_name, last_name, phone, role, tenant_id, branch_id)
@@ -64,17 +103,33 @@ exports.registerCompany = async (req, res) => {
             [email, hashedPassword, first_name, last_name, phone || null, tenantId, branchId]
         );
 
+        // 7. Asignar sucursal principal al admin
+        await connection.query(
+            `INSERT INTO user_branch_assignments (user_id, branch_id, is_default) VALUES (?, ?, TRUE)`,
+            [userResult.insertId, branchId]
+        );
+
         await connection.commit();
 
-        // 6. Generar JWT Token
+        // 8. Generar JWT Token
         const token = jwt.sign(
             { id: userResult.insertId, tenant_id: tenantId },
             process.env.JWT_SECRET,
             { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
         );
 
+        // 9. Parsear features del plan para el contexto frontend
+        let planFeatures = {};
+        try {
+            planFeatures = typeof plan.features === 'string' ? JSON.parse(plan.features) : (plan.features || {});
+        } catch (e) {
+            planFeatures = {};
+        }
+
         res.status(201).json({
-            message: 'Empresa registrada exitosamente.',
+            message: wantsTrial
+                ? `Empresa registrada con periodo de prueba de 30 dias. Bienvenido a ${plan.name}.`
+                : `Empresa registrada exitosamente con el plan ${plan.name}.`,
             token,
             user: {
                 id: userResult.insertId,
@@ -83,10 +138,28 @@ exports.registerCompany = async (req, res) => {
                 last_name,
                 role: 'admin',
                 tenant_id: tenantId,
-                branch_id: branchId,
+                branch_id: branchId
+            },
+            tenant: {
+                id: tenantId,
                 company_name,
-                slug: finalSlug
-            }
+                slug: finalSlug,
+                plan_id: plan.id,
+                plan_name: plan.name,
+                plan_slug: plan.slug,
+                plan_features: planFeatures,
+                subscription_status: subscriptionStatus,
+                trial_ends_at: trialEndsAt,
+                subscription_expires_at: subscriptionExpiresAt,
+                max_branches: plan.max_branches,
+                max_users: plan.max_users,
+                max_monthly_repairs: plan.max_monthly_repairs,
+                primary_color: '#e63358',
+                currency: 'MXN',
+                tax_rate: 16.00
+            },
+            branches: [{ id: branchId, code: 'SUC-001', name: 'Matriz Principal', is_main: true }],
+            default_branch_id: branchId
         });
     } catch (error) {
         await connection.rollback();

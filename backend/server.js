@@ -40,7 +40,22 @@ app.use(cors({
     },
     credentials: true
 }));
-app.use(express.json({ limit: '50mb' }));
+// Capturar rawBody para verificacion de firma en webhook de Stripe
+// El webhook de Stripe requiere el body crudo antes de que JSON.parse lo consuma
+app.use((req, res, next) => {
+    if (req.path === '/api/billing/webhook') {
+        let data = '';
+        req.setEncoding('utf8');
+        req.on('data', (chunk) => { data += chunk; });
+        req.on('end', () => {
+            req.rawBody = data;
+            req.body = data;
+            next();
+        });
+    } else {
+        express.json({ limit: '50mb' })(req, res, next);
+    }
+});
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Servir archivos estáticos (uploads)

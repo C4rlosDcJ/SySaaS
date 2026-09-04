@@ -2,18 +2,20 @@ const express = require('express');
 const router = express.Router();
 const { auth, isAdmin } = require('../middleware/auth');
 const tenantContext = require('../middleware/tenantContext');
-const { subscriptionGuard } = require('../middleware/subscriptionGuard');
+const { subscriptionGuard, featureGuard } = require('../middleware/subscriptionGuard');
 const orderController = require('../controllers/orderController');
 
-// Todas las rutas requieren autenticación, contexto de tenant y verificación de suscripción
+// Todas las rutas requieren autenticacion, contexto de tenant, suscripcion activa
+// y que el plan incluya e-commerce
 router.use(auth);
 router.use(tenantContext);
 router.use(subscriptionGuard);
+router.use(featureGuard('ecommerce'));
 
 // Cliente: crear pedido
 router.post('/', orderController.createOrder);
 
-// Cliente/Admin: obtener pedidos (filtra automáticamente por rol)
+// Cliente/Admin: obtener pedidos (filtra automaticamente por rol)
 router.get('/', orderController.getOrders);
 
 // Cliente/Admin: detalle de pedido

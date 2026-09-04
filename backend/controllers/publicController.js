@@ -399,3 +399,37 @@ exports.getPlatformInfo = async (req, res) => {
         });
     }
 };
+
+// Obtener planes SaaS activos (publico, sin auth - para registro y landing)
+exports.getPlans = async (req, res) => {
+    try {
+        const [plans] = await db.query(
+            'SELECT id, name, slug, price_monthly, price_yearly, max_branches, max_users, max_monthly_repairs, features FROM saas_plans WHERE is_active = 1 ORDER BY price_monthly ASC'
+        );
+
+        const formattedPlans = plans.map(p => {
+            let features = {};
+            try {
+                features = typeof p.features === 'string' ? JSON.parse(p.features) : (p.features || {});
+            } catch (e) {
+                features = {};
+            }
+            return {
+                id: p.id,
+                name: p.name,
+                slug: p.slug,
+                price_monthly: parseFloat(p.price_monthly || 0),
+                price_yearly: parseFloat(p.price_yearly || 0),
+                max_branches: p.max_branches,
+                max_users: p.max_users,
+                max_monthly_repairs: p.max_monthly_repairs,
+                features
+            };
+        });
+
+        res.json({ plans: formattedPlans });
+    } catch (error) {
+        console.error('[PUBLIC] Error al obtener planes:', error);
+        res.status(500).json({ message: 'Error al obtener planes de suscripcion.' });
+    }
+};

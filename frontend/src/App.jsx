@@ -58,7 +58,8 @@ import SuperReportsPage from './pages/admin/SuperReportsPage';
 import './index.css';
 
 
-import { Shield } from 'lucide-react';
+import { Shield, Clock, AlertCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useTenant } from './context/TenantContext';
 
 // Componente para manejar el layout con Sidebar/MobileHeader
@@ -142,6 +143,52 @@ function DashboardLayout({ children, adminOnly = false, superAdminOnly = false, 
             </button>
           </div>
         )}
+        {/* Banner de prueba activa */}
+        {!isSuperAdmin && !isImpersonating && tenant?.subscription_status === 'trial' && (() => {
+          const trialEnd = tenant.trial_ends_at ? new Date(tenant.trial_ends_at) : null;
+          const expired = trialEnd && trialEnd < new Date();
+          const daysLeft = trialEnd ? Math.max(0, Math.ceil((trialEnd - new Date()) / (1000 * 60 * 60 * 24))) : null;
+          return (
+            <div style={{
+              background: expired ? 'rgba(239,68,68,0.1)' : 'rgba(59,130,246,0.09)',
+              border: `1px solid ${expired ? 'rgba(239,68,68,0.3)' : 'rgba(59,130,246,0.25)'}`,
+              borderRadius: 'var(--radius-md)', padding: '10px 18px', marginBottom: '12px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {expired ? <AlertCircle size={18} style={{ color: '#ef4444', flexShrink: 0 }} /> : <Clock size={18} style={{ color: '#3b82f6', flexShrink: 0 }} />}
+                <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text)' }}>
+                  {expired
+                    ? 'Tu periodo de prueba ha expirado. Activa tu suscripcion para continuar.'
+                    : `Periodo de prueba activo: ${daysLeft !== null ? `${daysLeft} dias restantes de 30` : 'limitado'}`}
+                </span>
+              </div>
+              <Link to="/admin/suscripcion" className="btn btn-primary btn-sm" style={{ whiteSpace: 'nowrap' }}>
+                {expired ? 'Activar ahora' : 'Ver planes'}
+              </Link>
+            </div>
+          );
+        })()}
+
+        {/* Banner de pago vencido */}
+        {!isSuperAdmin && !isImpersonating && tenant?.subscription_status === 'past_due' && (
+          <div style={{
+            background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)',
+            borderRadius: 'var(--radius-md)', padding: '10px 18px', marginBottom: '12px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <AlertCircle size={18} style={{ color: '#f59e0b', flexShrink: 0 }} />
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text)' }}>
+                Tienes un pago pendiente. Solo puedes consultar informacion hasta regularizar tu cuenta.
+              </span>
+            </div>
+            <Link to="/admin/suscripcion" className="btn btn-sm" style={{ background: '#f59e0b', color: '#000', fontWeight: 700, whiteSpace: 'nowrap' }}>
+              Regularizar pago
+            </Link>
+          </div>
+        )}
+
         {children}
       </div>
     </div>

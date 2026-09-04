@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { tenantService, billingService } from '../../services/api';
 import { useTenant } from '../../context/TenantContext';
 import {
@@ -11,24 +12,48 @@ import {
     AlertCircle,
     Calendar,
     Check,
+    X,
     RefreshCw,
     Clock,
-    Lock,
     Zap,
-    ArrowRight
+    ArrowRight,
+    HelpCircle
 } from 'lucide-react';
 import { showAlert, showConfirm } from '../../utils/swal';
 import { formatCurrency } from '../../utils/constants';
+import './Subscription.css';
 
 export default function SubscriptionPage() {
+    const [searchParams, setSearchParams] = useSearchParams();
     const { updateTenantInfo } = useTenant();
     const [tenant, setTenant] = useState(null);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
-    const [billingCycle, setBillingCycle] = useState('monthly'); // 'monthly' | 'yearly'
+    const [billingCycle, setBillingCycle] = useState('monthly');
 
     useEffect(() => {
         loadTenantInfo();
+
+        const sessionId = searchParams.get('session_id');
+        const success = searchParams.get('success');
+        if (sessionId && success === 'true') {
+            verifyStripeSession(sessionId);
+            setSearchParams({});
+        } else if (searchParams.get('canceled') === 'true') {
+            showAlert({
+                title: 'Pago Cancelado',
+                text: 'El proceso de pago fue cancelado. Puedes reactivar tu suscripcion en cualquier momento.',
+                icon: 'info'
+            });
+            setSearchParams({});
+        } else if (searchParams.get('stripe_error')) {
+            showAlert({
+                title: 'Stripe Requiere Configuracion',
+                text: 'Tu empresa ha sido registrada, pero para procesar el cobro con Stripe es necesario configurar tus credenciales en el archivo backend/.env.',
+                icon: 'warning'
+            });
+            setSearchParams({});
+        }
     }, []);
 
     const loadTenantInfo = async () => {
@@ -45,14 +70,54 @@ export default function SubscriptionPage() {
                 });
             }
         } catch (err) {
-            showAlert({ title: 'Error', text: err.message || 'Error al obtener datos de suscripción', icon: 'error' });
+            showAlert({
+                title: 'Error',
+                text: err.message || 'Error al obtener datos de suscripcion',
+                icon: 'error'
+            });
         } finally {
             setLoading(false);
         }
     };
 
+    const verifyStripeSession = async (sessionId) => {
+        try {
+            setActionLoading(true);
+            const result = await billingService.verifySession(sessionId);
+            showAlert({
+                title: 'Suscripcion Activada',
+                text: result.message || 'Tu suscripcion ha sido confirmada y activada exitosamente.',
+                icon: 'success'
+            });
+            await loadTenantInfo();
+        } catch (err) {
+            console.warn('[SUBSCRIPTION] Error al verificar sesion Stripe:', err.message);
+            await loadTenantInfo();
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const openStripePortal = async () => {
+        try {
+            setActionLoading(true);
+            const res = await billingService.createPortalSession();
+            if (res.url) {
+                window.location.href = res.url;
+            }
+        } catch (err) {
+            showAlert({
+                title: 'Error',
+                text: err.message || 'No se pudo acceder al portal de clientes de Stripe.',
+                icon: 'error'
+            });
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
     const isTrialExpired = tenant?.subscription_status === 'trial' && tenant?.trial_ends_at && new Date(tenant.trial_ends_at) < new Date();
-    const daysLeftInTrial = tenant?.subscription_status === 'trial' && tenant?.trial_ends_at 
+    const daysLeftInTrial = tenant?.subscription_status === 'trial' && tenant?.trial_ends_at
         ? Math.max(0, Math.ceil((new Date(tenant.trial_ends_at) - new Date()) / (1000 * 60 * 60 * 24)))
         : null;
 
@@ -60,40 +125,40 @@ export default function SubscriptionPage() {
         if (status === 'trial' && isTrialExpired) {
             return {
                 label: 'Prueba Expirada',
-                icon: AlertCircle,
-                color: '#ef4444'
+                className: 'expired',
+                icon: AlertCircle
             };
         }
         switch (status) {
             case 'active':
                 return {
-                    label: 'Suscripción Activa',
-                    icon: CheckCircle2,
-                    color: '#10b981'
+                    label: 'Suscripcion Activa',
+                    className: 'active',
+                    icon: CheckCircle2
                 };
             case 'trial':
                 return {
-                    label: `Prueba (${daysLeftInTrial} días)`,
-                    icon: Clock,
-                    color: '#3b82f6'
+                    label: `Prueba (${daysLeftInTrial} dias)`,
+                    className: 'trial',
+                    icon: Clock
                 };
             case 'past_due':
                 return {
                     label: 'Pago Pendiente',
-                    icon: AlertCircle,
-                    color: '#f59e0b'
+                    className: 'expired',
+                    icon: AlertCircle
                 };
             case 'suspended':
                 return {
-                    label: 'Cuenta Suspendida',
-                    icon: AlertCircle,
-                    color: '#ef4444'
+                    label: 'Suspendida',
+                    className: 'expired',
+                    icon: AlertCircle
                 };
             default:
                 return {
                     label: 'Inactiva',
-                    icon: AlertCircle,
-                    color: '#64748b'
+                    className: 'trial',
+                    icon: AlertCircle
                 };
         }
     };
@@ -102,45 +167,64 @@ export default function SubscriptionPage() {
         const isCurrentActive = plan.id === tenant?.plan_id && tenant?.subscription_status === 'active';
         if (isCurrentActive) return;
 
-        const isTrialOrExpired = tenant?.subscription_status === 'trial' || isTrialExpired;
-        const price = billingCycle === 'yearly' ? (plan.price_yearly || plan.price_monthly * 10) : plan.price_monthly;
-        const cycleLabel = billingCycle === 'yearly' ? 'Anual (con 2 meses de descuento)' : 'Mensual';
+        const price = billingCycle === 'yearly'
+            ? (plan.price_yearly || plan.price_monthly * 10)
+            : plan.price_monthly;
+        const cycleLabel = billingCycle === 'yearly' ? 'Anual (2 meses de descuento)' : 'Mensual';
 
         const confirmed = await showConfirm({
-            title: isTrialOrExpired ? `Activar Suscripción: ${plan.name}` : `Cambiar a Plan ${plan.name}`,
-            text: `¿Deseas contratar el ${plan.name} por ${formatCurrency(price)} MXN (${cycleLabel})? ${isTrialOrExpired ? 'Tu periodo de prueba se convertirá a suscripción activa y tendrás acceso total inmediato.' : 'Se actualizarán tus límites de sucursales y personal.'}`,
+            title: `Activar Plan ${plan.name}`,
+            text: `Seras redirigido a la pasarela segura de Stripe para procesar el pago de ${formatCurrency(price)} MXN (${cycleLabel}).`,
             icon: 'question',
-            confirmText: 'Confirmar y Activar'
+            confirmText: 'Continuar a Stripe'
         });
         if (!confirmed) return;
 
         try {
             setActionLoading(true);
-            const res = await billingService.subscribePlan({
-                plan_id: plan.id,
-                billing_cycle: billingCycle
-            });
+            const res = await billingService.createCheckoutSession(plan.slug, billingCycle);
+            if (res.url) {
+                window.location.href = res.url;
+                return;
+            }
 
+            const fallback = await billingService.subscribePlan({ plan_id: plan.id, billing_cycle: billingCycle });
             showAlert({
-                title: '¡Suscripción Activada!',
-                text: res.message || `Tu cuenta ahora tiene activo el plan ${plan.name}.`,
+                title: 'Suscripcion Actualizada',
+                text: fallback.message || `Plan ${plan.name} activado con exito.`,
                 icon: 'success'
             });
-
             await loadTenantInfo();
             if (updateTenantInfo) {
-                updateTenantInfo({
-                    plan_id: plan.id,
-                    subscription_status: 'active'
-                });
+                updateTenantInfo({ plan_id: plan.id, subscription_status: 'active' });
             }
         } catch (err) {
-            console.error('Error al contratar plan:', err);
-            showAlert({
-                title: 'Error',
-                text: err.message || 'No se pudo procesar la suscripción.',
-                icon: 'error'
-            });
+            if (err.message && err.message.includes('Stripe')) {
+                try {
+                    const fallback = await billingService.subscribePlan({ plan_id: plan.id, billing_cycle: billingCycle });
+                    showAlert({
+                        title: 'Suscripcion Actualizada',
+                        text: fallback.message || `Plan ${plan.name} activado.`,
+                        icon: 'success'
+                    });
+                    await loadTenantInfo();
+                    if (updateTenantInfo) {
+                        updateTenantInfo({ plan_id: plan.id, subscription_status: 'active' });
+                    }
+                } catch (err2) {
+                    showAlert({
+                        title: 'Error',
+                        text: err2.message || 'No se pudo procesar la solicitud.',
+                        icon: 'error'
+                    });
+                }
+            } else {
+                showAlert({
+                    title: 'Error',
+                    text: err.message || 'Error al procesar la suscripcion.',
+                    icon: 'error'
+                });
+            }
         } finally {
             setActionLoading(false);
         }
@@ -148,9 +232,11 @@ export default function SubscriptionPage() {
 
     if (loading) {
         return (
-            <div className="container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}>
-                <div className="spinner"></div>
-                <p style={{ marginTop: '14px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>Cargando estado de suscripción...</p>
+            <div className="sub-page-container" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '420px' }}>
+                <div className="spinner" style={{ width: '28px', height: '28px', marginBottom: '14px' }} />
+                <span style={{ fontSize: '13px', color: 'var(--color-text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                    Cargando informacion de suscripcion...
+                </span>
             </div>
         );
     }
@@ -158,141 +244,119 @@ export default function SubscriptionPage() {
     const subStatus = getStatusInfo(tenant?.subscription_status);
     const plans = tenant?.available_plans || [];
 
-    // Cálculo de cuotas y porcentajes
     const branchesUsed = tenant?.used_branches || 1;
     const branchesMax = tenant?.max_branches || 1;
-    const branchesPct = branchesMax === 99 ? Math.min(100, (branchesUsed / 10) * 100) : Math.min(100, (branchesUsed / branchesMax) * 100);
+    const branchesPct = branchesMax === 99
+        ? Math.min(100, (branchesUsed / 10) * 100)
+        : Math.min(100, (branchesUsed / branchesMax) * 100);
 
     const usersUsed = tenant?.used_users || 1;
     const usersMax = tenant?.max_users || 3;
-    const usersPct = usersMax === 999 ? Math.min(100, (usersUsed / 20) * 100) : Math.min(100, (usersUsed / usersMax) * 100);
+    const usersPct = usersMax === 999
+        ? Math.min(100, (usersUsed / 20) * 100)
+        : Math.min(100, (usersUsed / usersMax) * 100);
 
     const repairsUsed = tenant?.used_repairs_month || 0;
     const repairsMax = tenant?.max_monthly_repairs;
-    const repairsPct = repairsMax ? Math.min(100, (repairsUsed / repairsMax) * 100) : Math.min(100, (repairsUsed / 500) * 100);
+    const repairsPct = repairsMax
+        ? Math.min(100, (repairsUsed / repairsMax) * 100)
+        : Math.min(100, (repairsUsed / 500) * 100);
 
     return (
-        <div className="container animate-fadeIn" style={{ paddingTop: 'var(--sp-6)', paddingBottom: 'var(--sp-8)' }}>
-            
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
+        <div className="sub-page-container animate-fadeIn">
+            {/* Encabezado */}
+            <div className="sub-header-row">
                 <div>
-                    <h1 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, fontSize: '24px', fontWeight: 800 }}>
-                        <Shield size={28} className="text-primary" />
-                        <span>Mi Suscripción SaaS</span>
+                    <h1 className="sub-title">
+                        <Shield size={24} />
+                        <span>Gestion de Suscripcion</span>
                     </h1>
-                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px', marginTop: '4px', margin: 0 }}>
-                        Estado de facturación, cuotas de recursos operativos y actualización de planes
+                    <p className="sub-subtitle">
+                        Estado operativo de tu cuenta, consumo de recursos y seleccion de planes
                     </p>
                 </div>
-                <button className="btn btn-secondary btn-sm" onClick={loadTenantInfo} title="Recargar">
-                    <RefreshCw size={14} />
-                    <span>Actualizar</span>
+
+                <button
+                    type="button"
+                    onClick={loadTenantInfo}
+                    className="sub-refresh-btn"
+                    disabled={actionLoading}
+                >
+                    <RefreshCw size={14} className={actionLoading ? 'animate-spin' : ''} />
+                    <span>Actualizar Estado</span>
                 </button>
             </div>
 
-            {/* Banner Informativo de Estado de Prueba / Suscripción */}
+            {/* Banners Informativos de Estado */}
             {isTrialExpired ? (
-                <div style={{
-                    background: 'rgba(239, 68, 68, 0.1)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    borderRadius: 'var(--radius-lg)',
-                    padding: '18px 24px',
-                    marginBottom: '28px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '16px'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ef4444', flexShrink: 0 }}>
-                            <AlertCircle size={24} />
+                <div className="sub-banner sub-banner-expired">
+                    <div className="sub-banner-left">
+                        <div className="sub-banner-icon">
+                            <AlertCircle size={22} />
                         </div>
                         <div>
-                            <h3 style={{ margin: 0, fontSize: '16px', fontWeight: 800, color: '#ef4444' }}>
-                                Periodo de Prueba Concluido
-                            </h3>
-                            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-                                Tu tiempo de prueba ha expirado. Selecciona un plan a continuación para activar tu suscripción y continuar gestionando tus talleres de forma inmediata.
+                            <div className="sub-banner-title">Periodo de Prueba Concluido</div>
+                            <p className="sub-banner-text">
+                                Tus 30 dias de prueba han finalizado. Selecciona un plan a continuacion para reactivar tu operacion de forma inmediata sin perder tus datos.
                             </p>
                         </div>
                     </div>
                 </div>
             ) : tenant?.subscription_status === 'trial' ? (
-                <div style={{
-                    background: 'rgba(59, 130, 246, 0.08)',
-                    border: '1px solid rgba(59, 130, 246, 0.25)',
-                    borderRadius: 'var(--radius-lg)',
-                    padding: '16px 22px',
-                    marginBottom: '28px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '16px'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6', flexShrink: 0 }}>
-                            <Clock size={20} />
+                <div className="sub-banner sub-banner-trial">
+                    <div className="sub-banner-left">
+                        <div className="sub-banner-icon">
+                            <Clock size={22} />
                         </div>
                         <div>
-                            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: '#3b82f6' }}>
-                                Periodo de Prueba Activo ({daysLeftInTrial} días restantes)
-                            </h3>
-                            <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                                Tienes acceso completo a todas las funcionalidades. Puedes activar tu plan definitivo cuando desees.
+                            <div className="sub-banner-title">Periodo de Prueba Activo: {daysLeftInTrial} dias restantes</div>
+                            <p className="sub-banner-text">
+                                Cuentas con acceso a todas las caracteristicas de tu plan. Puedes formalizar tu suscripcion en cualquier momento antes del vencimiento.
                             </p>
                         </div>
                     </div>
                 </div>
             ) : null}
 
-            {/* Grid 3 Tarjetas de Estado */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-                
-                {/* 1. Estado Actual */}
-                <div className="card" style={{ padding: '22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            {/* Metricas y Estado Actual */}
+            <div className="sub-metrics-grid">
+                {/* Tarjeta 1: Plan Contratado */}
+                <div className="sub-metric-card">
                     <div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
+                        <div className="sub-metric-header">
                             <div>
-                                <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Plan Contratado</span>
-                                <h2 style={{ fontSize: '22px', fontWeight: 800, margin: '2px 0 0 0', color: 'var(--color-text)' }}>
-                                    {tenant?.plan_name}
-                                </h2>
+                                <div className="sub-metric-label">Plan Contratado</div>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
+                                    {tenant?.plan_name || 'Sin Plan'}
+                                </div>
                             </div>
-                            <span className="badge-neutral" style={{ fontWeight: 700, color: subStatus.color }}>
-                                <subStatus.icon size={13} style={{ marginRight: '4px' }} />
-                                {subStatus.label}
+                            <span className={`sub-plan-badge ${subStatus.className}`}>
+                                <subStatus.icon size={12} />
+                                <span>{subStatus.label}</span>
                             </span>
                         </div>
 
-                        <div style={{ fontSize: '13px', color: 'var(--color-text-secondary)', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '18px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
-                                <span>Organización:</span>
-                                <strong style={{ color: 'var(--color-text)' }}>{tenant?.company_name}</strong>
+                        <div className="sub-detail-rows">
+                            <div className="sub-detail-row">
+                                <span>Empresa:</span>
+                                <strong>{tenant?.company_name}</strong>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
-                                <span>Costo Mensual:</span>
-                                <strong style={{ color: 'var(--color-text)' }}>{formatCurrency(tenant?.price_monthly || 0)} MXN</strong>
+                            <div className="sub-detail-row">
+                                <span>Costo Base:</span>
+                                <strong>{formatCurrency(tenant?.price_monthly || 0)} MXN/mes</strong>
                             </div>
                             {tenant?.subscription_status === 'trial' && tenant?.trial_ends_at && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--color-border)', paddingBottom: '8px' }}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <Clock size={13} /> Fin de Prueba:
-                                    </span>
-                                    <strong style={{ color: isTrialExpired ? '#ef4444' : 'var(--color-primary)' }}>
+                                <div className="sub-detail-row">
+                                    <span>Vence Prueba:</span>
+                                    <strong style={{ color: isTrialExpired ? 'var(--color-error)' : 'inherit' }}>
                                         {new Date(tenant.trial_ends_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                        {isTrialExpired ? ' (Expirado)' : ''}
                                     </strong>
                                 </div>
                             )}
                             {tenant?.subscription_expires_at && (
-                                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                        <Calendar size={13} /> Próxima Renovación:
-                                    </span>
-                                    <strong style={{ color: 'var(--color-text)' }}>
+                                <div className="sub-detail-row">
+                                    <span>Proxima Renovacion:</span>
+                                    <strong>
                                         {new Date(tenant.subscription_expires_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
                                     </strong>
                                 </div>
@@ -300,249 +364,234 @@ export default function SubscriptionPage() {
                         </div>
                     </div>
 
-                    <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Lock size={13} style={{ color: 'var(--color-primary)' }} />
-                        <span>Suscripción SaaS con aislamiento total de datos.</span>
-                    </div>
+                    {tenant?.subscription_status === 'active' && (
+                        <button
+                            type="button"
+                            onClick={openStripePortal}
+                            className="sub-btn-portal"
+                            disabled={actionLoading}
+                        >
+                            <CreditCard size={14} />
+                            <span>Portal de Facturacion Stripe</span>
+                        </button>
+                    )}
                 </div>
 
-                {/* 2. Cuotas y Consumo en Vivo */}
-                <div className="card" style={{ padding: '22px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
-                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Consumo de Recursos</span>
-                        <span className="badge-neutral" style={{ fontSize: '10px' }}>Mes en Curso</span>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {/* Sucursales */}
-                        <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-text)', fontWeight: 600 }}>
-                                    <Building2 size={15} style={{ color: '#3b82f6' }} /> Sucursales
-                                </span>
-                                <span style={{ color: 'var(--color-text-secondary)' }}>
-                                    <strong>{branchesUsed}</strong> / {branchesMax === 99 ? 'Ilimitadas' : `${branchesMax}`}
-                                </span>
-                            </div>
-                            <div className="progress-track" style={{ height: '8px' }}>
-                                <div className="progress-fill" style={{ width: `${branchesPct}%`, background: '#3b82f6' }} />
-                            </div>
-                        </div>
-
-                        {/* Usuarios Staff */}
-                        <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-text)', fontWeight: 600 }}>
-                                    <Users size={15} style={{ color: '#6366f1' }} /> Personal / Staff
-                                </span>
-                                <span style={{ color: 'var(--color-text-secondary)' }}>
-                                    <strong>{usersUsed}</strong> / {usersMax === 999 ? 'Ilimitados' : `${usersMax}`}
-                                </span>
-                            </div>
-                            <div className="progress-track" style={{ height: '8px' }}>
-                                <div className="progress-fill" style={{ width: `${usersPct}%`, background: '#6366f1' }} />
-                            </div>
-                        </div>
-
-                        {/* Reparaciones Mensuales */}
-                        <div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--color-text)', fontWeight: 600 }}>
-                                    <Wrench size={15} style={{ color: '#0284c7' }} /> Órdenes Taller (Mes)
-                                </span>
-                                <span style={{ color: 'var(--color-text-secondary)' }}>
-                                    <strong>{repairsUsed}</strong> / {repairsMax ? `${repairsMax}` : 'Ilimitadas'}
-                                </span>
-                            </div>
-                            <div className="progress-track" style={{ height: '8px' }}>
-                                <div className="progress-fill" style={{ width: `${repairsPct}%`, background: '#0284c7' }} />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* 3. Facturación y Ciclo */}
-                <div className="card" style={{ padding: '22px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                {/* Tarjeta 2: Consumo de Recursos */}
+                <div className="sub-metric-card">
                     <div>
-                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Resumen Operativo</span>
-                        
-                        <div style={{
-                            background: 'var(--color-bg-tertiary)',
-                            borderRadius: 'var(--radius-md)',
-                            padding: '16px',
-                            marginTop: '12px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: '10px'
-                        }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <Zap size={18} style={{ color: 'var(--color-primary)' }} />
-                                <div>
-                                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--color-text)' }}>
-                                        Acceso Ininterrumpido
-                                    </div>
-                                    <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                                        Activación instantánea sin pérdida de datos históricos
-                                    </div>
+                        <div className="sub-metric-header">
+                            <div>
+                                <div className="sub-metric-label">Consumo de Recursos</div>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
+                                    Cuotas Activas
+                                </div>
+                            </div>
+                            <span className="sub-plan-badge trial">MES EN CURSO</span>
+                        </div>
+
+                        <div style={{ marginTop: 'var(--sp-2)' }}>
+                            <div className="sub-quota-item">
+                                <div className="sub-quota-header">
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <Building2 size={13} /> Sucursales
+                                    </span>
+                                    <span>
+                                        <strong>{branchesUsed}</strong> / {branchesMax === 99 ? 'Ilimitadas' : branchesMax}
+                                    </span>
+                                </div>
+                                <div className="sub-progress-track">
+                                    <div className="sub-progress-fill" style={{ width: `${branchesPct}%` }} />
+                                </div>
+                            </div>
+
+                            <div className="sub-quota-item">
+                                <div className="sub-quota-header">
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <Users size={13} /> Personal Staff
+                                    </span>
+                                    <span>
+                                        <strong>{usersUsed}</strong> / {usersMax === 999 ? 'Ilimitados' : usersMax}
+                                    </span>
+                                </div>
+                                <div className="sub-progress-track">
+                                    <div className="sub-progress-fill" style={{ width: `${usersPct}%` }} />
+                                </div>
+                            </div>
+
+                            <div className="sub-quota-item">
+                                <div className="sub-quota-header">
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <Wrench size={13} /> Reparaciones del Mes
+                                    </span>
+                                    <span>
+                                        <strong>{repairsUsed}</strong> / {repairsMax ? repairsMax : 'Ilimitadas'}
+                                    </span>
+                                </div>
+                                <div className="sub-progress-track">
+                                    <div className="sub-progress-fill" style={{ width: `${repairsPct}%` }} />
                                 </div>
                             </div>
                         </div>
                     </div>
-
-                    <div style={{ marginTop: '16px' }}>
-                        <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '8px' }}>
-                            ¿Deseas soporte o un plan corporativo a medida?
-                        </div>
-                        <a 
-                            href="mailto:soporte@sysaas.com" 
-                            className="btn btn-secondary btn-sm w-full"
-                            style={{ textAlign: 'center', justifyContent: 'center' }}
-                        >
-                            Contactar Soporte
-                        </a>
-                    </div>
                 </div>
-            </div>
 
-            {/* Selector y Grid de Planes */}
-            <div style={{ marginTop: '20px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+                {/* Tarjeta 3: Asistencia y Soporte */}
+                <div className="sub-metric-card">
                     <div>
-                        <h2 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 4px 0', color: 'var(--color-text)' }}>
-                            Planes de Suscripción Disponibles
-                        </h2>
-                        <p style={{ color: 'var(--color-text-secondary)', fontSize: '13px', margin: 0 }}>
-                            Escala los recursos y capacidades de tu negocio según tu volumen de operaciones
+                        <div className="sub-metric-header">
+                            <div>
+                                <div className="sub-metric-label">Seguridad y Respaldo</div>
+                                <div style={{ fontSize: '1.4rem', fontWeight: 800, fontFamily: 'var(--font-mono)' }}>
+                                    Aislamiento Total
+                                </div>
+                            </div>
+                            <span className="sub-plan-badge active">SLA 99.9%</span>
+                        </div>
+
+                        <p style={{ fontSize: 'var(--font-xs)', color: 'var(--color-text-secondary)', lineHeight: 1.6, margin: '0 0 var(--sp-4) 0' }}>
+                            Tu base de datos y esquemas operativos se encuentran aislados logicamente. Todos los pagos son procesados de forma segura mediante Stripe con cifrado bancario.
                         </p>
                     </div>
 
-                    {/* Selector Ciclo de Facturación */}
-                    <div style={{ display: 'flex', gap: '4px', background: 'var(--color-bg-tertiary)', padding: '4px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                    <a
+                        href="mailto:soporte@sysaas.com"
+                        className="sub-btn-portal"
+                        style={{ textDecoration: 'none' }}
+                    >
+                        <HelpCircle size={14} />
+                        <span>Contactar a Soporte Tecnico</span>
+                    </a>
+                </div>
+            </div>
+
+            {/* Seccion de Planes Disponibles */}
+            <div className="sub-plans-section">
+                <div className="sub-plans-header">
+                    <div>
+                        <h2 className="sub-plans-title">Planes de Suscripcion Disponibles</h2>
+                        <p className="sub-plans-subtitle">
+                            Aumenta tus capacidades operativas y desbloquea funciones avanzadas de inteligencia artificial
+                        </p>
+                    </div>
+
+                    {/* Segmented Switch para ciclo de facturación */}
+                    <div className="sub-cycle-switch">
                         <button
+                            type="button"
+                            className={`sub-cycle-btn ${billingCycle === 'monthly' ? 'active' : ''}`}
                             onClick={() => setBillingCycle('monthly')}
-                            style={{
-                                padding: '6px 14px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                borderRadius: 'var(--radius-sm)',
-                                border: 'none',
-                                cursor: 'pointer',
-                                background: billingCycle === 'monthly' ? 'var(--color-primary)' : 'transparent',
-                                color: billingCycle === 'monthly' ? '#ffffff' : 'var(--color-text-secondary)',
-                                transition: 'all 0.2s ease'
-                            }}
                         >
-                            Facturación Mensual
+                            Facturacion Mensual
                         </button>
                         <button
+                            type="button"
+                            className={`sub-cycle-btn ${billingCycle === 'yearly' ? 'active' : ''}`}
                             onClick={() => setBillingCycle('yearly')}
-                            style={{
-                                padding: '6px 14px',
-                                fontSize: '12px',
-                                fontWeight: 600,
-                                borderRadius: 'var(--radius-sm)',
-                                border: 'none',
-                                cursor: 'pointer',
-                                background: billingCycle === 'yearly' ? 'var(--color-primary)' : 'transparent',
-                                color: billingCycle === 'yearly' ? '#ffffff' : 'var(--color-text-secondary)',
-                                transition: 'all 0.2s ease'
-                            }}
                         >
-                            Anual (2 Meses Gratis)
+                            <span>Anual</span>
+                            <span className="sub-cycle-badge">2 MESES GRATIS</span>
                         </button>
                     </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                <div className="sub-plans-grid">
                     {plans.map((p) => {
                         const isCurrentActive = p.id === tenant?.plan_id && tenant?.subscription_status === 'active';
-                        const price = billingCycle === 'yearly' ? (p.price_yearly || p.price_monthly * 10) : p.price_monthly;
+                        const isCurrentPlan = p.id === tenant?.plan_id;
+                        const isPro = p.slug === 'pro';
+                        const price = billingCycle === 'yearly'
+                            ? (p.price_yearly || p.price_monthly * 10)
+                            : p.price_monthly;
+
+                        const planFeatures = [
+                            { label: p.max_branches === 99 ? 'Sucursales ilimitadas' : `${p.max_branches} sucursal${p.max_branches > 1 ? 'es' : ''}`, included: true },
+                            { label: p.max_users === 999 ? 'Usuarios staff ilimitados' : `Hasta ${p.max_users} usuarios`, included: true },
+                            { label: p.max_monthly_repairs ? `${p.max_monthly_repairs} ordenes de servicio/mes` : 'Ordenes ilimitadas', included: true },
+                            { label: 'Punto de Venta e Inventario', included: true },
+                            { label: 'Asistente de Inteligencia Artificial', included: !!p.features?.ai_assistant },
+                            { label: 'Catalogo E-Commerce y Pedidos', included: !!p.features?.ecommerce },
+                            { label: 'Reportes y Analitica Machine Learning', included: !!p.features?.advanced_reports }
+                        ];
 
                         return (
                             <div
                                 key={p.id}
-                                className="card"
-                                style={{
-                                    padding: '24px',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    justifyContent: 'space-between',
-                                    border: isCurrentActive ? '2px solid var(--color-primary)' : (p.id === tenant?.plan_id ? '2px dashed var(--color-primary)' : '1px solid var(--color-border)'),
-                                    position: 'relative'
-                                }}
+                                className={`sub-plan-card ${isCurrentActive ? 'current' : ''} ${isPro ? 'featured' : ''}`}
                             >
+                                {isPro && !isCurrentActive && (
+                                    <div className="sub-card-tag">
+                                        RECOMENDADO
+                                    </div>
+                                )}
+
                                 <div>
-                                    {/* Header de Plan */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-                                        <h3 style={{ fontSize: '18px', fontWeight: 800, margin: 0, color: 'var(--color-text)' }}>
-                                            {p.name}
-                                        </h3>
+                                    <div className="sub-card-header">
+                                        <h3 className="sub-card-plan-name">{p.name}</h3>
                                         {isCurrentActive && (
-                                            <span className="badge-neutral" style={{ fontWeight: 700, color: '#10b981' }}>
-                                                ACTIVO
-                                            </span>
+                                            <span className="sub-plan-badge active">ACTIVO</span>
                                         )}
-                                        {!isCurrentActive && p.id === tenant?.plan_id && (
-                                            <span className="badge-neutral" style={{ fontWeight: 700, color: '#3b82f6' }}>
-                                                SELECCIONADO
-                                            </span>
+                                        {!isCurrentActive && isCurrentPlan && (
+                                            <span className="sub-plan-badge trial">EN PRUEBA</span>
                                         )}
                                     </div>
 
-                                    {/* Precio */}
-                                    <div style={{ marginBottom: '18px', paddingBottom: '14px', borderBottom: '1px solid var(--color-border)' }}>
-                                        <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
-                                            <span style={{ fontSize: '28px', fontWeight: 800, color: 'var(--color-text)' }}>
-                                                {formatCurrency(price)}
-                                            </span>
-                                            <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                                                /{billingCycle === 'yearly' ? 'año' : 'mes'}
+                                    <div className="sub-price-block">
+                                        <div style={{ display: 'flex', alignItems: 'baseline' }}>
+                                            <span className="sub-price-number">{formatCurrency(price)}</span>
+                                            <span className="sub-price-frequency">
+                                                MXN / {billingCycle === 'yearly' ? 'año' : 'mes'}
                                             </span>
                                         </div>
+                                        {billingCycle === 'yearly' && (
+                                            <div className="sub-price-savings">
+                                                Ahorro de 2 meses aplicado
+                                            </div>
+                                        )}
                                     </div>
 
-                                    {/* Características */}
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', fontSize: '13px', marginBottom: '24px' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <Check size={15} style={{ color: '#3b82f6', flexShrink: 0 }} />
-                                            <span><strong>{p.max_branches === 99 ? 'Sucursales Ilimitadas' : `${p.max_branches} Sucursal${p.max_branches > 1 ? 'es' : ''}`}</strong></span>
-                                        </div>
+                                    <div className="sub-card-quotas">
+                                        <span className="sub-quota-badge">
+                                            {p.max_branches === 99 ? 'Multi-Sucursal' : `${p.max_branches} Sede`}
+                                        </span>
+                                        <span className="sub-quota-badge">
+                                            {p.max_users === 999 ? 'Staff Libre' : `${p.max_users} Usuarios`}
+                                        </span>
+                                        <span className="sub-quota-badge">
+                                            {p.max_monthly_repairs ? `${p.max_monthly_repairs} Tickets` : 'Tickets Libres'}
+                                        </span>
+                                    </div>
 
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <Check size={15} style={{ color: '#3b82f6', flexShrink: 0 }} />
-                                            <span><strong>{p.max_users === 999 ? 'Usuarios Ilimitados' : `Hasta ${p.max_users} Usuarios`}</strong></span>
-                                        </div>
-
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <Check size={15} style={{ color: '#3b82f6', flexShrink: 0 }} />
-                                            <span>{p.max_monthly_repairs ? `${p.max_monthly_repairs} tickets al mes` : 'Tickets y órdenes ilimitadas'}</span>
-                                        </div>
-
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <Check size={15} style={{ color: '#3b82f6', flexShrink: 0 }} />
-                                            <span>Punto de Venta POS & Inventario</span>
-                                        </div>
-
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                            <Check size={15} style={{ color: '#3b82f6', flexShrink: 0 }} />
-                                            <span>Reportes & Inteligencia ML</span>
-                                        </div>
+                                    <div className="sub-features-checklist">
+                                        {planFeatures.map((f, idx) => (
+                                            <div
+                                                key={idx}
+                                                className={`sub-feature-item ${f.included ? 'included' : 'excluded'}`}
+                                            >
+                                                <div className={`sub-feature-dot ${f.included ? 'check' : 'cross'}`}>
+                                                    {f.included ? <Check size={10} strokeWidth={3} /> : <X size={10} />}
+                                                </div>
+                                                <span>{f.label}</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
 
-                                {/* Botón de Acción */}
                                 <button
-                                    className={`btn ${isCurrentActive ? 'btn-secondary' : 'btn-primary'} btn-sm w-full`}
+                                    type="button"
                                     onClick={() => handleUpgradePlan(p)}
                                     disabled={isCurrentActive || actionLoading}
-                                    style={{ fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+                                    className={`sub-action-btn ${isCurrentActive ? 'btn-current' : 'btn-active-primary'}`}
                                 >
                                     {isCurrentActive ? (
-                                        'Plan Actual Activo'
+                                        <>
+                                            <CheckCircle2 size={14} />
+                                            <span>Plan Actual</span>
+                                        </>
                                     ) : (tenant?.subscription_status === 'trial' || isTrialExpired) ? (
                                         <>
                                             <Zap size={14} />
-                                            <span>Activar {p.name}</span>
+                                            <span>Activar con Stripe</span>
                                         </>
                                     ) : (
                                         <>

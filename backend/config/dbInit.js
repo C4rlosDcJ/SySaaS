@@ -306,6 +306,25 @@ async function dbInit() {
             }
         }
 
+        // 17. Verificar columnas de Stripe en saas_plans y subscription_payments
+        console.log(`[DB-INIT] Verificando columnas de Stripe...`);
+        try {
+            const [planPriceCol] = await connection.query(`SHOW COLUMNS FROM saas_plans LIKE 'stripe_price_id'`);
+            if (planPriceCol.length === 0) {
+                await connection.query(`ALTER TABLE saas_plans ADD COLUMN stripe_price_id VARCHAR(100) NULL AFTER features`);
+                await connection.query(`ALTER TABLE saas_plans ADD COLUMN stripe_price_id_yearly VARCHAR(100) NULL AFTER stripe_price_id`);
+                console.log(`[DB-INIT] Columnas stripe_price_id añadidas a saas_plans.`);
+            }
+
+            const [paymentInvoiceCol] = await connection.query(`SHOW COLUMNS FROM subscription_payments LIKE 'stripe_invoice_id'`);
+            if (paymentInvoiceCol.length === 0) {
+                await connection.query(`ALTER TABLE subscription_payments ADD COLUMN stripe_invoice_id VARCHAR(100) NULL AFTER stripe_payment_id`);
+                console.log(`[DB-INIT] Columna stripe_invoice_id añadida a subscription_payments.`);
+            }
+        } catch (e) {
+            console.error(`[DB-INIT] Error al verificar/alterar columnas de Stripe:`, e.message);
+        }
+
         console.log(`[DB-INIT] Base de datos "${dbName}" inicializada correctamente.`);
 
     } catch (error) {

@@ -156,4 +156,43 @@ const planLimit = (resource) => {
     };
 };
 
-module.exports = { subscriptionGuard, planLimit };
+/**
+ * Middleware para verificar si una funcionalidad esta habilitada en el plan
+ * Uso: featureGuard('ai_assistant') o featureGuard('ecommerce')
+ */
+const featureGuard = (featureName) => {
+    return (req, res, next) => {
+        try {
+            if (req.tenantCtx && req.tenantCtx.isSuperAdmin) {
+                return next();
+            }
+
+            if (!req.tenantCtx || !req.tenantCtx.planFeatures) {
+                return res.status(403).json({
+                    message: 'Contexto de plan no disponible.',
+                    code: 'PLAN_CONTEXT_MISSING'
+                });
+            }
+
+            const { planFeatures, tenant } = req.tenantCtx;
+            const enabled = planFeatures[featureName];
+
+            if (!enabled) {
+                const planName = tenant ? tenant.plan_name : 'actual';
+                return res.status(403).json({
+                    message: `Esta funcionalidad no esta incluida en tu plan ${planName}. Actualiza tu suscripcion para acceder.`,
+                    code: 'FEATURE_LOCKED',
+                    feature: featureName,
+                    upgrade_url: '/admin/suscripcion'
+                });
+            }
+
+            next();
+        } catch (error) {
+            console.error('[FEATURE-GUARD] Error al verificar funcionalidad:', error.message);
+            res.status(500).json({ message: 'Error al verificar acceso a funcionalidad.' });
+        }
+    };
+};
+
+module.exports = { subscriptionGuard, planLimit, featureGuard };
