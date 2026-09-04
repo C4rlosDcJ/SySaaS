@@ -256,21 +256,10 @@ CREATE INDEX idx_quotes_status ON quotes(status);
 CREATE INDEX idx_status_history_repair ON repair_status_history(repair_id);
 
 -- =====================================================
--- USUARIO ADMIN POR DEFECTO
--- password: admin123
+-- NOTA: No se crean usuarios tenant por defecto aquí.
+-- El usuario SuperAdmin de la plataforma se gestiona
+-- mediante las migraciones SaaS multi-tenant.
 -- =====================================================
-INSERT INTO users (
-    email, password, first_name, last_name,
-    role, is_active, email_verified
-) VALUES (
-    'admin@sysaas.com',
-    '$2a$10$5HjXkF/XpIdTcLEzlKG8ZeSVY33xY.YINlb6K1O6wwt03ljX3CiZm',
-    'Administrador',
-    'Sistema',
-    'admin',
-    TRUE,
-    TRUE
-);
 
 
 -- -- =====================================================

@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, Save, Globe, Mail, Shield, Clock, ToggleLeft, ToggleRight, UploadCloud, Image as ImageIcon, Trash2, CheckCircle2 } from 'lucide-react';
+import { Settings, Save, Globe, Mail, Shield, Clock, ToggleLeft, ToggleRight, UploadCloud, Image as ImageIcon, Trash2, CheckCircle2, Lock, KeyRound, Eye, EyeOff, User, AlertCircle } from 'lucide-react';
 import { superAdminService, uploadService, getImageUrl } from '../../services/api';
 import { compressImage } from '../../utils/imageCompressor';
+import { useAuth } from '../../context/AuthContext';
 
 export default function SuperSettingsPage() {
+    const { user } = useAuth();
     const fileInputRef = useRef(null);
     const [uploadingLogo, setUploadingLogo] = useState(false);
     const [settings, setSettings] = useState({
@@ -22,6 +24,25 @@ export default function SuperSettingsPage() {
     const [saved, setSaved] = useState(false);
     const [error, setError] = useState('');
     const [showApiKey, setShowApiKey] = useState(false);
+
+    // Estado para cambio de credenciales de SuperAdmin
+    const [credState, setCredState] = useState({
+        current_password: '',
+        new_password: '',
+        confirm_password: '',
+        new_email: user?.email || 'superadmin@sysaas.com'
+    });
+    const [showCurrentPass, setShowCurrentPass] = useState(false);
+    const [showNewPass, setShowNewPass] = useState(false);
+    const [credLoading, setCredLoading] = useState(false);
+    const [credSuccess, setCredSuccess] = useState('');
+    const [credError, setCredError] = useState('');
+
+    useEffect(() => {
+        if (user?.email) {
+            setCredState(prev => ({ ...prev, new_email: user.email }));
+        }
+    }, [user]);
 
     useEffect(() => {
         loadSettings();
@@ -99,6 +120,55 @@ export default function SuperSettingsPage() {
             setTimeout(() => setSaved(false), 3000);
         } catch (err) {
             setError(err.message || 'Error al guardar configuraciones');
+        }
+    };
+
+    const handleUpdateCredentials = async (e) => {
+        e?.preventDefault();
+        setCredError('');
+        setCredSuccess('');
+
+        if (!credState.current_password) {
+            setCredError('Ingresa tu contraseña actual para autorizar los cambios.');
+            return;
+        }
+
+        if (credState.new_password) {
+            if (credState.new_password.length < 8) {
+                setCredError('La nueva contraseña debe tener al menos 8 caracteres.');
+                return;
+            }
+            if (credState.new_password !== credState.confirm_password) {
+                setCredError('La confirmación de la nueva contraseña no coincide.');
+                return;
+            }
+        }
+
+        if (!credState.new_password && (!credState.new_email || credState.new_email === user?.email)) {
+            setCredError('No has especificado cambios en la contraseña ni en el correo.');
+            return;
+        }
+
+        try {
+            setCredLoading(true);
+            const payload = {
+                current_password: credState.current_password,
+                ...(credState.new_password ? { new_password: credState.new_password } : {}),
+                ...(credState.new_email && credState.new_email !== user?.email ? { new_email: credState.new_email } : {})
+            };
+            const res = await superAdminService.changeCredentials(payload);
+            setCredSuccess(res.message || 'Credenciales de SuperAdmin actualizadas exitosamente.');
+            setCredState(prev => ({
+                ...prev,
+                current_password: '',
+                new_password: '',
+                confirm_password: ''
+            }));
+            setTimeout(() => setCredSuccess(''), 5000);
+        } catch (err) {
+            setCredError(err.message || 'Error al actualizar credenciales.');
+        } finally {
+            setCredLoading(false);
         }
     };
 
@@ -315,6 +385,161 @@ export default function SuperSettingsPage() {
                             </span>
                         </div>
                     </div>
+                </div>
+
+                {/* Seguridad y Credenciales SuperAdmin */}
+                <div className="card" style={{ padding: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                        <div>
+                            <h3 style={{ margin: 0, fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-text)' }}>
+                                <Lock size={18} className="text-primary" /> Acceso y Contraseña SuperAdmin
+                            </h3>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                                Cuenta de administración suprema de la plataforma.
+                            </p>
+                        </div>
+                        <span style={{ 
+                            fontSize: '11px', 
+                            padding: '3px 8px', 
+                            borderRadius: 'var(--radius-sm)', 
+                            background: 'rgba(59, 130, 246, 0.1)', 
+                            color: '#3b82f6', 
+                            border: '1px solid rgba(59, 130, 246, 0.2)',
+                            fontWeight: 600
+                        }}>
+                            SuperAdmin Activo
+                        </span>
+                    </div>
+
+                    <div style={{ 
+                        padding: '12px 14px', 
+                        background: 'var(--color-bg-tertiary)', 
+                        border: '1px solid var(--color-border)', 
+                        borderRadius: 'var(--radius-md)', 
+                        marginBottom: '16px',
+                        fontSize: '12px',
+                        color: 'var(--color-text-secondary)',
+                        lineHeight: 1.4
+                    }}>
+                        Esta es la única cuenta administrativa inicial de la plataforma. Por seguridad se genera con una contraseña compleja por defecto. Puedes cambiar tu contraseña o correo en cualquier momento aquí.
+                    </div>
+
+                    {credError && (
+                        <div className="error-alert" style={{ marginBottom: '16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <AlertCircle size={16} />
+                            <span>{credError}</span>
+                        </div>
+                    )}
+
+                    {credSuccess && (
+                        <div style={{ padding: '12px 14px', background: 'rgba(16,185,129,0.1)', border: '1px solid #10b981', borderRadius: 'var(--radius-md)', color: '#10b981', marginBottom: '16px', fontSize: '13px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <CheckCircle2 size={16} />
+                            <span>{credSuccess}</span>
+                        </div>
+                    )}
+
+                    <form onSubmit={handleUpdateCredentials} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                        <div>
+                            <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <User size={14} className="text-primary" /> Correo Electrónico
+                            </label>
+                            <input 
+                                type="email" 
+                                className="input" 
+                                value={credState.new_email} 
+                                onChange={e => setCredState(prev => ({ ...prev, new_email: e.target.value }))}
+                                placeholder="superadmin@sysaas.com" 
+                                required
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <KeyRound size={14} className="text-primary" /> Contraseña Actual
+                            </label>
+                            <div style={{ position: 'relative' }}>
+                                <input 
+                                    type={showCurrentPass ? 'text' : 'password'} 
+                                    className="input" 
+                                    value={credState.current_password} 
+                                    onChange={e => setCredState(prev => ({ ...prev, current_password: e.target.value }))}
+                                    placeholder="Ingresa tu contraseña actual" 
+                                    style={{ paddingRight: '40px' }}
+                                    required
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowCurrentPass(!showCurrentPass)}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '12px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'transparent',
+                                        border: 'none',
+                                        color: 'var(--color-text-secondary)',
+                                        cursor: 'pointer',
+                                        padding: 0
+                                    }}
+                                >
+                                    {showCurrentPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <div>
+                                <label className="label">Nueva Contraseña</label>
+                                <div style={{ position: 'relative' }}>
+                                    <input 
+                                        type={showNewPass ? 'text' : 'password'} 
+                                        className="input" 
+                                        value={credState.new_password} 
+                                        onChange={e => setCredState(prev => ({ ...prev, new_password: e.target.value }))}
+                                        placeholder="Min. 8 caracteres" 
+                                        style={{ paddingRight: '40px' }}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowNewPass(!showNewPass)}
+                                        style={{
+                                            position: 'absolute',
+                                            right: '12px',
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                            background: 'transparent',
+                                            border: 'none',
+                                            color: 'var(--color-text-secondary)',
+                                            cursor: 'pointer',
+                                            padding: 0
+                                        }}
+                                    >
+                                        {showNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="label">Confirmar Contraseña</label>
+                                <input 
+                                    type={showNewPass ? 'text' : 'password'} 
+                                    className="input" 
+                                    value={credState.confirm_password} 
+                                    onChange={e => setCredState(prev => ({ ...prev, confirm_password: e.target.value }))}
+                                    placeholder="Repite la nueva contraseña" 
+                                />
+                            </div>
+                        </div>
+
+                        <button 
+                            type="submit" 
+                            className="btn btn-primary" 
+                            disabled={credLoading}
+                            style={{ alignSelf: 'flex-start', marginTop: '4px' }}
+                        >
+                            <KeyRound size={16} />
+                            {credLoading ? 'Guardando...' : 'Actualizar Credenciales SuperAdmin'}
+                        </button>
+                    </form>
                 </div>
             </div>
         </div>

@@ -522,6 +522,10 @@ export const superAdminService = {
     updateGlobalSettings: (data) => fetchAPI('/settings/global', {
         method: 'POST',
         body: JSON.stringify(data)
+    }),
+    changeCredentials: (data) => fetchAPI('/settings/change-superadmin-password', {
+        method: 'POST',
+        body: JSON.stringify(data)
     })
 };
 

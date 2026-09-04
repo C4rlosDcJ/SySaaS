@@ -12,13 +12,13 @@
 -- =====================================================
 
 -- Crear SuperAdmin de la plataforma si no existe
--- Default password: admin123 (change immediately after first login)
+-- Default password: SuperAdmin#2026!SecureKey (cambiar en configuracion de plataforma)
 INSERT INTO users (email, password, first_name, last_name, role, is_active, email_verified)
 SELECT 'superadmin@sysaas.com',
-    '$2a$10$5HjXkF/XpIdTcLEzlKG8ZeSVY33xY.YINlb6K1O6wwt03ljX3CiZm',
+    '$2a$10$k3jVAnMIND7hAngOIAfoAO/BCJVTNuv5eT7D5zNGI.dR1yxZk/9eu',
     'Super', 'Admin', 'superadmin', TRUE, TRUE
 FROM dual
 WHERE NOT EXISTS (SELECT 1 FROM users WHERE role = 'superadmin');
 
 SELECT 'SaaS Data Migration completed successfully.' AS resultado;
-SELECT 'SuperAdmin: superadmin@sysaas.com / admin123 (change password on first login)' AS info;
+SELECT 'SuperAdmin: superadmin@sysaas.com / SuperAdmin#2026!SecureKey' AS info;

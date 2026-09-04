@@ -11,6 +11,7 @@ router.use(auth);
 // Rutas de configuración global de la plataforma (SuperAdmin)
 router.get('/global', isSuperAdmin, settingsController.getGlobalSettings);
 router.post('/global', isSuperAdmin, settingsController.updateGlobalSettings);
+router.post('/change-superadmin-password', isSuperAdmin, settingsController.changeSuperAdminPassword);
 
 // Rutas de configuración de tenant (requieren contexto, suscripción y ser TenantAdmin)
 router.use(tenantContext);

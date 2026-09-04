@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const mysql = require('mysql2/promise');
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 function cleanSql(rawSql, targetDb) {
@@ -327,6 +328,44 @@ async function dbInit() {
             }
         } catch (e) {
             console.error(`[DB-INIT] Error al verificar/alterar columnas de Stripe:`, e.message);
+        }
+
+        // 18. Garantizar solo SuperAdmin único con contraseña compleja
+        console.log(`[DB-INIT] Verificando usuarios esenciales del sistema...`);
+        try {
+            // Eliminar usuario de prueba/legacy admin@sysaas.com si existe sin tenant
+            const [delResult] = await connection.query(
+                `DELETE FROM users WHERE email = 'admin@sysaas.com' AND tenant_id IS NULL`
+            );
+            if (delResult.affectedRows > 0) {
+                console.log(`[DB-INIT] Usuario legacy admin@sysaas.com eliminado correctamente.`);
+            }
+
+            // Verificar SuperAdmin
+            const [superAdmins] = await connection.query(`SELECT id, password FROM users WHERE role = 'superadmin'`);
+            const defaultPassword = process.env.SUPERADMIN_DEFAULT_PASSWORD || 'SuperAdmin#2026!SecureKey';
+            const weakLegacyHash = '$2a$10$5HjXkF/XpIdTcLEzlKG8ZeSVY33xY.YINlb6K1O6wwt03ljX3CiZm'; // admin123
+
+            if (superAdmins.length === 0) {
+                const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+                await connection.query(
+                    `INSERT INTO users (email, password, first_name, last_name, role, is_active, email_verified)
+                     VALUES ('superadmin@sysaas.com', ?, 'Super', 'Admin', 'superadmin', TRUE, TRUE)`,
+                    [hashedPassword]
+                );
+                console.log(`[DB-INIT] SuperAdmin creado exitosamente con contraseña segura.`);
+            } else {
+                // Si aún tiene la contraseña básica antigua (admin123), actualizar a la contraseña compleja
+                for (const sa of superAdmins) {
+                    if (sa.password === weakLegacyHash) {
+                        const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+                        await connection.query(`UPDATE users SET password = ? WHERE id = ?`, [hashedPassword, sa.id]);
+                        console.log(`[DB-INIT] Contraseña de SuperAdmin (ID: ${sa.id}) actualizada a la contraseña segura inicial.`);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error(`[DB-INIT] Error al verificar usuarios del sistema:`, e.message);
         }
 
         console.log(`[DB-INIT] Base de datos "${dbName}" inicializada correctamente.`);
