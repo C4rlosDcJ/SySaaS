@@ -135,18 +135,12 @@ exports.register = async (req, res) => {
                 }
             }
         } else {
-            // Fallback: si no viene tenant_slug, buscar el tenant por defecto
-            const [defaultTenant] = await db.query('SELECT id FROM tenants ORDER BY id ASC LIMIT 1');
-            if (defaultTenant.length > 0) {
-                tenantId = defaultTenant[0].id;
-                const [mainBranch] = await db.query(
-                    'SELECT id FROM branches WHERE tenant_id = ? AND is_main = TRUE LIMIT 1',
-                    [tenantId]
-                );
-                if (mainBranch.length > 0) {
-                    resolvedBranchId = mainBranch[0].id;
-                }
-            }
+            // No se proporcionó tenant_slug -- los clientes SIEMPRE deben registrarse
+            // bajo una empresa específica. No se hace fallback al primer tenant de la BD
+            // para evitar que usuarios se asignen a la empresa equivocada.
+            return res.status(400).json({
+                message: 'Se requiere el identificador de empresa (tenant_slug) para el registro de clientes.'
+            });
         }
 
         // Encriptar contraseña

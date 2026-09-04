@@ -255,19 +255,7 @@ async function dbInit() {
                 console.warn(`[DB-INIT] ADVERTENCIA: No se encontro ${saasDataPath}`);
             }
         } else {
-            console.log(`[DB-INIT] Tablas SaaS ya existen. Verificando tenant por defecto...`);
-            const [tenantCount] = await connection.query(`SELECT COUNT(*) as count FROM tenants`);
-            if (tenantCount[0].count === 0) {
-                // Las tablas existen pero no hay tenants -- ejecutar solo migracion de datos
-                const saasDataPath = path.join(__dirname, '../../database/saas_data_migration.sql');
-                if (fs.existsSync(saasDataPath)) {
-                    console.log(`[DB-INIT] Sin tenants encontrados. Ejecutando migracion de datos...`);
-                    let saasDataSql = fs.readFileSync(saasDataPath, 'utf8');
-                    saasDataSql = saasDataSql.replace(/USE\s+\w+/gi, `USE \`${dbName}\``);
-                    await connection.query(saasDataSql);
-                    console.log(`[DB-INIT] Migracion de datos SaaS aplicada exitosamente.`);
-                }
-            }
+            console.log(`[DB-INIT] Tablas SaaS ya existen. Instancia lista.`);
         }
 
         // 15. Migración de Funcionalidades Extendidas (Proveedores, Órdenes de Compra, Cupones)
