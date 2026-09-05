@@ -304,55 +304,15 @@ export default function SuperTenantsPage() {
     const getStatusBadge = (status) => {
         switch (status) {
             case 'active':
-                return (
-                    <span style={{
-                        padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
-                        background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.25)',
-                        letterSpacing: '0.04em'
-                    }}>
-                        ACTIVA
-                    </span>
-                );
+                return <span className="badge-cool-active">Activa</span>;
             case 'trial':
-                return (
-                    <span style={{
-                        padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
-                        background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)',
-                        letterSpacing: '0.04em'
-                    }}>
-                        EN PRUEBA
-                    </span>
-                );
+                return <span className="badge-cool-trial">En Prueba</span>;
             case 'suspended':
-                return (
-                    <span style={{
-                        padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
-                        background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.25)',
-                        letterSpacing: '0.04em'
-                    }}>
-                        SUSPENDIDA
-                    </span>
-                );
+                return <span className="badge-cool-expired">Suspendida</span>;
             case 'past_due':
-                return (
-                    <span style={{
-                        padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
-                        background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.25)',
-                        letterSpacing: '0.04em'
-                    }}>
-                        PAGO PENDIENTE
-                    </span>
-                );
+                return <span className="badge-cool-trial">Pago Pendiente</span>;
             default:
-                return (
-                    <span style={{
-                        padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
-                        background: 'rgba(107, 114, 128, 0.12)', color: '#9ca3af', border: '1px solid rgba(107, 114, 128, 0.25)',
-                        letterSpacing: '0.04em'
-                    }}>
-                        CANCELADA
-                    </span>
-                );
+                return <span className="badge-cool-expired">Cancelada</span>;
         }
     };
 
@@ -769,11 +729,11 @@ export default function SuperTenantsPage() {
                                                 {/* Operational Metric Cards */}
                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
                                                     {[
-                                                        { label: 'Usuarios', value: tenantDetail.operations?.total_users || 0, icon: Users, color: '#3b82f6' },
-                                                        { label: 'Sucursales', value: tenantDetail.branches?.length || 0, icon: GitBranch, color: '#8b5cf6' },
-                                                        { label: 'Reparaciones', value: tenantDetail.operations?.total_repairs || 0, icon: Wrench, color: '#f59e0b' },
-                                                        { label: 'Ventas POS', value: tenantDetail.operations?.total_sales || 0, icon: ShoppingBag, color: '#10b981' },
-                                                        { label: 'Facturación', value: `$${parseFloat(tenantDetail.operations?.total_revenue || 0).toLocaleString('es-MX', { minimumFractionDigits: 0 })}`, icon: DollarSign, color: '#10b981' },
+                                                        { label: 'Usuarios', value: tenantDetail.operations?.total_users || 0, icon: Users, color: 'var(--cool-cyan)' },
+                                                        { label: 'Sucursales', value: tenantDetail.branches?.length || 0, icon: GitBranch, color: 'var(--cool-indigo)' },
+                                                        { label: 'Reparaciones', value: tenantDetail.operations?.total_repairs || 0, icon: Wrench, color: 'var(--cool-slate-blue)' },
+                                                        { label: 'Ventas POS', value: tenantDetail.operations?.total_sales || 0, icon: ShoppingBag, color: 'var(--cool-teal)' },
+                                                        { label: 'Facturación', value: `$${parseFloat(tenantDetail.operations?.total_revenue || 0).toLocaleString('es-MX', { minimumFractionDigits: 0 })}`, icon: DollarSign, color: 'var(--cool-teal)' },
                                                     ].map((kpi, i) => (
                                                         <div
                                                             key={i}

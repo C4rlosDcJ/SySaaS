@@ -167,9 +167,9 @@
 }
 
 .stat-card.active .stat-icon-wrapper {
-    background: rgba(245, 158, 11, 0.08);
-    color: #f59e0b;
-    border-color: rgba(245, 158, 11, 0.15);
+    background: var(--cool-amber-bg);
+    color: var(--cool-amber);
+    border-color: var(--cool-amber-border);
 }
 
 .stat-card.completed .stat-icon-wrapper {

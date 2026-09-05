@@ -258,7 +258,7 @@ export default function SalesHistoryPage() {
             {/* Stats Cards */}
             <div className="sales-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
                 <div className="sales-stat-card">
-                    <div className="sales-stat-icon" style={{ background: 'rgba(34,197,94,0.15)', color: '#10b981' }}>
+                    <div className="sales-stat-icon" style={{ background: 'var(--cool-teal-bg)', color: 'var(--cool-teal)', border: '1px solid var(--cool-teal-border)' }}>
                         <DollarSign size={24} />
                     </div>
                     <div>
@@ -269,7 +269,7 @@ export default function SalesHistoryPage() {
                 </div>
 
                 <div className="sales-stat-card">
-                    <div className="sales-stat-icon" style={{ background: 'rgba(99,102,241,0.15)', color: '#6366f1' }}>
+                    <div className="sales-stat-icon" style={{ background: 'var(--cool-cyan-bg)', color: 'var(--cool-cyan)', border: '1px solid var(--cool-cyan-border)' }}>
                         <TrendingUp size={24} />
                     </div>
                     <div>
@@ -280,7 +280,7 @@ export default function SalesHistoryPage() {
                 </div>
 
                 <div className="sales-stat-card">
-                    <div className="sales-stat-icon" style={{ background: 'rgba(236,72,153,0.15)', color: '#ec4899' }}>
+                    <div className="sales-stat-icon" style={{ background: 'var(--cool-slate-blue-bg)', color: 'var(--cool-slate-blue)', border: '1px solid var(--cool-slate-blue-border)' }}>
                         <ShoppingBag size={24} />
                     </div>
                     <div>
@@ -291,7 +291,7 @@ export default function SalesHistoryPage() {
                 </div>
 
                 <div className="sales-stat-card">
-                    <div className="sales-stat-icon" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>
+                    <div className="sales-stat-icon" style={{ background: 'var(--cool-amber-bg)', color: 'var(--cool-amber)', border: '1px solid var(--cool-amber-border)' }}>
                         <Receipt size={24} />
                     </div>
                     <div>

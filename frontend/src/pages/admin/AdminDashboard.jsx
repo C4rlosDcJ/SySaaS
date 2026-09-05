@@ -300,12 +300,12 @@ export default function AdminDashboard() {
                         <div key={bc.id} style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                             padding: '12px 18px', borderRadius: 'var(--radius-md)',
-                            background: bc.type === 'urgent' ? 'rgba(239, 68, 68, 0.12)' : bc.type === 'warning' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(59, 130, 246, 0.12)',
-                            border: `1px solid ${bc.type === 'urgent' ? 'rgba(239, 68, 68, 0.25)' : bc.type === 'warning' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(59, 130, 246, 0.25)'}`,
+                            background: bc.type === 'urgent' ? 'var(--cool-rose-bg)' : bc.type === 'warning' ? 'var(--cool-amber-bg)' : 'var(--cool-cyan-bg)',
+                            border: `1px solid ${bc.type === 'urgent' ? 'var(--cool-rose-border)' : bc.type === 'warning' ? 'var(--cool-amber-border)' : 'var(--cool-cyan-border)'}`,
                             color: 'var(--color-text)', gap: '12px'
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <Megaphone size={18} style={{ color: bc.type === 'urgent' ? '#ef4444' : bc.type === 'warning' ? '#f59e0b' : '#3b82f6', flexShrink: 0 }} />
+                                <Megaphone size={18} style={{ color: bc.type === 'urgent' ? 'var(--cool-rose)' : bc.type === 'warning' ? 'var(--cool-amber)' : 'var(--cool-cyan)', flexShrink: 0 }} />
                                 <div>
                                     <strong style={{ fontSize: '13px', display: 'block' }}>{bc.title}</strong>
                                     <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>{bc.message}</span>
@@ -318,9 +318,9 @@ export default function AdminDashboard() {
 
             {/* Banner de Notificaciones Operativas Críticas */}
             {(lowStockCount > 0 || pendingApprovalCount > 0) && (
-                <div className="alert-banner" style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+                <div className="alert-banner" style={{ background: 'var(--cool-amber-bg)', border: '1px solid var(--cool-amber-border)' }}>
                     <div className="alert-banner-content">
-                        <AlertTriangle size={18} style={{ color: '#d97706', flexShrink: 0 }} />
+                        <AlertTriangle size={18} style={{ color: 'var(--cool-amber)', flexShrink: 0 }} />
                         <span style={{ fontSize: '13px' }}>
                             {lowStockCount > 0 && `Tienes ${lowStockCount} producto${lowStockCount > 1 ? 's' : ''} con bajo stock. `}
                             {pendingApprovalCount > 0 && `${pendingApprovalCount} reparación${pendingApprovalCount > 1 ? 'es' : ''} esperan cotización o aprobación del cliente.`}
@@ -376,11 +376,11 @@ export default function AdminDashboard() {
                 {/* Ingresos Reparaciones */}
                 <div className="kpi-card">
                     <div className="kpi-header-row">
-                        <div className="kpi-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: 'none' }}>
+                        <div className="kpi-icon" style={{ background: 'var(--cool-teal-bg)', color: 'var(--cool-teal)', border: 'none' }}>
                             <DollarSign size={20} />
                         </div>
                         {revenueChange && (
-                            <span style={{ fontSize: '11px', fontWeight: 700, color: revenueChange.positive ? '#10b981' : '#ef4444' }}>
+                            <span style={{ fontSize: '11px', fontWeight: 700, color: revenueChange.positive ? 'var(--cool-teal)' : 'var(--cool-rose)' }}>
                                 {revenueChange.text}
                             </span>
                         )}
@@ -397,7 +397,7 @@ export default function AdminDashboard() {
                 {/* Reparaciones en Proceso */}
                 <div className="kpi-card">
                     <div className="kpi-header-row">
-                        <div className="kpi-icon" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', border: 'none' }}>
+                        <div className="kpi-icon" style={{ background: 'var(--cool-cyan-bg)', color: 'var(--cool-cyan)', border: 'none' }}>
                             <Wrench size={20} />
                         </div>
                         <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', background: 'var(--color-bg-tertiary)', padding: '2px 6px', borderRadius: '4px' }}>
@@ -416,10 +416,10 @@ export default function AdminDashboard() {
                 {/* Ventas POS del Mes */}
                 <div className="kpi-card">
                     <div className="kpi-header-row">
-                        <div className="kpi-icon" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', border: 'none' }}>
+                        <div className="kpi-icon" style={{ background: 'var(--cool-slate-blue-bg)', color: 'var(--cool-slate-blue)', border: 'none' }}>
                             <Receipt size={20} />
                         </div>
-                        <span style={{ fontSize: '11px', color: '#10b981', fontWeight: 600 }}>
+                        <span style={{ fontSize: '11px', color: 'var(--cool-teal)', fontWeight: 600 }}>
                             {salesStats?.today?.count || 0} hoy
                         </span>
                     </div>
@@ -435,7 +435,7 @@ export default function AdminDashboard() {
                 {/* Clientes Registrados */}
                 <div className="kpi-card">
                     <div className="kpi-header-row">
-                        <div className="kpi-icon" style={{ background: 'rgba(217, 119, 6, 0.1)', color: '#d97706', border: 'none' }}>
+                        <div className="kpi-icon" style={{ background: 'var(--cool-amber-bg)', color: 'var(--cool-amber)', border: 'none' }}>
                             <Users size={20} />
                         </div>
                     </div>

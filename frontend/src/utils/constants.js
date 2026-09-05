@@ -17,7 +17,7 @@ export const STATUS_LABELS = {
 export const STATUS_COLORS = {
     received: '#3b82f6',
     diagnosing: '#8b5cf6',
-    waiting_approval: '#f59e0b',
+    waiting_approval: '#818cf8',
     waiting_parts: '#78716c',
     repairing: '#ef4444',
     quality_check: '#06b6d4',

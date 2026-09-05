@@ -860,7 +860,7 @@ export default function RepairDetailPage() {
                                             width: `${Math.max(0, Math.min(100, (remainingWarranty / (repair.warranty_days || 30)) * 100))}%`,
                                             height: '100%',
                                             borderRadius: '6px',
-                                            background: remainingWarranty > 7 ? 'var(--color-success, #22c55e)' : remainingWarranty > 0 ? 'var(--color-warning, #f59e0b)' : 'var(--color-error, #ef4444)',
+                                            background: remainingWarranty > 7 ? 'var(--cool-teal)' : remainingWarranty > 0 ? 'var(--cool-amber)' : 'var(--cool-rose)',
                                             transition: 'width 0.5s ease'
                                         }} />
                                     </div>

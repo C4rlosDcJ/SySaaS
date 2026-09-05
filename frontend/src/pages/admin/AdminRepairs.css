@@ -191,7 +191,7 @@
 
 .status-badge.status-received::before    { background: #3b82f6; }
 .status-badge.status-diagnosing::before  { background: #a855f7; }
-.status-badge.status-waiting_approval::before { background: #f59e0b; }
+.status-badge.status-waiting_approval::before { background: var(--cool-slate-blue); }
 .status-badge.status-waiting_parts::before    { background: #6b7280; }
 .status-badge.status-repairing::before   { background: #ef4444; }
 .status-badge.status-quality_check::before    { background: #06b6d4; }

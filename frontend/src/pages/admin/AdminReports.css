@@ -2,10 +2,17 @@
    SYSAAS — Admin Reports & Enterprise Analytics Stylesheet
    ===================================================== */
 
+/* Global cool tokens and indicators are provided centrally in index.css */
+
 .reports-page {
     padding: var(--sp-6) var(--sp-8);
     background: var(--color-bg);
     min-height: 100vh;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    position: relative;
     animation: fadeIn var(--transition-normal);
 }
 
@@ -17,6 +24,11 @@
     flex-wrap: wrap;
     gap: var(--sp-4);
     margin-bottom: var(--sp-6);
+}
+
+.reports-header-title {
+    min-width: 280px;
+    flex: 1;
 }
 
 .reports-header-title h1 {
@@ -71,7 +83,16 @@
     border-bottom: 1px solid var(--color-border);
     margin-bottom: var(--sp-6);
     overflow-x: auto;
-    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 0;
+}
+
+.reports-tabs-bar::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 .report-tab-btn {
@@ -95,8 +116,8 @@
 }
 
 .report-tab-btn.active {
-    color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
+    color: var(--cool-cyan);
+    border-bottom-color: var(--cool-cyan);
 }
 
 /* ── KPI Grid ── */
@@ -115,11 +136,13 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    transition: border-color var(--transition-normal);
+    transition: all var(--transition-fast);
+    position: relative;
 }
 
 .kpi-card:hover {
-    border-color: var(--color-border-strong);
+    border-color: rgba(125, 211, 252, 0.35);
+    box-shadow: 0 4px 18px -2px rgba(125, 211, 252, 0.08);
 }
 
 .kpi-card-header {
@@ -134,6 +157,8 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--color-text-secondary);
+    display: flex;
+    align-items: center;
 }
 
 .kpi-icon {
@@ -143,6 +168,220 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
+}
+
+/* ── Tooltips Explicativos de Métricas ── */
+.metric-help-trigger {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: help;
+    margin-left: 6px;
+    color: var(--color-text-secondary);
+    transition: color var(--transition-fast);
+}
+
+.metric-help-trigger:hover {
+    color: #7dd3fc;
+}
+
+.metric-help-popover {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 230px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--color-text);
+    backdrop-filter: blur(12px);
+    animation: fadeIn 0.15s ease-out;
+}
+
+.metric-help-popover strong {
+    color: var(--cool-cyan);
+    font-size: 11px;
+}
+
+.metric-help-popover span {
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+    font-weight: normal;
+}
+
+.metric-help-popover::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 5px;
+    border-style: solid;
+    border-color: var(--color-border-strong) transparent transparent transparent;
+}
+
+/* ── Resumen Ejecutivo de Salud SaaS ── */
+.health-summary-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--sp-4);
+    padding: 14px 18px;
+    background: linear-gradient(135deg, var(--cool-cyan-bg) 0%, var(--cool-slate-blue-bg) 100%);
+    border: 1px solid var(--cool-cyan-border);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--sp-5);
+    flex-wrap: wrap;
+}
+
+.health-status-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.health-pulse-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--cool-teal);
+    box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+    animation: pulseGlow 2s infinite;
+}
+
+@keyframes pulseGlow {
+    0% {
+        box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 8px rgba(52, 211, 153, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(52, 211, 153, 0);
+    }
+}
+
+.health-pills-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.health-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 9999px;
+    font-size: 12px;
+    color: var(--color-text);
+}
+
+.health-pill strong {
+    color: var(--cool-cyan);
+}
+
+/* ── Quick Filter Chips ── */
+.quick-filter-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: var(--sp-4);
+}
+
+.quick-filter-chip {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.quick-filter-chip:hover {
+    border-color: var(--cool-cyan);
+    color: var(--color-text);
+}
+
+.quick-filter-chip.active {
+    background: var(--cool-cyan-bg);
+    color: var(--cool-cyan);
+    border-color: var(--cool-cyan-border);
+}
+
+.quick-filter-chip .chip-count {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: var(--cool-cyan-bg);
+}
+
+.quick-filter-chip.active .chip-count {
+    background: var(--cool-cyan);
+    color: #ffffff;
+}
+
+/* ── Plan Overview Cards ── */
+.plan-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-6);
+}
+
+.plan-overview-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--sp-5);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: transform var(--transition-fast), border-color var(--transition-normal);
+}
+
+.plan-overview-card:hover {
+    border-color: var(--cool-cyan-border);
+    transform: translateY(-2px);
+}
+
+.plan-overview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.plan-price-tag {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--color-text);
+}
+
+.plan-price-sub {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    font-weight: normal;
 }
 
 .kpi-value {
@@ -233,14 +472,52 @@
     transition: width 0.6s ease;
 }
 
+/* ── Donut Chart Enhancement ── */
+.donut-center-container {
+    position: relative;
+    width: 100%;
+    height: 190px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.donut-center-badge {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.donut-center-num {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--color-text);
+    line-height: 1;
+}
+
+.donut-center-text {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 3px;
+}
+
 /* ── Pie Legend ── */
 .pie-legend {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 8px;
-    margin-top: 10px;
-    max-height: 140px;
-    overflow-y: auto;
+    margin-top: 12px;
+    width: 100%;
 }
 
 .pie-legend-item {
@@ -277,11 +554,15 @@
 
 /* ── Table Styling ── */
 .table-responsive {
+    width: 100%;
+    max-width: 100%;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .tech-table {
     width: 100%;
+    min-width: 720px;
     border-collapse: collapse;
 }
 
@@ -290,6 +571,7 @@
     text-align: left;
     border-bottom: 1px solid var(--color-border);
     font-size: 13px;
+    white-space: nowrap;
 }
 
 .tech-table th {
@@ -314,6 +596,40 @@
     background: var(--color-bg-tertiary);
     color: var(--color-text);
     border: 1px solid var(--color-border);
+}
+
+/* ── Subscriptions & Plan Chips ── */
+.badge-cool-cycle {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    width: fit-content;
+}
+
+.badge-cool-cycle.yearly {
+    color: var(--cool-cyan);
+    background: var(--cool-cyan-bg);
+    border: 1px solid var(--cool-cyan-border);
+}
+
+.badge-cool-cycle.monthly {
+    color: var(--color-text-secondary);
+    background: transparent;
+    border: 1px solid transparent;
+}
+
+.plan-yearly-chip {
+    font-size: 12px;
+    color: var(--cool-cyan);
+    font-weight: 600;
+    margin-top: 4px;
+    background: var(--cool-cyan-bg);
+    border: 1px solid var(--cool-cyan-border);
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
 }
 
 /* ── Loading Container ── */
@@ -443,9 +759,15 @@
 }
 
 /* ── Responsive ── */
-@media (max-width: 1200px) {
-    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 1280px) {
+    .reports-page { padding: var(--sp-5) var(--sp-6); }
     .charts-split-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 1100px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .reports-header-box { flex-direction: column; align-items: stretch; gap: var(--sp-3); }
+    .reports-controls-bar { width: 100%; justify-content: flex-start; }
 }
 
 @media (max-width: 768px) {
@@ -453,4 +775,5 @@
     .kpi-grid { grid-template-columns: 1fr; }
     .reports-header-box { flex-direction: column; align-items: flex-start; }
     .reports-controls-bar { width: 100%; justify-content: flex-start; }
+    .report-card { padding: var(--sp-4); }
 }

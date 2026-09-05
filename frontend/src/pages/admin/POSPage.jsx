@@ -693,16 +693,7 @@ export default function POSPage() {
                             >
                                 <ShoppingBag size={14} /> Pedidos Web
                                 {!isOrdersPlanAllowed && (
-                                    <span style={{
-                                        fontSize: '9px',
-                                        fontWeight: 700,
-                                        textTransform: 'uppercase',
-                                        background: 'rgba(245, 158, 11, 0.15)',
-                                        color: '#f59e0b',
-                                        padding: '1px 5px',
-                                        borderRadius: '4px',
-                                        marginLeft: '4px'
-                                    }}>
+                                    <span className="badge-plan-lock" style={{ marginLeft: '4px' }}>
                                         Pro
                                     </span>
                                 )}

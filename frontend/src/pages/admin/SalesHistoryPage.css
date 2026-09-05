@@ -136,8 +136,9 @@
 }
 
 .preset-pill.active {
-    background: var(--color-primary);
-    color: #ffffff;
+    background: var(--cool-cyan-bg);
+    color: var(--cool-cyan);
+    border: 1px solid var(--cool-cyan-border);
 }
 
 .sales-filters-bottom {
@@ -229,11 +230,11 @@
 }
 
 .sale-status-indicator.status-pending {
-    color: var(--color-text);
+    color: var(--cool-amber);
 }
 
 .sale-status-indicator.status-pending .status-dot {
-    background-color: #f59e0b;
+    background-color: var(--cool-amber);
 }
 
 /* Table Clean Styling */

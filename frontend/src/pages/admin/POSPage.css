@@ -144,9 +144,9 @@
 }
 
 .pos-scan-btn.plan-locked:hover {
-    border-color: #f59e0b;
-    color: #f59e0b;
-    background: rgba(245, 158, 11, 0.08);
+    border-color: var(--cool-slate-blue-border);
+    color: var(--cool-slate-blue);
+    background: var(--cool-slate-blue-bg);
 }
 
 .pos-mode-toggle {

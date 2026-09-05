@@ -70,7 +70,7 @@
 }
 
 .payment-badge.payment-pending {
-    background: rgba(245, 158, 11, 0.12);
-    color: #f59e0b;
-    border: 1px solid rgba(245, 158, 11, 0.25);
+    background: var(--cool-amber-bg);
+    color: var(--cool-amber);
+    border: 1px solid var(--cool-amber-border);
 }

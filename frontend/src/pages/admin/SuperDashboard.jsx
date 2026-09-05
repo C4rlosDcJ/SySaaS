@@ -203,12 +203,12 @@ export default function SuperDashboard() {
                                 {formatCurrency(totalRevenue)}
                             </div>
                         </div>
-                        <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'var(--cool-teal-bg)', color: 'var(--cool-teal)', border: '1px solid var(--cool-teal-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <DollarSign size={20} />
                         </div>
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <TrendingUp size={13} style={{ color: '#10b981' }} />
+                        <TrendingUp size={13} style={{ color: 'var(--cool-teal)' }} />
                         <span>Consolidado de ventas POS y reparaciones</span>
                     </div>
                 </div>
@@ -219,15 +219,15 @@ export default function SuperDashboard() {
                         <div>
                             <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Empresas Cliente</span>
                             <div style={{ fontSize: '24px', fontWeight: 800, color: 'var(--color-text)', marginTop: '4px' }}>
-                                {totalTenants} <span style={{ fontSize: '13px', fontWeight: 500, color: '#10b981' }}>({activeTenants} activas)</span>
+                                {totalTenants} <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--cool-teal)' }}>({activeTenants} activas)</span>
                             </div>
                         </div>
-                        <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'var(--cool-cyan-bg)', color: 'var(--cool-cyan)', border: '1px solid var(--cool-cyan-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Building2 size={20} />
                         </div>
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Clock size={13} style={{ color: '#3b82f6' }} />
+                        <Clock size={13} style={{ color: 'var(--cool-cyan)' }} />
                         <span>{trialTenants} organizaciones en prueba</span>
                     </div>
                 </div>
@@ -241,12 +241,12 @@ export default function SuperDashboard() {
                                 {totalRepairs.toLocaleString('es-MX')}
                             </div>
                         </div>
-                        <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'rgba(217, 119, 6, 0.1)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'var(--cool-amber-bg)', color: 'var(--cool-amber)', border: '1px solid var(--cool-amber-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Wrench size={20} />
                         </div>
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <GitBranch size={13} style={{ color: '#6366f1' }} />
+                        <GitBranch size={13} style={{ color: 'var(--cool-slate-blue)' }} />
                         <span>En {totalBranches} sucursales operativas</span>
                     </div>
                 </div>
@@ -260,12 +260,12 @@ export default function SuperDashboard() {
                                 {totalUsers.toLocaleString('es-MX')}
                             </div>
                         </div>
-                        <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'var(--cool-slate-blue-bg)', color: 'var(--cool-slate-blue)', border: '1px solid var(--cool-slate-blue-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                             <Users size={20} />
                         </div>
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <CheckCircle2 size={13} style={{ color: '#10b981' }} />
+                        <CheckCircle2 size={13} style={{ color: 'var(--cool-teal)' }} />
                         <span>Staff y clientes en la plataforma</span>
                     </div>
                 </div>
