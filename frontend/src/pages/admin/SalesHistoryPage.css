@@ -136,8 +136,9 @@
 }
 
 .preset-pill.active {
-    background: var(--color-primary);
-    color: #ffffff;
+    background: var(--cool-cyan-bg);
+    color: var(--cool-cyan);
+    border: 1px solid var(--cool-cyan-border);
 }
 
 .sales-filters-bottom {

@@ -84,17 +84,15 @@
     margin-bottom: var(--sp-6);
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    padding-bottom: 4px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 0;
 }
 
 .reports-tabs-bar::-webkit-scrollbar {
-    height: 4px;
-}
-
-.reports-tabs-bar::-webkit-scrollbar-thumb {
-    background: var(--color-border);
-    border-radius: 4px;
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 .report-tab-btn {
@@ -118,8 +116,8 @@
 }
 
 .report-tab-btn.active {
-    color: var(--color-primary);
-    border-bottom-color: var(--color-primary);
+    color: var(--cool-cyan);
+    border-bottom-color: var(--cool-cyan);
 }
 
 /* ── KPI Grid ── */
