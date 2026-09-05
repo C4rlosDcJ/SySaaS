@@ -75,17 +75,17 @@ export const AlertProvider = ({ children }) => {
                                 </div>
                             )}
                             {alertConfig.icon === 'error' && (
-                                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--cool-rose-bg)', color: 'var(--cool-rose)', border: '1px solid var(--cool-rose-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <AlertCircle size={32} />
                                 </div>
                             )}
                             {alertConfig.icon === 'warning' && (
-                                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--cool-amber-bg)', color: 'var(--cool-amber)', border: '1px solid var(--cool-amber-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <AlertCircle size={32} />
                                 </div>
                             )}
                             {alertConfig.icon === 'info' && (
-                                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <div style={{ width: '56px', height: '56px', borderRadius: '50%', background: 'var(--cool-cyan-bg)', color: 'var(--cool-cyan)', border: '1px solid var(--cool-cyan-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <Info size={32} />
                                 </div>
                             )}
@@ -121,8 +121,8 @@ export const AlertProvider = ({ children }) => {
                                     padding: '10px 20px',
                                     borderRadius: '8px',
                                     border: 'none',
-                                    background: alertConfig.icon === 'error' ? '#ef4444' : (alertConfig.icon === 'warning' ? '#f59e0b' : 'var(--color-primary, #3b82f6)'),
-                                    color: '#ffffff',
+                                    background: alertConfig.icon === 'error' ? 'var(--cool-rose)' : (alertConfig.icon === 'warning' ? 'var(--cool-amber)' : 'var(--color-primary)'),
+                                    color: alertConfig.icon === 'warning' ? '#000000' : 'var(--color-primary-contrast, #ffffff)',
                                     fontSize: '14px',
                                     fontWeight: 600,
                                     cursor: 'pointer',

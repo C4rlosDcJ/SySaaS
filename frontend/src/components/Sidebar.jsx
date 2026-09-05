@@ -442,17 +442,7 @@ export default function Sidebar({ isOpen, toggleMenu }) {
                                             const lock = getPlanLock(link.to);
                                             if (!lock) return null;
                                             return (
-                                                <span style={{
-                                                    marginLeft: 'auto',
-                                                    fontSize: '9.5px',
-                                                    fontWeight: 700,
-                                                    textTransform: 'uppercase',
-                                                    letterSpacing: '0.04em',
-                                                    background: 'rgba(245, 158, 11, 0.15)',
-                                                    color: '#f59e0b',
-                                                    padding: '2px 6px',
-                                                    borderRadius: '4px'
-                                                }}>
+                                                <span className="badge-plan-lock" style={{ marginLeft: 'auto' }}>
                                                     {lock.badge}
                                                 </span>
                                             );
