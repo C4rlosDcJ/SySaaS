@@ -78,6 +78,7 @@ app.use('/api/public', require('./routes/public'));
 app.use('/api/search', require('./routes/search'));
 app.use('/api/ai', require('./routes/ai'));
 app.use('/api/orders', require('./routes/orders'));
+app.use('/api/notifications', require('./routes/notifications'));
 
 // Rutas SaaS Multi-Tenant
 app.use('/api/tenants', require('./routes/tenants'));

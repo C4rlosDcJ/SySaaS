@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import { broadcastService, publicService, getImageUrl } from '../services/api';
 import GlobalSearch from './common/GlobalSearch';
+import NotificationCenter from './NotificationCenter';
 import './Sidebar.css';
 
 export default function Sidebar({ isOpen, toggleMenu }) {
@@ -307,29 +308,36 @@ export default function Sidebar({ isOpen, toggleMenu }) {
                 )}
 
                 {isAdmin && (
-                    <div style={{ display: 'flex', gap: '8px', padding: '12px 16px 6px' }}>
+                    <div style={{ display: 'flex', gap: '6px', padding: '12px 16px 6px' }}>
                         <div className="sidebar-search-trigger" style={{ flex: 1, margin: 0 }} onClick={() => setSearchOpen(true)}>
                             <Search size={16} />
                             <span>Buscar...</span>
                             <kbd className="search-kbd">⌘K</kbd>
                         </div>
+
+                        {/* Notificaciones de negocio */}
+                        <NotificationCenter />
+
+                        {/* Comunicados del Sistema (broadcasts de superadmin) */}
                         {systemBroadcasts.length > 0 && (
                             <button
                                 onClick={() => setShowBroadcastModal(true)}
                                 style={{
                                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    padding: '8px 12px', background: 'rgba(99, 102, 241, 0.15)',
-                                    border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-sm)',
-                                    color: 'var(--color-primary)', cursor: 'pointer', position: 'relative'
+                                    padding: '8px 10px', background: 'rgba(99, 102, 241, 0.1)',
+                                    border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)',
+                                    color: 'var(--color-text-secondary)', cursor: 'pointer', position: 'relative',
+                                    flexShrink: 0, width: '36px', height: '36px'
                                 }}
                                 title="Comunicados del Sistema"
                             >
-                                <Bell size={18} />
+                                <Megaphone size={17} />
                                 <span style={{
-                                    position: 'absolute', top: '-4px', right: '-4px',
+                                    position: 'absolute', top: '-5px', right: '-5px',
                                     background: '#ef4444', color: '#fff', borderRadius: '50%',
                                     width: '16px', height: '16px', fontSize: '10px', fontWeight: 700,
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    border: '2px solid var(--color-bg)'
                                 }}>
                                     {systemBroadcasts.length}
                                 </span>

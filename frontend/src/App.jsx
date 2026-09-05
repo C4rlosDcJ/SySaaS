@@ -474,6 +474,7 @@ import AIChatbot from './components/AIChatbot';
 import DocumentMetaSync from './components/common/DocumentMetaSync';
 
 import { AlertProvider } from './context/AlertContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 
 function App() {
   return (
@@ -481,11 +482,13 @@ function App() {
       <ThemeProvider>
         <TenantProvider>
           <AuthProvider>
-            <AlertProvider>
-              <DocumentMetaSync />
-              <AppRoutes />
-              <AIChatbot />
-            </AlertProvider>
+            <NotificationsProvider>
+              <AlertProvider>
+                <DocumentMetaSync />
+                <AppRoutes />
+                <AIChatbot />
+              </AlertProvider>
+            </NotificationsProvider>
           </AuthProvider>
         </TenantProvider>
       </ThemeProvider>

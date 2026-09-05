@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { createNotification } = require('./notificationsController');
 const { sendEmail } = require('../services/emailService');
 
 // Generar número de ticket único con prefijo de sucursal si está disponible
@@ -342,6 +343,18 @@ exports.create = async (req, res) => {
                 customer: customers[0]
             });
         }
+
+        // Notificacion interna para el equipo del tenant
+        const isClientRequest = req.user.role === 'client';
+        await createNotification(tenantId, {
+            title: isClientRequest ? 'Nueva solicitud de reparacion' : 'Reparacion creada',
+            message: isClientRequest
+                ? `${customers[0]?.first_name || 'Un cliente'} solicito reparacion para ${model || 'dispositivo'}. Ticket: ${ticketNumber}`
+                : `Reparacion ${ticketNumber} registrada para ${model || 'dispositivo'}.`,
+            type: 'new_repair',
+            link: `/admin/reparaciones/${result.insertId}`,
+            entity_id: result.insertId
+        });
 
         res.status(201).json({
             message: 'Reparación creada exitosamente.',

@@ -1,4 +1,5 @@
 const db = require('../config/database');
+const { createNotification } = require('./notificationsController');
 
 // Generar número de venta prefixado
 const generateSaleNumber = (branchCode = 'VTA') => {
@@ -125,6 +126,15 @@ exports.createOrder = async (req, res) => {
         }
 
         await connection.commit();
+
+        // Notificacion interna al tenant sobre el nuevo pedido web
+        await createNotification(tenantId, {
+            title: 'Nuevo pedido web',
+            message: `Un cliente realizo un pedido en linea por $${subtotal.toFixed(2)}. Pedido: ${saleNumber}`,
+            type: 'new_order',
+            link: `/admin/pedidos`,
+            entity_id: saleId
+        });
 
         res.status(201).json({
             message: 'Pedido registrado en caja exitosamente.',

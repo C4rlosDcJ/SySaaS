@@ -638,6 +638,17 @@ export const billingService = {
     })
 };
 
+export const notificationsService = {
+    getAll: () => fetchAPI('/notifications'),
+    markAsRead: (id) => fetchAPI(`/notifications/${id}/read`, { method: 'PUT' }),
+    markAllAsRead: () => fetchAPI('/notifications/read-all', { method: 'PUT' }),
+    remove: (id) => fetchAPI(`/notifications/${id}`, { method: 'DELETE' }),
+    getStreamUrl: () => {
+        const token = localStorage.getItem('token');
+        return `${API_URL}/notifications/stream?token=${encodeURIComponent(token)}`;
+    }
+};
+
 export default {
     auth: authService,
     repairs: repairService,
@@ -659,5 +670,6 @@ export default {
     coupons: couponService,
     broadcasts: broadcastService,
     analytics: analyticsService,
-    billing: billingService
+    billing: billingService,
+    notifications: notificationsService
 };
