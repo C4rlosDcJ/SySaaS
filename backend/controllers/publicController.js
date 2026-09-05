@@ -163,6 +163,7 @@ exports.getTheme = async (req, res) => {
                     border_radius: '12px',
                     logo_border_radius: '12px',
                     company_name_transform: 'none',
+                    brand_font: "'Inter', -apple-system, system-ui, sans-serif",
                     business_name: tenant.company_name,
                     business_logo: tenant.logo_url || '',
                     landing_show_stats: 'true',
@@ -214,6 +215,9 @@ exports.getTheme = async (req, res) => {
         const platformTheme = {
             accent_color: globalSettings.accent_color || '#4f46e5',
             border_radius: globalSettings.border_radius || '12px',
+            logo_border_radius: globalSettings.logo_border_radius || '12px',
+            company_name_transform: globalSettings.company_name_transform || 'none',
+            brand_font: globalSettings.brand_font || "'Inter', -apple-system, system-ui, sans-serif",
             business_name: globalSettings.platform_name || 'SySaaS',
             business_logo: globalSettings.platform_logo || globalSettings.platform_logo_url || '',
             contact_email: globalSettings.support_email || 'soporte@sysaas.com',

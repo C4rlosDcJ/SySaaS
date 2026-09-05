@@ -64,10 +64,10 @@
 }
 
 .logo-text {
-    font-family: var(--font-mono);
+    font-family: var(--brand-font, var(--font-family));
     font-size: var(--font-md);
-    font-weight: 600;
-    letter-spacing: 0.08em;
+    font-weight: 700;
+    letter-spacing: -0.01em;
     text-transform: var(--company-name-transform, none);
     color: var(--color-text);
 }
@@ -77,12 +77,11 @@
 }
 
 .auth-visual-content h1 {
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: 2.25rem;
-    font-weight: 600;
-    line-height: 1.15;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
     margin-bottom: var(--sp-5);
     color: var(--color-text);
 }

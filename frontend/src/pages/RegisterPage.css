@@ -61,21 +61,20 @@
 }
 
 .register-logo-text {
-    font-family: var(--font-mono);
+    font-family: var(--brand-font, var(--font-family));
     font-size: var(--font-sm);
     font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
+    letter-spacing: -0.01em;
+    text-transform: var(--company-name-transform, none);
     color: var(--color-text);
 }
 
 .register-headline {
-    font-family: var(--font-mono);
+    font-family: var(--font-family);
     font-size: clamp(1.5rem, 2.2vw, 2.1rem);
     font-weight: 700;
     line-height: 1.2;
-    letter-spacing: -0.01em;
-    text-transform: uppercase;
+    letter-spacing: -0.02em;
     margin-bottom: var(--sp-4);
     color: var(--color-text);
     text-wrap: balance;

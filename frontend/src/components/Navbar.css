@@ -36,12 +36,12 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: var(--font-pixel);
+    font-family: var(--brand-font, var(--font-family));
     font-size: 15px;
     font-weight: 700;
     color: var(--color-text);
     text-decoration: none;
-    letter-spacing: 0.08em;
+    letter-spacing: -0.01em;
     text-transform: var(--company-name-transform, none);
     transition: opacity 0.2s ease;
 }

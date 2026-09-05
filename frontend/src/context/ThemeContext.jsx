@@ -80,6 +80,12 @@ const applyCompanyTransformToDOM = (transform) => {
   root.style.setProperty('--company-name-transform', transform || 'none');
 };
 
+// Apply brand font style (Nothing Pixel, Mono, Modern) to CSS custom properties on :root
+const applyBrandFontToDOM = (font) => {
+  const root = document.documentElement;
+  root.style.setProperty('--brand-font', font || "'Silkscreen', 'VT323', monospace");
+};
+
 export const ThemeProvider = ({ children }) => {
   // ── Light/Dark theme ──────────────────────────────────────
   const [theme, setTheme] = useState(() => {
@@ -96,6 +102,7 @@ export const ThemeProvider = ({ children }) => {
   const [borderRadius, setBorderRadius] = useState(() => localStorage.getItem('borderRadius') || '12px');
   const [logoBorderRadius, setLogoBorderRadius] = useState(() => localStorage.getItem('logoBorderRadius') || '12px');
   const [companyNameTransform, setCompanyNameTransform] = useState(() => localStorage.getItem('companyNameTransform') || 'none');
+  const [brandFont, setBrandFont] = useState(() => localStorage.getItem('brandFont') || "'Silkscreen', 'VT323', monospace");
   const [businessName, setBusinessName] = useState(() => localStorage.getItem('businessName') || 'Sys-Teck');
   const [businessLogo, setBusinessLogo] = useState(() => localStorage.getItem('businessLogo') || '');
 
@@ -160,6 +167,11 @@ export const ThemeProvider = ({ children }) => {
             setCompanyNameTransform(data.company_name_transform);
             applyCompanyTransformToDOM(data.company_name_transform);
             localStorage.setItem('companyNameTransform', data.company_name_transform);
+          }
+          if (data.brand_font) {
+            setBrandFont(data.brand_font);
+            applyBrandFontToDOM(data.brand_font);
+            localStorage.setItem('brandFont', data.brand_font);
           }
           if (data.business_name) {
             setBusinessName(data.business_name);
@@ -291,6 +303,12 @@ export const ThemeProvider = ({ children }) => {
     localStorage.setItem('companyNameTransform', companyNameTransform);
   }, [companyNameTransform]);
 
+  // ── Apply brand font to DOM ───────────────────────────────
+  useEffect(() => {
+    applyBrandFontToDOM(brandFont);
+    localStorage.setItem('brandFont', brandFont);
+  }, [brandFont]);
+
   // ── Persist business name locally ──
   useEffect(() => {
     localStorage.setItem('businessName', businessName);
@@ -337,6 +355,16 @@ export const ThemeProvider = ({ children }) => {
     localStorage.setItem('companyNameTransform', transform);
     settingsService.update({ company_name_transform: transform }).catch((err) => {
       console.warn('[Theme] Error al guardar formato de nombre en BD:', err.message);
+    });
+  };
+
+  const setBrandFontAndPersist = (font) => {
+    isUserChange.current = true;
+    setBrandFont(font);
+    applyBrandFontToDOM(font);
+    localStorage.setItem('brandFont', font);
+    settingsService.update({ brand_font: font }).catch((err) => {
+      console.warn('[Theme] Error al guardar tipografía de marca en BD:', err.message);
     });
   };
 
@@ -475,6 +503,8 @@ export const ThemeProvider = ({ children }) => {
       setLogoBorderRadius: setLogoBorderRadiusAndPersist,
       companyNameTransform,
       setCompanyNameTransform: setCompanyNameTransformAndPersist,
+      brandFont,
+      setBrandFont: setBrandFontAndPersist,
       businessName,
       setBusinessName,
       businessLogo,

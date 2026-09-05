@@ -7,7 +7,7 @@
 .landing-page {
     padding-top: 70px;
     overflow-x: hidden;
-    font-family: var(--font-sans);
+    font-family: var(--font-family);
     transition: background-color 0.25s ease, color 0.25s ease;
     min-height: 100vh;
 }
@@ -48,7 +48,7 @@
 
 .pixel-font {
     font-family: var(--font-pixel) !important;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
 }
 
 .tilt-3d-card {
@@ -139,11 +139,11 @@
 }
 
 .nothing-hero-title {
-    font-family: monospace, var(--font-sans);
-    font-size: clamp(2.2rem, 4vw, 3.2rem);
+    font-family: var(--font-family);
+    font-size: clamp(2.5rem, 5vw, 4rem);
     font-weight: 800;
-    line-height: 1.15;
-    letter-spacing: -0.02em;
+    line-height: 1.08;
+    letter-spacing: -0.035em;
     text-transform: uppercase;
     color: var(--nothing-text-primary);
     margin: 0;
@@ -151,17 +151,31 @@
 
 .nothing-highlight {
     color: var(--nothing-text-secondary);
-    text-decoration: underline;
-    text-decoration-thickness: 2px;
-    text-underline-offset: 6px;
+    display: inline;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.landing-page.theme-dark .nothing-highlight {
+    background: linear-gradient(180deg, #ffffff 10%, #a1a1aa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.landing-page.theme-light .nothing-highlight {
+    background: linear-gradient(180deg, #000000 10%, #64748b 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
 }
 
 .nothing-hero-description {
-    font-size: 1.05rem;
-    line-height: 1.6;
+    font-family: var(--font-family);
+    font-size: 1.125rem;
+    line-height: 1.65;
     color: var(--nothing-text-secondary);
-    max-width: 520px;
+    max-width: 540px;
     margin: 0;
+    letter-spacing: -0.01em;
 }
 
 /* ── Action Buttons (Pills / Cápsula Nothing) ── */
@@ -181,8 +195,10 @@
     border-radius: 9999px;
     background: var(--nothing-btn-primary-bg);
     color: var(--nothing-btn-primary-text) !important;
-    font-weight: 800;
-    font-size: 13px;
+    font-family: var(--font-family);
+    font-weight: 700;
+    font-size: 13.5px;
+    letter-spacing: -0.01em;
     text-decoration: none;
     border: none;
     cursor: pointer;
@@ -205,8 +221,10 @@
     background: var(--nothing-btn-sec-bg);
     border: 1px solid var(--nothing-btn-sec-border);
     color: var(--nothing-btn-sec-text) !important;
-    font-weight: 700;
-    font-size: 13px;
+    font-family: var(--font-family);
+    font-weight: 600;
+    font-size: 13.5px;
+    letter-spacing: -0.01em;
     text-decoration: none;
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -250,9 +268,9 @@
     border: none;
     background: transparent;
     color: var(--nothing-text-primary);
-    font-size: 13px;
+    font-family: var(--font-family);
+    font-size: 13.5px;
     outline: none;
-    font-family: monospace, var(--font-sans);
 }
 
 .nothing-quick-track input::placeholder {
@@ -267,7 +285,7 @@
     border: none;
     font-weight: 700;
     font-size: 12px;
-    font-family: monospace;
+    font-family: var(--font-family);
     text-transform: uppercase;
     letter-spacing: 0.05em;
     cursor: pointer;
@@ -363,19 +381,21 @@
 }
 
 .stat-code {
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-size: 11px;
     color: var(--nothing-text-secondary);
 }
 
 .stat-value {
-    font-size: 1.8rem;
+    font-size: 2rem;
     font-weight: 800;
-    font-family: monospace;
+    font-family: var(--font-family);
+    letter-spacing: -0.03em;
     color: var(--nothing-text-primary);
 }
 
 .stat-label {
+    font-family: var(--font-family);
     font-size: 12px;
     color: var(--nothing-text-secondary);
     font-weight: 600;
@@ -396,11 +416,11 @@
 }
 
 .nothing-section-title {
-    font-family: monospace, var(--font-sans);
-    font-size: clamp(1.8rem, 3vw, 2.4rem);
+    font-family: var(--font-family);
+    font-size: clamp(2rem, 3.5vw, 2.75rem);
     font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.03em;
     color: var(--nothing-text-primary);
     margin: 0;
 }
@@ -436,7 +456,7 @@
 }
 
 .bento-num {
-    font-family: monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     font-weight: 700;
     color: var(--nothing-text-secondary);
@@ -454,14 +474,17 @@
 }
 
 .bento-title {
+    font-family: var(--font-family);
     font-size: 1.15rem;
     font-weight: 700;
+    letter-spacing: -0.02em;
     color: var(--nothing-text-primary);
     margin: 0;
 }
 
 .bento-desc {
-    font-size: 13px;
+    font-family: var(--font-family);
+    font-size: 13.5px;
     line-height: 1.6;
     color: var(--nothing-text-secondary);
     margin: 0;
@@ -529,23 +552,26 @@
     padding: 4px 10px;
     background: var(--nothing-btn-primary-bg);
     color: var(--nothing-btn-primary-text);
-    font-family: monospace;
-    font-size: 10px;
-    font-weight: 800;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 700;
     border-radius: 9999px;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
 }
 
 .plan-name {
-    font-size: 1.25rem;
+    font-family: var(--font-family);
+    font-size: 1.35rem;
     font-weight: 800;
-    font-family: monospace;
+    letter-spacing: -0.02em;
     margin: 0 0 6px 0;
     color: var(--nothing-text-primary);
 }
 
 .plan-desc {
-    font-size: 13px;
+    font-family: var(--font-family);
+    font-size: 13.5px;
+    line-height: 1.5;
     color: var(--nothing-text-secondary);
     margin: 0 0 20px 0;
     min-height: 38px;
@@ -561,16 +587,18 @@
 }
 
 .price-val {
-    font-size: 2.2rem;
+    font-family: var(--font-family);
+    font-size: 2.25rem;
     font-weight: 800;
-    font-family: monospace;
+    letter-spacing: -0.03em;
     color: var(--nothing-text-primary);
 }
 
 .price-unit {
+    font-family: var(--font-family);
     font-size: 12px;
+    font-weight: 600;
     color: var(--nothing-text-secondary);
-    font-family: monospace;
 }
 
 .plan-features-list {
@@ -614,14 +642,16 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-family: monospace;
-    font-size: 15px;
-    letter-spacing: 0.05em;
+    font-family: var(--font-family);
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
     color: var(--nothing-text-primary);
     margin-bottom: 10px;
 }
 
 .footer-tagline {
+    font-family: var(--font-family);
     font-size: 13px;
     color: var(--nothing-text-secondary);
     max-width: 320px;
@@ -635,10 +665,12 @@
 }
 
 .footer-col h4 {
-    font-family: monospace;
+    font-family: var(--font-family);
     font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
     color: var(--nothing-text-secondary);
-    letter-spacing: 0.05em;
     margin: 0 0 12px 0;
 }
 
@@ -652,6 +684,7 @@
 }
 
 .footer-col a {
+    font-family: var(--font-family);
     color: var(--nothing-text-secondary);
     font-size: 13px;
     text-decoration: none;
@@ -669,12 +702,13 @@
     justify-content: space-between;
     flex-wrap: wrap;
     gap: 12px;
-    font-family: monospace;
-    font-size: 11px;
+    font-family: var(--font-family);
+    font-size: 12px;
     color: var(--nothing-text-secondary);
 }
 
 .footer-mono-status {
+    font-family: var(--font-mono);
     letter-spacing: 0.05em;
 }
 

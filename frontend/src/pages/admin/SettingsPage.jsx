@@ -26,6 +26,8 @@ export default function SettingsPage() {
         setLogoBorderRadius,
         companyNameTransform,
         setCompanyNameTransform,
+        brandFont,
+        setBrandFont,
         setBusinessName,
         setBusinessLogo
     } = useTheme();
@@ -813,6 +815,45 @@ export default function SettingsPage() {
                                         >
                                             <span>{c.label}</span>
                                             <span style={{ fontSize: '10px', opacity: 0.6, textTransform: c.id }}>{c.sample}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Estilo de Tipografía (Nothing / Sistema) */}
+                            <div>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '8px' }}>
+                                    Estilo de Tipografía (Nothing / Sistema)
+                                </label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', marginTop: '8px' }}>
+                                    {[
+                                        { id: "'Silkscreen', 'VT323', monospace", label: 'Nothing Pixel', sub: 'Matriz de Puntos', font: "'Silkscreen', monospace" },
+                                        { id: "'Space Mono', monospace", label: 'Nothing Mono', sub: 'Técnica / Código', font: "'Space Mono', monospace" },
+                                        { id: "'Inter', -apple-system, system-ui, sans-serif", label: 'Moderna / Sistema', sub: 'Inter Minimalista', font: "'Inter', sans-serif" }
+                                    ].map(f => (
+                                        <button
+                                            key={f.id}
+                                            type="button"
+                                            onClick={() => setBrandFont(f.id)}
+                                            style={{
+                                                padding: '10px 12px', fontSize: '12px', fontWeight: 600,
+                                                borderRadius: 'var(--radius-sm)',
+                                                border: (brandFont || "'Silkscreen', 'VT323', monospace") === f.id ? '1px solid var(--color-border-strong)' : '1px solid var(--color-border)',
+                                                background: (brandFont || "'Silkscreen', 'VT323', monospace") === f.id ? 'var(--color-bg-tertiary)' : 'transparent',
+                                                color: (brandFont || "'Silkscreen', 'VT323', monospace") === f.id ? 'var(--color-text)' : 'var(--color-text-secondary)',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'flex-start',
+                                                gap: '4px',
+                                                transition: 'all 0.15s ease'
+                                            }}
+                                        >
+                                            <span style={{ fontWeight: 700 }}>{f.label}</span>
+                                            <span style={{ fontSize: '10px', opacity: 0.6 }}>{f.sub}</span>
+                                            <span style={{ fontSize: '13px', fontFamily: f.font, marginTop: '2px', color: 'var(--color-text)' }}>
+                                                {settings.business_name || 'SysTeck'}
+                                            </span>
                                         </button>
                                     ))}
                                 </div>
