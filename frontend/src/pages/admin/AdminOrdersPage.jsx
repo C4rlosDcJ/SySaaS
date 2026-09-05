@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { orderService } from '../../services/api';
+import { useTenant } from '../../context/TenantContext';
+import { showAlert } from '../../utils/swal';
 import {
     ClipboardCheck, Clock, Package, Truck, DollarSign,
-    Eye, X, ChevronRight, AlertCircle, CheckCircle
+    Eye, X, ChevronRight, AlertCircle, CheckCircle, ShoppingBag
 } from 'lucide-react';
 import './AdminOrdersPage.css';
 
@@ -27,6 +29,12 @@ const formatDate = (dateStr) => {
 };
 
 export default function AdminOrdersPage() {
+    const { tenant } = useTenant();
+    const planSlug = (tenant?.plan_slug || tenant?.plan_name || '').toLowerCase();
+    const isOrdersPlanAllowed = 
+        ['pro', 'enterprise'].some(p => planSlug.includes(p)) || 
+        (tenant?.plan_id && Number(tenant.plan_id) >= 2);
+
     const [orders, setOrders] = useState([]);
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -37,9 +45,24 @@ export default function AdminOrdersPage() {
     const [updating, setUpdating] = useState(false);
 
     useEffect(() => {
+        if (!isOrdersPlanAllowed && tenant) {
+            showAlert({
+                title: 'Función Pro y Enterprise',
+                text: 'El módulo de Pedidos Web está reservado para los planes Pro y Enterprise.',
+                icon: 'warning',
+                confirmButtonText: 'Aceptar'
+            });
+        }
+    }, [isOrdersPlanAllowed, tenant]);
+
+    useEffect(() => {
+        if (!isOrdersPlanAllowed) {
+            setLoading(false);
+            return;
+        }
         fetchOrders();
         fetchStats();
-    }, [statusFilter]);
+    }, [statusFilter, isOrdersPlanAllowed]);
 
     const fetchOrders = async () => {
         try {
@@ -105,6 +128,48 @@ export default function AdminOrdersPage() {
             setUpdating(false);
         }
     };
+
+    if (!isOrdersPlanAllowed) {
+        return (
+            <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '65vh' }}>
+                <div style={{
+                    maxWidth: '480px',
+                    width: '100%',
+                    textAlign: 'center',
+                    background: 'var(--color-bg-card)',
+                    padding: '36px 28px',
+                    borderRadius: 'var(--radius-lg)',
+                    border: '1px solid var(--color-border)',
+                    boxShadow: 'var(--shadow-md)'
+                }}>
+                    <div style={{
+                        width: '56px',
+                        height: '56px',
+                        borderRadius: '50%',
+                        background: 'rgba(245, 158, 11, 0.1)',
+                        color: '#f59e0b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 16px auto'
+                    }}>
+                        <ShoppingBag size={28} />
+                    </div>
+                    <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px', color: 'var(--color-text)' }}>Función Pro y Enterprise</h2>
+                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px', lineHeight: 1.5, marginBottom: '24px' }}>
+                        El módulo de Gestión de Pedidos Web está reservado para los planes Pro y Enterprise.
+                    </p>
+                    <button 
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => window.history.back()}
+                    >
+                        Volver
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     if (loading) {
         return (

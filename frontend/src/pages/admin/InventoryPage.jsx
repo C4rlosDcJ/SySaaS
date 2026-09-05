@@ -668,8 +668,23 @@ export default function InventoryPage() {
         }
     };
 
+    // ─── Plan Check: Códigos de barras exclusivo para Pro y Enterprise ───
+    const planSlug = (tenant?.plan_slug || tenant?.plan_name || '').toLowerCase();
+    const isBarcodePlanAllowed = 
+        (tenant?.plan_id && Number(tenant.plan_id) >= 2) || 
+        ['pro', 'enterprise'].some(p => planSlug.includes(p));
+
     // ─── Barcode Printing ───
     const openBarcodeModal = (product) => {
+        if (!isBarcodePlanAllowed) {
+            showAlert({
+                title: 'Función Pro y Enterprise',
+                text: 'La impresión de etiquetas de código de barras está reservada para los planes Pro y Enterprise.',
+                icon: 'warning',
+                confirmButtonText: 'Aceptar'
+            });
+            return;
+        }
         setBarcodeProduct(product);
         setPrintCopies(1);
         setShowBarcodeModal(true);
@@ -1686,6 +1701,15 @@ export default function InventoryPage() {
                                                     type="button"
                                                     className="btn-link-action"
                                                     onClick={() => {
+                                                        if (!isBarcodePlanAllowed) {
+                                                            showAlert({
+                                                                title: 'Función Pro y Enterprise',
+                                                                text: 'La generación automática de códigos de barras está reservada para los planes Pro y Enterprise.',
+                                                                icon: 'warning',
+                                                                confirmButtonText: 'Aceptar'
+                                                            });
+                                                            return;
+                                                        }
                                                         const generated = Array.from({ length: 12 }, () => Math.floor(Math.random() * 10)).join('');
                                                         setForm({ ...form, barcode: generated });
                                                     }}
@@ -2175,7 +2199,7 @@ export default function InventoryPage() {
             )}
 
             {/* Barcode Print Modal */}
-            {showBarcodeModal && barcodeProduct && (
+            {showBarcodeModal && barcodeProduct && isBarcodePlanAllowed && (
                 <div className="modal-overlay" onClick={() => setShowBarcodeModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
                         <div className="modal-header">

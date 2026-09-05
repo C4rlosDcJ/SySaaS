@@ -41,6 +41,7 @@ import {
     Zap
 } from 'lucide-react';
 import { broadcastService, publicService, getImageUrl } from '../services/api';
+import { showAlert } from '../utils/swal';
 import GlobalSearch from './common/GlobalSearch';
 import NotificationCenter from './NotificationCenter';
 import './Sidebar.css';
@@ -55,6 +56,30 @@ export default function Sidebar({ isOpen, toggleMenu }) {
     const [showBroadcastModal, setShowBroadcastModal] = useState(false);
     const [platformName, setPlatformName] = useState(() => localStorage.getItem('platform_name') || 'SySaaS');
     const [platformLogo, setPlatformLogo] = useState(() => localStorage.getItem('platform_logo') || '');
+
+    // Plan check
+    const planSlug = (tenant?.plan_slug || tenant?.plan_name || '').toLowerCase();
+    const isProOrEnterprise = 
+        ['pro', 'enterprise'].some(p => planSlug.includes(p)) || 
+        (tenant?.plan_id && Number(tenant.plan_id) >= 2);
+    const isEnterprise = 
+        planSlug.includes('enterprise') || 
+        (tenant?.plan_id && Number(tenant.plan_id) >= 3) || 
+        Boolean(tenant?.plan_features?.advanced_reports) ||
+        Boolean(tenant?.features?.advanced_reports);
+
+    const isReportsPlanAllowed = isEnterprise;
+    const isCouponsPlanAllowed = isEnterprise;
+    const isOrdersPlanAllowed = isProOrEnterprise;
+    const isSuppliersPlanAllowed = isProOrEnterprise;
+
+    const getPlanLock = (to) => {
+        if (to === '/admin/reportes' && !isReportsPlanAllowed) return { badge: 'Enterprise', title: 'Función Enterprise', text: 'El módulo de Análisis y Reportes está reservado para el plan Enterprise.' };
+        if (to === '/admin/cupones' && !isCouponsPlanAllowed) return { badge: 'Enterprise', title: 'Función Enterprise', text: 'El módulo de Cupones de Descuento está reservado para el plan Enterprise.' };
+        if (to === '/admin/pedidos' && !isOrdersPlanAllowed) return { badge: 'Pro', title: 'Función Pro y Enterprise', text: 'El módulo de Pedidos Web está reservado para los planes Pro y Enterprise.' };
+        if (to === '/admin/proveedores' && !isSuppliersPlanAllowed) return { badge: 'Pro', title: 'Función Pro y Enterprise', text: 'El módulo de Proveedores y Órdenes de Compra está reservado para los planes Pro y Enterprise.' };
+        return null;
+    };
 
     useEffect(() => {
         if (isSuperAdmin) {
@@ -396,12 +421,42 @@ export default function Sidebar({ isOpen, toggleMenu }) {
                                         to={link.to}
                                         end={link.exact}
                                         className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                            const lock = getPlanLock(link.to);
+                                            if (lock) {
+                                                e.preventDefault();
+                                                showAlert({
+                                                    title: lock.title,
+                                                    text: lock.text,
+                                                    icon: 'warning',
+                                                    confirmButtonText: 'Aceptar'
+                                                });
+                                                return;
+                                            }
                                             if (window.innerWidth <= 900) toggleMenu();
                                         }}
                                     >
                                         <link.icon size={20} className="nav-icon" />
                                         <span className="nav-label">{link.label}</span>
+                                        {(() => {
+                                            const lock = getPlanLock(link.to);
+                                            if (!lock) return null;
+                                            return (
+                                                <span style={{
+                                                    marginLeft: 'auto',
+                                                    fontSize: '9.5px',
+                                                    fontWeight: 700,
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: '0.04em',
+                                                    background: 'rgba(245, 158, 11, 0.15)',
+                                                    color: '#f59e0b',
+                                                    padding: '2px 6px',
+                                                    borderRadius: '4px'
+                                                }}>
+                                                    {lock.badge}
+                                                </span>
+                                            );
+                                        })()}
                                     </NavLink>
                                 </li>
                             )

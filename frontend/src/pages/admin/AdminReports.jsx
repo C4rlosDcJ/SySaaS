@@ -12,6 +12,7 @@ import {
     ShoppingBag, CreditCard, Download, Printer, Store, Filter, Calendar
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/constants';
+import { showAlert } from '../../utils/swal';
 import './AdminReports.css';
 
 // Etiquetas y estados del flujo
@@ -102,11 +103,30 @@ export default function AdminReports() {
     const { activeBranchId, branches: tenantBranches, tenant } = useTenant();
     const isBranchScoped = !isTenantAdmin && !isSuperAdmin && !isImpersonating;
 
+    // Plan check: Reportes exclusivo para Enterprise
+    const planSlug = (tenant?.plan_slug || tenant?.plan_name || '').toLowerCase();
+    const isReportsPlanAllowed = 
+        planSlug.includes('enterprise') || 
+        (tenant?.plan_id && Number(tenant.plan_id) >= 3) || 
+        Boolean(tenant?.plan_features?.advanced_reports) ||
+        Boolean(tenant?.features?.advanced_reports);
+
     const [analytics, setAnalytics] = useState(defaultAnalytics);
     const [branches, setBranches] = useState([]);
     const [forecastData, setForecastData] = useState(null);
     const [segmentationData, setSegmentationData] = useState(null);
     const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!isReportsPlanAllowed && tenant) {
+            showAlert({
+                title: 'Función Enterprise',
+                text: 'El módulo de Análisis y Reportes está reservado para el plan Enterprise.',
+                icon: 'warning',
+                confirmButtonText: 'Aceptar'
+            });
+        }
+    }, [isReportsPlanAllowed, tenant]);
 
     // Filtros
     const [period, setPeriod] = useState('this_month'); // 'today' | '7d' | '30d' | 'this_month' | 'last_month' | 'year'
@@ -122,8 +142,9 @@ export default function AdminReports() {
     const KMEANS_PAGE_SIZE = 8;
 
     useEffect(() => {
+        if (!isReportsPlanAllowed) return;
         loadBranches();
-    }, []);
+    }, [isReportsPlanAllowed]);
 
     useEffect(() => {
         if (isBranchScoped) {
@@ -135,8 +156,9 @@ export default function AdminReports() {
     }, [isBranchScoped, user?.branch_id, activeBranchId, branches]);
 
     useEffect(() => {
+        if (!isReportsPlanAllowed) return;
         fetchAnalytics();
-    }, [period, selectedBranch]);
+    }, [period, selectedBranch, isReportsPlanAllowed]);
 
     const loadBranches = async () => {
         try {
@@ -300,6 +322,48 @@ export default function AdminReports() {
         last_month: 'Mes Anterior',
         year: 'Este Año'
     };
+
+    if (!isReportsPlanAllowed) {
+        return (
+            <div className="reports-page animate-fadeIn" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '65vh' }}>
+                <div style={{
+                    maxWidth: '480px',
+                    width: '100%',
+                    textAlign: 'center',
+                    background: 'var(--color-bg-card)',
+                    padding: '36px 28px',
+                    borderRadius: 'var(--radius-lg)',
+                    border: '1px solid var(--color-border)',
+                    boxShadow: 'var(--shadow-md)'
+                }}>
+                    <div style={{
+                        width: '56px',
+                        height: '56px',
+                        borderRadius: '50%',
+                        background: 'rgba(245, 158, 11, 0.1)',
+                        color: '#f59e0b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 16px auto'
+                    }}>
+                        <TrendingUp size={28} />
+                    </div>
+                    <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px', color: 'var(--color-text)' }}>Función Enterprise</h2>
+                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px', lineHeight: 1.5, marginBottom: '24px' }}>
+                        El módulo de Análisis y Reportes está reservado para el plan Enterprise.
+                    </p>
+                    <button 
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => window.history.back()}
+                    >
+                        Volver
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="reports-page animate-fadeIn">

@@ -21,6 +21,8 @@ import {
     Barcode,
     Printer
 } from 'lucide-react';
+import { useTenant } from '../../context/TenantContext';
+import { showAlert } from '../../utils/swal';
 import './AdminServices.css';
 
 export default function AdminServices() {
@@ -37,6 +39,13 @@ export default function AdminServices() {
     const [showModal, setShowModal] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
     const [formData, setFormData] = useState({});
+
+    // Plan check
+    const { tenant } = useTenant();
+    const planSlug = (tenant?.plan_slug || tenant?.plan_name || '').toLowerCase();
+    const isBarcodePlanAllowed = 
+        (tenant?.plan_id && Number(tenant.plan_id) >= 2) || 
+        ['pro', 'enterprise'].some(p => planSlug.includes(p));
     
     // Barcode Printing States
     const [showBarcodeModal, setShowBarcodeModal] = useState(false);
@@ -65,6 +74,15 @@ export default function AdminServices() {
     }, [showBarcodeModal, barcodeItem]);
 
     const openBarcodeModal = (item) => {
+        if (!isBarcodePlanAllowed) {
+            showAlert({
+                title: 'Función Pro y Enterprise',
+                text: 'La impresión de etiquetas de código de barras está reservada para los planes Pro y Enterprise.',
+                icon: 'warning',
+                confirmButtonText: 'Aceptar'
+            });
+            return;
+        }
         setBarcodeItem(item);
         setPrintCopies(1);
         setShowBarcodeModal(true);
@@ -569,6 +587,15 @@ export default function AdminServices() {
                                                     type="button"
                                                     style={{ background: 'none', color: 'var(--color-primary)', fontSize: '0.65rem', fontWeight: 600, padding: 0, cursor: 'pointer' }}
                                                     onClick={() => {
+                                                        if (!isBarcodePlanAllowed) {
+                                                            showAlert({
+                                                                title: 'Función Pro y Enterprise',
+                                                                text: 'La generación automática de códigos de barras está reservada para los planes Pro y Enterprise.',
+                                                                icon: 'warning',
+                                                                confirmButtonText: 'Aceptar'
+                                                            });
+                                                            return;
+                                                        }
                                                         const generated = `9${Array.from({ length: 11 }, () => Math.floor(Math.random() * 10)).join('')}`;
                                                         setFormData(prev => ({ ...prev, barcode: generated }));
                                                     }}
@@ -600,7 +627,7 @@ export default function AdminServices() {
             )}
 
             {/* Barcode Print Modal */}
-            {showBarcodeModal && barcodeItem && (
+            {showBarcodeModal && barcodeItem && isBarcodePlanAllowed && (
                 <div className="modal-overlay" onClick={() => setShowBarcodeModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
                         <div className="modal-header">

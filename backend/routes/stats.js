@@ -3,7 +3,7 @@ const router = express.Router();
 const statsController = require('../controllers/statsController');
 const { auth, isAdmin, isSuperAdmin } = require('../middleware/auth');
 const tenantContext = require('../middleware/tenantContext');
-const { subscriptionGuard } = require('../middleware/subscriptionGuard');
+const { subscriptionGuard, featureGuard } = require('../middleware/subscriptionGuard');
 
 // Ruta analítica global SuperAdmin (no requiere tenantContext)
 router.get('/superadmin', auth, isSuperAdmin, statsController.getSuperAdminStats);
@@ -18,7 +18,7 @@ router.use(subscriptionGuard);
 router.use(isAdmin);
 
 router.get('/dashboard', statsController.getDashboard);
-router.get('/analytics', statsController.getEnterpriseAnalytics);
+router.get('/analytics', featureGuard('advanced_reports'), statsController.getEnterpriseAnalytics);
 router.get('/revenue', statsController.getRevenue);
 router.get('/technicians', statsController.getTechniciansStats);
 

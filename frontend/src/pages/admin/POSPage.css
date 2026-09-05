@@ -138,6 +138,17 @@
     transform: scale(0.92);
 }
 
+.pos-scan-btn.plan-locked {
+    position: relative;
+    opacity: 0.85;
+}
+
+.pos-scan-btn.plan-locked:hover {
+    border-color: #f59e0b;
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.08);
+}
+
 .pos-mode-toggle {
     display: flex;
     border-radius: var(--radius-md);

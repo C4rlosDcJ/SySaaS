@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
 import { couponService } from '../../services/api';
+import { useTenant } from '../../context/TenantContext';
 import { Tag, Plus, CheckCircle2, XCircle, Clock, Percent, DollarSign, AlertCircle } from 'lucide-react';
 import { showAlert, showConfirm } from '../../utils/swal';
 import { formatCurrency } from '../../utils/constants';
 
 export default function AdminCoupons() {
+    const { tenant } = useTenant();
+    const planSlug = (tenant?.plan_slug || tenant?.plan_name || '').toLowerCase();
+    const isEnterprise = planSlug.includes('enterprise') || (tenant?.plan_id && Number(tenant.plan_id) >= 3);
+
     const [coupons, setCoupons] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -20,8 +25,23 @@ export default function AdminCoupons() {
     });
 
     useEffect(() => {
+        if (!isEnterprise && tenant) {
+            showAlert({
+                title: 'Función Enterprise',
+                text: 'El módulo de Cupones de Descuento está reservado para el plan Enterprise.',
+                icon: 'warning',
+                confirmButtonText: 'Aceptar'
+            });
+        }
+    }, [isEnterprise, tenant]);
+
+    useEffect(() => {
+        if (!isEnterprise) {
+            setLoading(false);
+            return;
+        }
         loadCoupons();
-    }, []);
+    }, [isEnterprise]);
 
     const loadCoupons = async () => {
         setLoading(true);
@@ -67,6 +87,48 @@ export default function AdminCoupons() {
             showAlert({ title: 'Error', text: err.message || 'Error al cambiar estado', icon: 'error' });
         }
     };
+
+    if (!isEnterprise) {
+        return (
+            <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '65vh' }}>
+                <div style={{
+                    maxWidth: '480px',
+                    width: '100%',
+                    textAlign: 'center',
+                    background: 'var(--color-bg-card)',
+                    padding: '36px 28px',
+                    borderRadius: 'var(--radius-lg)',
+                    border: '1px solid var(--color-border)',
+                    boxShadow: 'var(--shadow-md)'
+                }}>
+                    <div style={{
+                        width: '56px',
+                        height: '56px',
+                        borderRadius: '50%',
+                        background: 'rgba(245, 158, 11, 0.1)',
+                        color: '#f59e0b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 16px auto'
+                    }}>
+                        <Tag size={28} />
+                    </div>
+                    <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px', color: 'var(--color-text)' }}>Función Enterprise</h2>
+                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px', lineHeight: 1.5, marginBottom: '24px' }}>
+                        El módulo de Cupones de Descuento está reservado para el plan Enterprise.
+                    </p>
+                    <button 
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => window.history.back()}
+                    >
+                        Volver
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="container" style={{ paddingTop: 'var(--sp-6)', paddingBottom: 'var(--sp-6)' }}>

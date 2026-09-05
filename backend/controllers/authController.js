@@ -229,9 +229,9 @@ exports.login = async (req, res) => {
 
         if (user.tenant_id) {
             const [tenants] = await db.query(
-                `SELECT t.id, t.company_name, t.slug, t.logo_url, t.primary_color, t.currency, 
+                `SELECT t.id, t.plan_id, t.company_name, t.slug, t.logo_url, t.primary_color, t.currency, 
                         t.tax_rate, t.subscription_status, t.trial_ends_at,
-                        sp.name as plan_name, sp.slug as plan_slug
+                        sp.name as plan_name, sp.slug as plan_slug, sp.features as plan_features
                  FROM tenants t
                  JOIN saas_plans sp ON t.plan_id = sp.id
                  WHERE t.id = ?`,
@@ -338,9 +338,9 @@ exports.getMe = async (req, res) => {
 
         if (userData.tenant_id) {
             const [tenants] = await db.query(
-                `SELECT t.id, t.company_name, t.slug, t.logo_url, t.primary_color, t.currency, 
+                `SELECT t.id, t.plan_id, t.company_name, t.slug, t.logo_url, t.primary_color, t.currency, 
                         t.tax_rate, t.subscription_status, t.trial_ends_at,
-                        sp.name as plan_name, sp.slug as plan_slug
+                        sp.name as plan_name, sp.slug as plan_slug, sp.features as plan_features
                  FROM tenants t
                  JOIN saas_plans sp ON t.plan_id = sp.id
                  WHERE t.id = ?`,
@@ -609,9 +609,9 @@ exports.impersonateTenant = async (req, res) => {
 
         // Obtener datos de la empresa
         const [tenants] = await db.query(
-            `SELECT t.id, t.company_name, t.slug, t.logo_url, t.primary_color, t.currency, 
+            `SELECT t.id, t.plan_id, t.company_name, t.slug, t.logo_url, t.primary_color, t.currency, 
                     t.tax_rate, t.subscription_status, t.trial_ends_at,
-                    sp.name as plan_name, sp.slug as plan_slug
+                    sp.name as plan_name, sp.slug as plan_slug, sp.features as plan_features
              FROM tenants t
              JOIN saas_plans sp ON t.plan_id = sp.id
              WHERE t.id = ?`,

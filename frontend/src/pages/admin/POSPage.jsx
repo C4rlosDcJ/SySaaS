@@ -13,10 +13,12 @@ import BarcodeScannerModal from '../../components/BarcodeScannerModal';
 import { showAlert, showConfirm } from '../../utils/swal';
 import './POSPage.css';
 import { useTenant } from '../../context/TenantContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function POSPage() {
     const [searchParams, setSearchParams] = useSearchParams();
-    const { activeBranchId } = useTenant();
+    const { activeBranchId, tenant } = useTenant();
+    const { user, isSuperAdmin } = useAuth();
 
     // ─── State ───
     const [mode, setMode] = useState('products'); // 'products' | 'services' | 'repairs' | 'pending_sales'
@@ -103,7 +105,7 @@ export default function POSPage() {
                 servicesCatalog.getAll({ limit: 200 }),
                 posService.getBillableRepairs(),
                 settingsService.getAll(),
-                orderService.getAll({ status: 'pending' })
+                isOrdersPlanAllowed ? orderService.getAll({ status: 'pending' }) : Promise.resolve({ orders: [] })
             ]);
             if (catData.status === 'fulfilled') setCategories(catData.value || []);
             if (prodData.status === 'fulfilled') setProducts(prodData.value?.products || []);
@@ -157,7 +159,7 @@ export default function POSPage() {
 
     // ─── Load pending web sales (with search) ───
     useEffect(() => {
-        if (mode !== 'pending_sales') return;
+        if (mode !== 'pending_sales' || !isOrdersPlanAllowed) return;
         const timeout = setTimeout(async () => {
             try {
                 const params = { status: 'pending' };
@@ -520,6 +522,26 @@ export default function POSPage() {
         return { success: false };
     };
 
+    // ─── Plan Check: Lector de Cámara y Pedidos Web para Pro y Enterprise ───
+    const planSlug = (tenant?.plan_slug || tenant?.plan_name || '').toLowerCase();
+    const isOrdersPlanAllowed = 
+        (tenant?.plan_id && Number(tenant.plan_id) >= 2) || 
+        ['pro', 'enterprise'].some(p => planSlug.includes(p));
+    const isScannerPlanAllowed = isOrdersPlanAllowed;
+
+    const handleOpenScanner = () => {
+        if (!isScannerPlanAllowed) {
+            showAlert({
+                title: 'Función Pro y Enterprise',
+                text: 'El escaneo de códigos de barra con la cámara está reservado para los planes Pro y Enterprise. Actualiza tu suscripción para habilitar esta herramienta en tu punto de venta.',
+                icon: 'warning',
+                confirmButtonText: 'Aceptar'
+            });
+            return;
+        }
+        setShowBarcodeScanner(true);
+    };
+
     // ─── Render ───
     if (loading) {
         return (
@@ -623,10 +645,10 @@ export default function POSPage() {
                             </div>
                             <button
                                 type="button"
-                                className="pos-scan-btn"
-                                title="Escanear código de barras con la cámara"
+                                className={`pos-scan-btn ${!isScannerPlanAllowed ? 'plan-locked' : ''}`}
+                                title={isScannerPlanAllowed ? "Escanear código de barras con la cámara" : "Función exclusiva para planes Pro y Enterprise"}
                                 aria-label="Escanear código de barras con la cámara"
-                                onClick={() => setShowBarcodeScanner(true)}
+                                onClick={handleOpenScanner}
                             >
                                 <Camera size={18} />
                             </button>
@@ -655,10 +677,36 @@ export default function POSPage() {
                             </button>
                             <button
                                 className={`${mode === 'pending_sales' ? 'active' : ''} ${pendingSales.length > 0 ? 'has-badge' : ''}`}
-                                onClick={() => { setMode('pending_sales'); setPendingSearch(''); }}
+                                onClick={() => {
+                                    if (!isOrdersPlanAllowed) {
+                                        showAlert({
+                                            title: 'Función Pro y Enterprise',
+                                            text: 'El apartado de Pedidos Web está reservado para los planes Pro y Enterprise.',
+                                            icon: 'warning',
+                                            confirmButtonText: 'Aceptar'
+                                        });
+                                        return;
+                                    }
+                                    setMode('pending_sales');
+                                    setPendingSearch('');
+                                }}
                             >
                                 <ShoppingBag size={14} /> Pedidos Web
-                                {pendingSales.length > 0 && (
+                                {!isOrdersPlanAllowed && (
+                                    <span style={{
+                                        fontSize: '9px',
+                                        fontWeight: 700,
+                                        textTransform: 'uppercase',
+                                        background: 'rgba(245, 158, 11, 0.15)',
+                                        color: '#f59e0b',
+                                        padding: '1px 5px',
+                                        borderRadius: '4px',
+                                        marginLeft: '4px'
+                                    }}>
+                                        Pro
+                                    </span>
+                                )}
+                                {isOrdersPlanAllowed && pendingSales.length > 0 && (
                                     <span className="mode-badge">{pendingSales.length}</span>
                                 )}
                             </button>
@@ -1275,7 +1323,7 @@ export default function POSPage() {
             )}
 
             {/* ═══ Barcode Scanner Camera Modal ═══ */}
-            {showBarcodeScanner && (
+            {showBarcodeScanner && isScannerPlanAllowed && (
                 <BarcodeScannerModal
                     isOpen={showBarcodeScanner}
                     onClose={() => setShowBarcodeScanner(false)}

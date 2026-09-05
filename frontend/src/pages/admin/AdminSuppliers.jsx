@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react';
 import { supplierService, inventoryService } from '../../services/api';
+import { useTenant } from '../../context/TenantContext';
 import { Truck, Plus, PackageCheck, Building2, Phone, Mail, FileText, CheckCircle2, Clock, XCircle, Search } from 'lucide-react';
 import { showAlert, showConfirm } from '../../utils/swal';
 import { formatCurrency } from '../../utils/constants';
 
 export default function AdminSuppliers() {
+    const { tenant } = useTenant();
+    const planSlug = (tenant?.plan_slug || tenant?.plan_name || '').toLowerCase();
+    const isSuppliersPlanAllowed = 
+        ['pro', 'enterprise'].some(p => planSlug.includes(p)) || 
+        (tenant?.plan_id && Number(tenant.plan_id) >= 2);
+
     const [activeTab, setActiveTab] = useState('suppliers'); // 'suppliers' | 'orders'
     const [suppliers, setSuppliers] = useState([]);
     const [purchaseOrders, setPurchaseOrders] = useState([]);
@@ -35,8 +42,23 @@ export default function AdminSuppliers() {
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
+        if (!isSuppliersPlanAllowed && tenant) {
+            showAlert({
+                title: 'Función Pro y Enterprise',
+                text: 'El módulo de Proveedores y Órdenes de Compra está reservado para los planes Pro y Enterprise.',
+                icon: 'warning',
+                confirmButtonText: 'Aceptar'
+            });
+        }
+    }, [isSuppliersPlanAllowed, tenant]);
+
+    useEffect(() => {
+        if (!isSuppliersPlanAllowed) {
+            setLoading(false);
+            return;
+        }
         loadData();
-    }, []);
+    }, [isSuppliersPlanAllowed]);
 
     const loadData = async () => {
         setLoading(true);
@@ -197,6 +219,48 @@ export default function AdminSuppliers() {
     const filteredSuppliers = suppliers.filter(s =>
         !search || `${s.company_name} ${s.contact_name || ''} ${s.phone || ''} ${s.tax_id || ''}`.toLowerCase().includes(search.toLowerCase())
     );
+
+    if (!isSuppliersPlanAllowed) {
+        return (
+            <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '65vh' }}>
+                <div style={{
+                    maxWidth: '480px',
+                    width: '100%',
+                    textAlign: 'center',
+                    background: 'var(--color-bg-card)',
+                    padding: '36px 28px',
+                    borderRadius: 'var(--radius-lg)',
+                    border: '1px solid var(--color-border)',
+                    boxShadow: 'var(--shadow-md)'
+                }}>
+                    <div style={{
+                        width: '56px',
+                        height: '56px',
+                        borderRadius: '50%',
+                        background: 'rgba(245, 158, 11, 0.1)',
+                        color: '#f59e0b',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 16px auto'
+                    }}>
+                        <Truck size={28} />
+                    </div>
+                    <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '8px', color: 'var(--color-text)' }}>Función Pro y Enterprise</h2>
+                    <p style={{ color: 'var(--color-text-secondary)', fontSize: '14px', lineHeight: 1.5, marginBottom: '24px' }}>
+                        El módulo de Proveedores y Órdenes de Compra está reservado para los planes Pro y Enterprise.
+                    </p>
+                    <button 
+                        type="button"
+                        className="btn btn-secondary"
+                        onClick={() => window.history.back()}
+                    >
+                        Volver
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="container" style={{ paddingTop: 'var(--sp-6)', paddingBottom: 'var(--sp-6)' }}>
