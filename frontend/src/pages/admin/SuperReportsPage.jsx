@@ -8,7 +8,8 @@ import {
     DollarSign, Building2, Users, TrendingUp, Shield,
     RefreshCw, ArrowUpRight, ArrowDownRight, Layers,
     Download, Printer, Calendar, Clock, AlertTriangle, CheckCircle2,
-    Search, UserCheck, Sparkles, Cpu, Target, HelpCircle, CreditCard
+    Search, UserCheck, Sparkles, Cpu, Target, HelpCircle, CreditCard,
+    X, ChevronRight, Info, ExternalLink
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/constants';
 import './AdminReports.css';
@@ -70,6 +71,27 @@ const defaultAnalytics = {
     tenantsGrowth: []
 };
 
+function MetricHelp({ title, explanation }) {
+    const [visible, setVisible] = useState(false);
+    return (
+        <span
+            className="metric-help-trigger"
+            onMouseEnter={() => setVisible(true)}
+            onMouseLeave={() => setVisible(false)}
+            onClick={(e) => { e.stopPropagation(); setVisible(!visible); }}
+            title={explanation}
+        >
+            <HelpCircle size={13} />
+            {visible && (
+                <span className="metric-help-popover">
+                    <strong>{title}</strong>
+                    <span>{explanation}</span>
+                </span>
+            )}
+        </span>
+    );
+}
+
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
         return (
@@ -100,6 +122,7 @@ export default function SuperReportsPage() {
     // Paginación y búsqueda de empresas
     const [tenantSearch, setTenantSearch] = useState('');
     const [tenantStatusFilter, setTenantStatusFilter] = useState('');
+    const [quickFilter, setQuickFilter] = useState('all'); // 'all' | 'active' | 'yearly' | 'monthly' | 'trial' | 'expiring'
     const [tenantPage, setTenantPage] = useState(1);
     const TENANT_PAGE_SIZE = 8;
 
@@ -299,32 +322,83 @@ export default function SuperReportsPage() {
                        ══════════════════════════════════════════════════════════ */}
                     {activeTab === 'financial' && (
                         <div className="tab-content animate-fadeIn">
+
+                            {/* Resumen de Salud y Estado de la Plataforma */}
+                            <div className="health-summary-banner">
+                                <div className="health-status-badge">
+                                    <span className="health-pulse-dot" />
+                                    <div>
+                                        <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--color-text)' }}>
+                                            Estado de Plataforma: Saludable & Activa
+                                        </div>
+                                        <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                                            Suscripciones, facturación periódica y pagos procesados con normalidad
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="health-pills-row">
+                                    <div className="health-pill">
+                                        <Shield size={13} style={{ color: 'var(--color-primary)' }} />
+                                        <span>Empresas Activas: <strong>{kpis.paid_tenants || 0}</strong> de {kpis.total_tenants || 0}</span>
+                                    </div>
+                                    <div className="health-pill">
+                                        <Sparkles size={13} style={{ color: '#6366f1' }} />
+                                        <span>Planes Anuales: <strong>{kpis.yearly_paid_tenants || 0}</strong></span>
+                                    </div>
+                                    <div className="health-pill">
+                                        <CheckCircle2 size={13} style={{ color: '#10b981' }} />
+                                        <span>Retención: <strong>{kpis.retention_rate || 100}%</strong></span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Tarjetas KPI Financieras */}
                             <div className="kpi-grid">
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
-                                        <span className="kpi-label">MRR (Ingreso Mensual Recurrente)</span>
+                                        <span className="kpi-label">
+                                            Ingreso Mensual (MRR)
+                                            <MetricHelp
+                                                title="MRR (Monthly Recurring Revenue)"
+                                                explanation="Monto mensual recurrente que genera la plataforma. Para clientes con plan anual, se calcula prorrateando el total anual entre 12 meses."
+                                            />
+                                        </span>
                                         <div className="kpi-icon" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
                                             <DollarSign size={18} />
                                         </div>
                                     </div>
                                     <div className="kpi-value">{formatCurrency(kpis.mrr || 0)}</div>
-                                    <span className="kpi-subtext">{kpis.paid_tenants || 0} activas ({kpis.yearly_paid_tenants || 0} anual, {kpis.monthly_paid_tenants || 0} mensual)</span>
+                                    <span className="kpi-subtext">
+                                        {kpis.paid_tenants || 0} activas ({kpis.yearly_paid_tenants || 0} anual, {kpis.monthly_paid_tenants || 0} mensual)
+                                    </span>
                                 </div>
 
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
-                                        <span className="kpi-label">ARR Real (Anual Contratado)</span>
+                                        <span className="kpi-label">
+                                            Facturación Anual (ARR)
+                                            <MetricHelp
+                                                title="ARR (Annual Recurring Revenue)"
+                                                explanation="Proyección anual total basada en contratos vigentes. Para planes anuales es su valor total anual; para mensuales, la tarifa multiplicada por 12."
+                                            />
+                                        </span>
                                         <div className="kpi-icon" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
                                             <TrendingUp size={18} />
                                         </div>
                                     </div>
                                     <div className="kpi-value">{formatCurrency(kpis.arr || 0)}</div>
-                                    <span className="kpi-subtext">Facturación anual recurrente normalizada</span>
+                                    <span className="kpi-subtext">Total contractual anualizado</span>
                                 </div>
 
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
-                                        <span className="kpi-label">Cobrado en Stripe (Total Real)</span>
+                                        <span className="kpi-label">
+                                            Cobrado en Stripe
+                                            <MetricHelp
+                                                title="Cobros Procesados en Stripe"
+                                                explanation="Dinero real efectivamente cobrado y recibido a través de las transacciones exitosas de Stripe."
+                                            />
+                                        </span>
                                         <div className="kpi-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
                                             <CreditCard size={18} />
                                         </div>
@@ -335,7 +409,13 @@ export default function SuperReportsPage() {
 
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
-                                        <span className="kpi-label">ARPU (Ingreso / Tenant)</span>
+                                        <span className="kpi-label">
+                                            Promedio por Empresa (ARPU)
+                                            <MetricHelp
+                                                title="ARPU (Average Revenue Per User/Tenant)"
+                                                explanation="Ingreso promedio mensual que aporta cada empresa con suscripción activa a la plataforma."
+                                            />
+                                        </span>
                                         <div className="kpi-icon" style={{ background: 'rgba(2, 132, 199, 0.1)', color: '#0284c7' }}>
                                             <Building2 size={18} />
                                         </div>
@@ -346,7 +426,13 @@ export default function SuperReportsPage() {
 
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
-                                        <span className="kpi-label">Valor de Vida (LTV Estimado)</span>
+                                        <span className="kpi-label">
+                                            Valor de Vida (LTV)
+                                            <MetricHelp
+                                                title="LTV (Customer Lifetime Value)"
+                                                explanation="Ingreso estimado que generará un cliente promedio durante todo el tiempo que permanezca suscrito a SySaaS."
+                                            />
+                                        </span>
                                         <div className="kpi-icon" style={{ background: 'rgba(96, 165, 250, 0.1)', color: '#60a5fa' }}>
                                             <Shield size={18} />
                                         </div>
@@ -364,6 +450,9 @@ export default function SuperReportsPage() {
                                             <h2>Nuevas Empresas Registradas</h2>
                                             <p>Crecimiento y adopción de la plataforma en el tiempo</p>
                                         </div>
+                                        <span className="badge-neutral" style={{ fontWeight: 600 }}>
+                                            {tenantsGrowthData.reduce((acc, curr) => acc + (curr.new_tenants || 0), 0)} registros en período
+                                        </span>
                                     </div>
                                     <div className="chart-area" style={{ height: 300 }}>
                                         {tenantsGrowthData.length > 0 ? (
@@ -375,11 +464,20 @@ export default function SuperReportsPage() {
                                                             <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                                                         </linearGradient>
                                                     </defs>
-                                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.5} />
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.4} />
                                                     <XAxis dataKey="date" stroke="var(--color-text-secondary)" fontSize={11} tickLine={false} />
                                                     <YAxis stroke="var(--color-text-secondary)" fontSize={11} tickLine={false} allowDecimals={false} />
                                                     <Tooltip content={<CustomTooltip />} />
-                                                    <Area type="monotone" dataKey="new_tenants" name="Nuevos Registros" stroke="#3b82f6" strokeWidth={2} fill="url(#tenantsGrad)" />
+                                                    <Area
+                                                        type="monotone"
+                                                        dataKey="new_tenants"
+                                                        name="Nuevos Registros"
+                                                        stroke="#3b82f6"
+                                                        strokeWidth={2.5}
+                                                        fill="url(#tenantsGrad)"
+                                                        dot={{ r: 4, stroke: '#3b82f6', strokeWidth: 2, fill: 'var(--color-bg-card)' }}
+                                                        activeDot={{ r: 7, stroke: '#3b82f6', strokeWidth: 2, fill: '#3b82f6' }}
+                                                    />
                                                 </AreaChart>
                                             </ResponsiveContainer>
                                         ) : (
@@ -392,12 +490,15 @@ export default function SuperReportsPage() {
                                     <div className="report-card-header">
                                         <div>
                                             <h2>Suscripciones por Plan</h2>
-                                            <p>Distribución de clientes</p>
+                                            <p>Distribución de clientes activos</p>
                                         </div>
+                                        <span className="badge-neutral" style={{ fontWeight: 700 }}>
+                                            {kpis.paid_tenants || 0} Total
+                                        </span>
                                     </div>
                                     {planPieData.length > 0 ? (
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                                            <div style={{ width: '100%', height: 180 }}>
+                                            <div className="donut-center-container">
                                                 <ResponsiveContainer width="100%" height="100%">
                                                     <PieChart>
                                                         <Pie
@@ -405,7 +506,7 @@ export default function SuperReportsPage() {
                                                             dataKey="value"
                                                             nameKey="name"
                                                             cx="50%" cy="50%"
-                                                            innerRadius={48} outerRadius={72}
+                                                            innerRadius={50} outerRadius={74}
                                                             paddingAngle={3}
                                                         >
                                                             {planPieData.map((entry, index) => (
@@ -415,21 +516,101 @@ export default function SuperReportsPage() {
                                                         <Tooltip formatter={(val) => [`${val} empresas`, 'Total']} />
                                                     </PieChart>
                                                 </ResponsiveContainer>
+                                                <div className="donut-center-badge">
+                                                    <span className="donut-center-num">{kpis.paid_tenants || 0}</span>
+                                                    <span className="donut-center-text">Activas</span>
+                                                </div>
                                             </div>
 
-                                            <div className="pie-legend" style={{ width: '100%' }}>
-                                                {planPieData.map((item, idx) => (
-                                                    <div key={idx} className="pie-legend-item">
-                                                        <span className="pie-legend-dot" style={{ background: item.color }} />
-                                                        <span className="pie-legend-name">{item.name}</span>
-                                                        <span className="pie-legend-val">{item.value}</span>
-                                                    </div>
-                                                ))}
+                                            <div className="pie-legend">
+                                                {planPieData.map((item, idx) => {
+                                                    const percentage = kpis.paid_tenants > 0 ? Math.round((item.value / kpis.paid_tenants) * 100) : 0;
+                                                    return (
+                                                        <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px' }}>
+                                                                <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+                                                                    <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: item.color }} />
+                                                                    {item.name}
+                                                                </span>
+                                                                <span style={{ fontWeight: 700 }}>
+                                                                    {item.value} {item.value === 1 ? 'empresa' : 'empresas'} ({percentage}%)
+                                                                </span>
+                                                            </div>
+                                                            <div className="progress-track" style={{ height: '5px' }}>
+                                                                <div className="progress-fill" style={{ width: `${Math.max(5, percentage)}%`, background: item.color }} />
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     ) : (
                                         <div className="empty-chart">Sin planes activos</div>
                                     )}
+                                </div>
+                            </div>
+
+                            {/* Resumen de Empresas Principales en Facturación */}
+                            <div className="report-card">
+                                <div className="report-card-header">
+                                    <div>
+                                        <h2>Empresas Principales en Facturación</h2>
+                                        <p>Organizaciones clave por volumen de contratación y recaudación</p>
+                                    </div>
+                                    <button
+                                        className="btn btn-secondary btn-sm"
+                                        onClick={() => setActiveTab('tenants')}
+                                        style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                                    >
+                                        <span>Ver Directorio Completo</span>
+                                        <ChevronRight size={14} />
+                                    </button>
+                                </div>
+                                <div className="table-responsive">
+                                    <table className="tech-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Empresa</th>
+                                                <th>Plan & Ciclo</th>
+                                                <th>Tarifa Contratada</th>
+                                                <th>Aporte Mensual (MRR)</th>
+                                                <th style={{ textAlign: 'right' }}>Total Cobrado Stripe</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {(analytics?.tenants || [])
+                                                .filter(t => t.subscription_status === 'active')
+                                                .slice(0, 4)
+                                                .map(t => (
+                                                    <tr key={t.id}>
+                                                        <td>
+                                                            <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>{t.name}</div>
+                                                            <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>
+                                                                /{t.slug}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <span className="badge-neutral" style={{ fontWeight: 600, marginRight: '6px' }}>{t.plan_name}</span>
+                                                            <span style={{ fontSize: '11px', fontWeight: 600, color: t.billing_cycle === 'yearly' ? '#2563eb' : 'var(--color-text-secondary)' }}>
+                                                                {t.billing_cycle === 'yearly' ? 'Anual (1 Año)' : 'Mensual (1 Mes)'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ fontWeight: 600 }}>
+                                                            {formatCurrency(t.plan_price)}
+                                                            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginLeft: '3px' }}>
+                                                                /{t.billing_cycle === 'yearly' ? 'año' : 'mes'}
+                                                            </span>
+                                                        </td>
+                                                        <td style={{ fontWeight: 600, color: '#3b82f6' }}>
+                                                            {formatCurrency(t.mrr_contribution)}/mes
+                                                        </td>
+                                                        <td style={{ textAlign: 'right', fontWeight: 700, color: '#10b981' }}>
+                                                            {formatCurrency(t.total_paid || t.plan_price)}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
@@ -441,7 +622,7 @@ export default function SuperReportsPage() {
                     {activeTab === 'ai_forecast' && (
                         <div className="tab-content animate-fadeIn">
                             {/* Selector de Horizonte */}
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
                                 <div>
                                     <h2 style={{ margin: 0, fontSize: '16px', fontWeight: 800 }}>Modelo de Proyección Financiera SaaS</h2>
                                     <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-text-secondary)' }}>
@@ -474,6 +655,40 @@ export default function SuperReportsPage() {
                                             {h.label}
                                         </button>
                                     ))}
+                                </div>
+                            </div>
+
+                            {/* Banner Explicativo Ejecutivo de IA */}
+                            <div style={{
+                                padding: '14px 18px',
+                                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(59, 130, 246, 0.05) 100%)',
+                                border: '1px solid rgba(99, 102, 241, 0.25)',
+                                borderRadius: 'var(--radius-lg)',
+                                marginBottom: '20px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '14px'
+                            }}>
+                                <div style={{
+                                    width: '38px',
+                                    height: '38px',
+                                    borderRadius: 'var(--radius-md)',
+                                    background: 'rgba(99, 102, 241, 0.15)',
+                                    color: '#6366f1',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    flexShrink: 0
+                                }}>
+                                    <Sparkles size={20} />
+                                </div>
+                                <div>
+                                    <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--color-text)' }}>
+                                        Proyección Predictiva a {forecastHorizon === '3m' ? '3 Meses' : (forecastHorizon === '6m' ? '6 Meses' : (forecastHorizon === '12m' ? '12 Meses' : '3 Años'))}
+                                    </div>
+                                    <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                                        Con un nivel de confianza estadística del {analytics?.predictions?.confidence_score || 90}%, el modelo proyecta alcanzar {formatCurrency(forecastHorizon === '3y' ? (selectedForecastData[selectedForecastData.length - 1]?.projected_arr || 0) : (selectedForecastData[selectedForecastData.length - 1]?.predicted_arr || 0))} en facturación recurrente (ARR) para el final del ciclo.
+                                    </div>
                                 </div>
                             </div>
 
@@ -610,7 +825,13 @@ export default function SuperReportsPage() {
                             <div className="kpi-grid" style={{ marginBottom: '24px' }}>
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
-                                        <span className="kpi-label">Tasa de Conversión (Trial - Pago)</span>
+                                        <span className="kpi-label">
+                                            Tasa de Conversión
+                                            <MetricHelp
+                                                title="Tasa de Conversión (Trial a Pago)"
+                                                explanation="Porcentaje de empresas que tras iniciar su período de prueba gratuita completaron la contratación de un plan comercial."
+                                            />
+                                        </span>
                                         <Target size={18} className="text-primary" />
                                     </div>
                                     <div className="kpi-value">{kpis.conversion_rate || 0}%</div>
@@ -619,7 +840,13 @@ export default function SuperReportsPage() {
 
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
-                                        <span className="kpi-label">Tasa de Retención</span>
+                                        <span className="kpi-label">
+                                            Tasa de Retención
+                                            <MetricHelp
+                                                title="Tasa de Retención"
+                                                explanation="Porcentaje de organizaciones que renuevan periódicamente y mantienen su cuenta activa sin interrupciones."
+                                            />
+                                        </span>
                                         <CheckCircle2 size={18} style={{ color: '#10b981' }} />
                                     </div>
                                     <div className="kpi-value">{kpis.retention_rate || 100}%</div>
@@ -628,7 +855,13 @@ export default function SuperReportsPage() {
 
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
-                                        <span className="kpi-label">Tasa de Pérdida (Churn Rate)</span>
+                                        <span className="kpi-label">
+                                            Tasa de Pérdida (Churn)
+                                            <MetricHelp
+                                                title="Churn Rate (Tasa de Cancelación)"
+                                                explanation="Porcentaje de clientes que han cancelado o dejado expirar su suscripción sin renovación."
+                                            />
+                                        </span>
                                         <AlertTriangle size={18} style={{ color: '#ef4444' }} />
                                     </div>
                                     <div className="kpi-value">{kpis.churn_rate || 0}%</div>
@@ -741,23 +974,70 @@ export default function SuperReportsPage() {
                                             <option value="trial">En Prueba</option>
                                             <option value="expired">Vencidas</option>
                                         </select>
-                                        <input
-                                            type="text"
-                                            className="input input-sm"
-                                            placeholder="Buscar empresa..."
-                                            value={tenantSearch}
-                                            onChange={(e) => { setTenantSearch(e.target.value); setTenantPage(1); }}
-                                            style={{ width: '170px' }}
-                                        />
+                                        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                            <Search size={14} style={{ position: 'absolute', left: '8px', color: 'var(--color-text-secondary)', pointerEvents: 'none' }} />
+                                            <input
+                                                type="text"
+                                                className="input input-sm"
+                                                placeholder="Buscar por nombre o slug..."
+                                                value={tenantSearch}
+                                                onChange={(e) => { setTenantSearch(e.target.value); setTenantPage(1); }}
+                                                style={{ paddingLeft: '28px', paddingRight: tenantSearch ? '28px' : '10px', width: '200px' }}
+                                            />
+                                            {tenantSearch && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setTenantSearch(''); setTenantPage(1); }}
+                                                    style={{ position: 'absolute', right: '6px', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', padding: '2px' }}
+                                                    title="Limpiar búsqueda"
+                                                >
+                                                    <X size={13} />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
+                                </div>
+
+                                {/* Chips de Filtro Rápido */}
+                                <div className="quick-filter-chips" style={{ padding: '4px 0 10px 0' }}>
+                                    {[
+                                        { id: 'all', label: 'Todas', count: (analytics?.tenants || []).length },
+                                        { id: 'active', label: 'Pago Activo', count: (analytics?.tenants || []).filter(t => t.subscription_status === 'active').length },
+                                        { id: 'yearly', label: 'Planes Anuales', count: (analytics?.tenants || []).filter(t => t.subscription_status === 'active' && t.billing_cycle === 'yearly').length },
+                                        { id: 'monthly', label: 'Planes Mensuales', count: (analytics?.tenants || []).filter(t => t.subscription_status === 'active' && t.billing_cycle === 'monthly').length },
+                                        { id: 'trial', label: 'En Prueba', count: (analytics?.tenants || []).filter(t => t.subscription_status === 'trial').length },
+                                        { id: 'expiring', label: 'Por Vencer (7d)', count: (analytics?.expiringSoon || []).length }
+                                    ].map(chip => (
+                                        <button
+                                            key={chip.id}
+                                            type="button"
+                                            className={`quick-filter-chip ${quickFilter === chip.id ? 'active' : ''}`}
+                                            onClick={() => { setQuickFilter(chip.id); setTenantPage(1); }}
+                                        >
+                                            <span>{chip.label}</span>
+                                            <span className="chip-count">{chip.count}</span>
+                                        </button>
+                                    ))}
                                 </div>
 
                                 {(() => {
                                     const filtered = (analytics?.tenants || []).filter(t => {
                                         const matchesSearch = t.name.toLowerCase().includes(tenantSearch.toLowerCase()) ||
-                                            t.slug.toLowerCase().includes(tenantSearch.toLowerCase());
-                                        const matchesStatus = !tenantStatusFilter || t.subscription_status === tenantStatusFilter;
-                                        return matchesSearch && matchesStatus;
+                                            t.slug.toLowerCase().includes(tenantSearch.toLowerCase()) ||
+                                            (t.plan_name && t.plan_name.toLowerCase().includes(tenantSearch.toLowerCase()));
+                                        if (!matchesSearch) return false;
+
+                                        if (tenantStatusFilter && t.subscription_status !== tenantStatusFilter) return false;
+
+                                        if (quickFilter === 'active') return t.subscription_status === 'active';
+                                        if (quickFilter === 'yearly') return t.subscription_status === 'active' && t.billing_cycle === 'yearly';
+                                        if (quickFilter === 'monthly') return t.subscription_status === 'active' && t.billing_cycle === 'monthly';
+                                        if (quickFilter === 'trial') return t.subscription_status === 'trial';
+                                        if (quickFilter === 'expired') return t.subscription_status === 'expired' || t.subscription_status === 'canceled';
+                                        if (quickFilter === 'expiring') {
+                                            return (analytics?.expiringSoon || []).some(es => es.id === t.id);
+                                        }
+                                        return true;
                                     });
 
                                     const totalPages = Math.ceil(filtered.length / TENANT_PAGE_SIZE) || 1;
@@ -889,10 +1169,44 @@ export default function SuperReportsPage() {
                        ══════════════════════════════════════════════════════════ */}
                     {activeTab === 'plans' && (
                         <div className="tab-content animate-fadeIn">
+                            {/* Tarjetas Visuales de Planes */}
+                            <div className="plan-overview-grid">
+                                {(analytics?.planDistribution || []).map((p, idx) => (
+                                    <div key={idx} className="plan-overview-card">
+                                        <div className="plan-overview-header">
+                                            <span className="badge-neutral" style={{ fontWeight: 700, fontSize: '12px' }}>{p.name}</span>
+                                            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-primary)' }}>
+                                                {p.count} {p.count === 1 ? 'cliente' : 'clientes'}
+                                            </span>
+                                        </div>
+                                        <div>
+                                            <div className="plan-price-tag">
+                                                {formatCurrency(p.price)} <span className="plan-price-sub">/ mes</span>
+                                            </div>
+                                            <div style={{ fontSize: '12px', color: '#2563eb', fontWeight: 600, marginTop: '2px' }}>
+                                                {formatCurrency(p.price_yearly)} / año
+                                            </div>
+                                        </div>
+                                        <div style={{
+                                            borderTop: '1px solid var(--color-border)',
+                                            paddingTop: '8px',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            fontSize: '11px'
+                                        }}>
+                                            <span style={{ color: 'var(--color-text-secondary)' }}>Aporte Anual (ARR):</span>
+                                            <strong style={{ color: '#2563eb', fontSize: '13px' }}>{formatCurrency(p.arr)}</strong>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Tabla Comparativa Detallada */}
                             <div className="report-card">
                                 <div className="report-card-header">
                                     <div>
-                                        <h2>Rendimiento de Planes de Suscripción</h2>
+                                        <h2>Rendimiento Detallado de Planes</h2>
                                         <p>Monetización recurrente y volumen de suscripciones por plan</p>
                                     </div>
                                 </div>

@@ -115,11 +115,13 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
-    transition: border-color var(--transition-normal);
+    transition: all var(--transition-fast);
+    position: relative;
 }
 
 .kpi-card:hover {
-    border-color: var(--color-border-strong);
+    border-color: var(--color-primary);
+    box-shadow: 0 4px 18px -2px rgba(59, 130, 246, 0.12);
 }
 
 .kpi-card-header {
@@ -134,6 +136,8 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--color-text-secondary);
+    display: flex;
+    align-items: center;
 }
 
 .kpi-icon {
@@ -143,6 +147,220 @@
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
+}
+
+/* ── Tooltips Explicativos de Métricas ── */
+.metric-help-trigger {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    cursor: help;
+    margin-left: 6px;
+    color: var(--color-text-secondary);
+    transition: color var(--transition-fast);
+}
+
+.metric-help-trigger:hover {
+    color: var(--color-primary);
+}
+
+.metric-help-popover {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    width: 230px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+    text-transform: none;
+    letter-spacing: normal;
+    color: var(--color-text);
+    backdrop-filter: blur(12px);
+    animation: fadeIn 0.15s ease-out;
+}
+
+.metric-help-popover strong {
+    color: var(--color-primary);
+    font-size: 11px;
+}
+
+.metric-help-popover span {
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+    font-weight: normal;
+}
+
+.metric-help-popover::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 5px;
+    border-style: solid;
+    border-color: var(--color-border-strong) transparent transparent transparent;
+}
+
+/* ── Resumen Ejecutivo de Salud SaaS ── */
+.health-summary-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--sp-4);
+    padding: 14px 18px;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(99, 102, 241, 0.04) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--sp-5);
+    flex-wrap: wrap;
+}
+
+.health-status-badge {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.health-pulse-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    animation: pulseGlow 2s infinite;
+}
+
+@keyframes pulseGlow {
+    0% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+    }
+}
+
+.health-pills-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.health-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: 9999px;
+    font-size: 12px;
+    color: var(--color-text);
+}
+
+.health-pill strong {
+    color: var(--color-primary);
+}
+
+/* ── Quick Filter Chips ── */
+.quick-filter-chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: var(--sp-4);
+}
+
+.quick-filter-chip {
+    padding: 6px 12px;
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--color-border);
+    background: var(--color-bg-card);
+    color: var(--color-text-secondary);
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.quick-filter-chip:hover {
+    border-color: var(--color-primary);
+    color: var(--color-text);
+}
+
+.quick-filter-chip.active {
+    background: var(--color-primary);
+    color: #ffffff;
+    border-color: var(--color-primary);
+}
+
+.quick-filter-chip .chip-count {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.quick-filter-chip.active .chip-count {
+    background: rgba(255, 255, 255, 0.25);
+    color: #ffffff;
+}
+
+/* ── Plan Overview Cards ── */
+.plan-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--sp-4);
+    margin-bottom: var(--sp-6);
+}
+
+.plan-overview-card {
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: var(--sp-5);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: transform var(--transition-fast), border-color var(--transition-normal);
+}
+
+.plan-overview-card:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+}
+
+.plan-overview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.plan-price-tag {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--color-text);
+}
+
+.plan-price-sub {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    font-weight: normal;
 }
 
 .kpi-value {
@@ -233,14 +451,52 @@
     transition: width 0.6s ease;
 }
 
+/* ── Donut Chart Enhancement ── */
+.donut-center-container {
+    position: relative;
+    width: 100%;
+    height: 190px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.donut-center-badge {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.donut-center-num {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--color-text);
+    line-height: 1;
+}
+
+.donut-center-text {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 3px;
+}
+
 /* ── Pie Legend ── */
 .pie-legend {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 8px;
-    margin-top: 10px;
-    max-height: 140px;
-    overflow-y: auto;
+    margin-top: 12px;
+    width: 100%;
 }
 
 .pie-legend-item {
