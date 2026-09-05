@@ -64,6 +64,11 @@
     padding: var(--sp-6) var(--sp-8);
     background: var(--color-bg);
     min-height: 100vh;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+    position: relative;
     animation: fadeIn var(--transition-normal);
 }
 
@@ -75,6 +80,11 @@
     flex-wrap: wrap;
     gap: var(--sp-4);
     margin-bottom: var(--sp-6);
+}
+
+.reports-header-title {
+    min-width: 280px;
+    flex: 1;
 }
 
 .reports-header-title h1 {
@@ -129,7 +139,18 @@
     border-bottom: 1px solid var(--color-border);
     margin-bottom: var(--sp-6);
     overflow-x: auto;
-    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    padding-bottom: 4px;
+}
+
+.reports-tabs-bar::-webkit-scrollbar {
+    height: 4px;
+}
+
+.reports-tabs-bar::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 4px;
 }
 
 .report-tab-btn {
@@ -591,11 +612,15 @@
 
 /* ── Table Styling ── */
 .table-responsive {
+    width: 100%;
+    max-width: 100%;
     overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 .tech-table {
     width: 100%;
+    min-width: 720px;
     border-collapse: collapse;
 }
 
@@ -604,6 +629,7 @@
     text-align: left;
     border-bottom: 1px solid var(--color-border);
     font-size: 13px;
+    white-space: nowrap;
 }
 
 .tech-table th {
@@ -854,9 +880,15 @@
 }
 
 /* ── Responsive ── */
-@media (max-width: 1200px) {
-    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 1280px) {
+    .reports-page { padding: var(--sp-5) var(--sp-6); }
     .charts-split-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 1100px) {
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .reports-header-box { flex-direction: column; align-items: stretch; gap: var(--sp-3); }
+    .reports-controls-bar { width: 100%; justify-content: flex-start; }
 }
 
 @media (max-width: 768px) {
@@ -864,4 +896,5 @@
     .kpi-grid { grid-template-columns: 1fr; }
     .reports-header-box { flex-direction: column; align-items: flex-start; }
     .reports-controls-bar { width: 100%; justify-content: flex-start; }
+    .report-card { padding: var(--sp-4); }
 }
