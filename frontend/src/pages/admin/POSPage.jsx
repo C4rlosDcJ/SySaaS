@@ -3,12 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import {
     ShoppingCart, Search, Package, Wrench, X, Plus, Minus, Trash2,
     CreditCard, Banknote, ArrowRightLeft, Printer, CheckCircle2,
-    User, ShoppingBag, ClipboardList, Hash, AlertCircle, Store
+    User, ShoppingBag, ClipboardList, Hash, AlertCircle, Store, Camera
 } from 'lucide-react';
 import { inventoryService, posService, customerService, servicesCatalog, settingsService, repairService, orderService, getImageUrl } from '../../services/api';
 import { formatCurrency, STATUS_LABELS } from '../../utils/constants';
 import PrintReceipt from '../../components/common/PrintReceipt';
 import SignatureModal from '../../components/common/SignatureModal';
+import BarcodeScannerModal from '../../components/BarcodeScannerModal';
 import { showAlert, showConfirm } from '../../utils/swal';
 import './POSPage.css';
 import { useTenant } from '../../context/TenantContext';
@@ -56,6 +57,9 @@ export default function POSPage() {
 
     // Toast
     const [toast, setToast] = useState(null);
+
+    // Barcode scanner modal
+    const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
 
     // Paginación y Carrito Móvil
     const [currentPage, setCurrentPage] = useState(1);
@@ -473,6 +477,49 @@ export default function POSPage() {
         setTimeout(() => setToast(null), 3000);
     };
 
+    // ─── Barcode Scan Handler ───
+    const handleBarcodeScanned = (code) => {
+        if (!code) return { success: false };
+        const query = code.trim().toLowerCase();
+
+        // 1. Buscar coincidencia exacta en productos (barcode o SKU)
+        const foundProduct = products.find(p => 
+            (p.barcode && p.barcode.toLowerCase() === query) || 
+            (p.sku && p.sku.toLowerCase() === query)
+        );
+
+        if (foundProduct) {
+            addToCart(foundProduct, 'product');
+            showToast(`Producto agregado: ${foundProduct.name}`);
+            return { success: true, item: foundProduct, type: 'product' };
+        }
+
+        // 2. Buscar coincidencia exacta en servicios de catálogo (barcode)
+        const foundService = services.find(s => 
+            s.barcode && s.barcode.toLowerCase() === query
+        );
+
+        if (foundService) {
+            addToCart(foundService, 'service');
+            showToast(`Servicio agregado: ${foundService.name}`);
+            return { success: true, item: foundService, type: 'service' };
+        }
+
+        // 3. Buscar coincidencia en órdenes de reparación (ticket_number)
+        const foundRepair = billableRepairs.find(r => 
+            r.ticket_number && r.ticket_number.toLowerCase() === query
+        );
+
+        if (foundRepair) {
+            addRepairToCart(foundRepair);
+            showToast(`Reparación cargada: ${foundRepair.ticket_number}`);
+            return { success: true, item: foundRepair, type: 'repair' };
+        }
+
+        showToast(`No se encontró ningún artículo con código: ${code}`, 'error');
+        return { success: false };
+    };
+
     // ─── Render ───
     if (loading) {
         return (
@@ -493,85 +540,96 @@ export default function POSPage() {
                         Punto de Venta
                     </h1>
                     <div className="pos-search-row">
-                        <div className="search-box">
-                            <Search size={16} className="search-icon" />
-                            <input
-                                ref={searchRef}
-                                type="text"
-                                className="input"
-                                placeholder={
-                                    mode === 'products' ? 'Buscar producto, SKU o código...' :
-                                    mode === 'services' ? 'Buscar servicio...' :
-                                    mode === 'pending_sales' ? 'Buscar pedido por folio o cliente...' :
-                                    'Buscar ticket, cliente o modelo...'
-                                }
-                                value={
-                                    mode === 'repairs' ? repairSearch :
-                                    mode === 'pending_sales' ? pendingSearch :
-                                    search
-                                }
-                                onChange={(e) => {
-                                    if (mode === 'repairs') setRepairSearch(e.target.value);
-                                    else if (mode === 'pending_sales') setPendingSearch(e.target.value);
-                                    else setSearch(e.target.value);
-                                }}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        const query = (mode === 'repairs' ? repairSearch : mode === 'pending_sales' ? pendingSearch : search).trim();
-                                        if (!query) return;
-
-                                        // 1. Buscar coincidencia exacta en productos (barcode o SKU)
-                                        const foundProduct = products.find(p => 
-                                            (p.barcode && p.barcode.toLowerCase() === query.toLowerCase()) || 
-                                            (p.sku && p.sku.toLowerCase() === query.toLowerCase())
-                                        );
-
-                                        if (foundProduct) {
-                                            addToCart(foundProduct, 'product');
-                                            setSearch('');
-                                            setRepairSearch('');
-                                            setPendingSearch('');
-                                            setMode('products');
-                                            showToast(`Producto agregado: ${foundProduct.name}`);
-                                            e.preventDefault();
-                                            return;
-                                        }
-
-                                        // 2. Buscar coincidencia exacta en servicios de catálogo (barcode)
-                                        const foundService = services.find(s => 
-                                            s.barcode && s.barcode.toLowerCase() === query.toLowerCase()
-                                        );
-
-                                        if (foundService) {
-                                            addToCart(foundService, 'service');
-                                            setSearch('');
-                                            setRepairSearch('');
-                                            setPendingSearch('');
-                                            setMode('services');
-                                            showToast(`Servicio agregado: ${foundService.name}`);
-                                            e.preventDefault();
-                                            return;
-                                        }
-
-                                        // 3. Buscar coincidencia exacta en reparaciones pendientes por cobrar (ticket_number)
-                                        const foundRepair = billableRepairs.find(r => 
-                                            r.ticket_number && r.ticket_number.toLowerCase() === query.toLowerCase()
-                                        );
-
-                                        if (foundRepair) {
-                                            addRepairToCart(foundRepair);
-                                            setSearch('');
-                                            setRepairSearch('');
-                                            setPendingSearch('');
-                                            setMode('repairs');
-                                            showToast(`Reparación cargada: ${foundRepair.ticket_number}`);
-                                            e.preventDefault();
-                                            return;
-                                        }
+                        <div className="pos-search-input-group">
+                            <div className="search-box">
+                                <Search size={16} className="search-icon" />
+                                <input
+                                    ref={searchRef}
+                                    type="text"
+                                    className="input"
+                                    placeholder={
+                                        mode === 'products' ? 'Buscar producto, SKU o código...' :
+                                        mode === 'services' ? 'Buscar servicio...' :
+                                        mode === 'pending_sales' ? 'Buscar pedido por folio o cliente...' :
+                                        'Buscar ticket, cliente o modelo...'
                                     }
-                                }}
-                                id="pos-search"
-                            />
+                                    value={
+                                        mode === 'repairs' ? repairSearch :
+                                        mode === 'pending_sales' ? pendingSearch :
+                                        search
+                                    }
+                                    onChange={(e) => {
+                                        if (mode === 'repairs') setRepairSearch(e.target.value);
+                                        else if (mode === 'pending_sales') setPendingSearch(e.target.value);
+                                        else setSearch(e.target.value);
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            const query = (mode === 'repairs' ? repairSearch : mode === 'pending_sales' ? pendingSearch : search).trim();
+                                            if (!query) return;
+
+                                            // 1. Buscar coincidencia exacta en productos (barcode o SKU)
+                                            const foundProduct = products.find(p => 
+                                                (p.barcode && p.barcode.toLowerCase() === query.toLowerCase()) || 
+                                                (p.sku && p.sku.toLowerCase() === query.toLowerCase())
+                                            );
+
+                                            if (foundProduct) {
+                                                addToCart(foundProduct, 'product');
+                                                setSearch('');
+                                                setRepairSearch('');
+                                                setPendingSearch('');
+                                                setMode('products');
+                                                showToast(`Producto agregado: ${foundProduct.name}`);
+                                                e.preventDefault();
+                                                return;
+                                            }
+
+                                            // 2. Buscar coincidencia exacta en servicios de catálogo (barcode)
+                                            const foundService = services.find(s => 
+                                                s.barcode && s.barcode.toLowerCase() === query.toLowerCase()
+                                            );
+
+                                            if (foundService) {
+                                                addToCart(foundService, 'service');
+                                                setSearch('');
+                                                setRepairSearch('');
+                                                setPendingSearch('');
+                                                setMode('services');
+                                                showToast(`Servicio agregado: ${foundService.name}`);
+                                                e.preventDefault();
+                                                return;
+                                            }
+
+                                            // 3. Buscar coincidencia exacta en reparaciones pendientes por cobrar (ticket_number)
+                                            const foundRepair = billableRepairs.find(r => 
+                                                r.ticket_number && r.ticket_number.toLowerCase() === query.toLowerCase()
+                                            );
+
+                                            if (foundRepair) {
+                                                addRepairToCart(foundRepair);
+                                                setSearch('');
+                                                setRepairSearch('');
+                                                setPendingSearch('');
+                                                setMode('repairs');
+                                                showToast(`Reparación cargada: ${foundRepair.ticket_number}`);
+                                                e.preventDefault();
+                                                return;
+                                            }
+                                        }
+                                    }}
+                                    id="pos-search"
+                                />
+                            </div>
+                            <button
+                                type="button"
+                                className="pos-scan-btn"
+                                title="Escanear código de barras con la cámara"
+                                aria-label="Escanear código de barras con la cámara"
+                                onClick={() => setShowBarcodeScanner(true)}
+                            >
+                                <Camera size={18} />
+                            </button>
                         </div>
                         <div className="pos-mode-toggle">
                             <button
@@ -1073,10 +1131,10 @@ export default function POSPage() {
                                 <input
                                     type="number"
                                     className="input input-sm"
-                                    placeholder="$0.00"
+                                    placeholder="0"
                                     value={discount}
                                     onChange={(e) => setDiscount(e.target.value)}
-                                    style={{ width: '80px', textAlign: 'right' }}
+                                    style={{ width: '90px', textAlign: 'right', flexShrink: 0 }}
                                 />
                             </div>
                             <div className="cart-total-row grand-total">
@@ -1086,7 +1144,7 @@ export default function POSPage() {
                         </div>
 
                         {/* Payment Method Selector */}
-                        <div className="payment-method-selector" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--sp-2)', marginBottom: 'var(--sp-4)' }}>
+                        <div className="pos-payment-methods">
                             <button
                                 className={`payment-method-btn ${paymentMethod === 'cash' ? 'selected' : ''}`}
                                 onClick={() => setPaymentMethod('cash')}
@@ -1214,6 +1272,15 @@ export default function POSPage() {
                 <div className={`pos-toast ${toast.type}`}>
                     {toast.message}
                 </div>
+            )}
+
+            {/* ═══ Barcode Scanner Camera Modal ═══ */}
+            {showBarcodeScanner && (
+                <BarcodeScannerModal
+                    isOpen={showBarcodeScanner}
+                    onClose={() => setShowBarcodeScanner(false)}
+                    onScan={handleBarcodeScanned}
+                />
             )}
         </div>
     );
