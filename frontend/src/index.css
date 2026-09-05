@@ -31,10 +31,37 @@
   --color-text-muted: #555555;
 
   /* Semantic */
-  --color-success: #10b981;
-  --color-warning: #f5a623;
-  --color-error: #ff003c;
-  --color-info: #0070f3;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
+  --color-info: #38bdf8;
+
+  /* Executive Cool Palette — Global Tokens (Dark Theme) */
+  --cool-cyan: #38bdf8;
+  --cool-cyan-bg: rgba(56, 189, 248, 0.12);
+  --cool-cyan-border: rgba(56, 189, 248, 0.3);
+
+  --cool-slate-blue: #818cf8;
+  --cool-slate-blue-bg: rgba(129, 140, 248, 0.12);
+  --cool-slate-blue-border: rgba(129, 140, 248, 0.3);
+
+  --cool-teal: #34d399;
+  --cool-teal-bg: rgba(52, 211, 153, 0.12);
+  --cool-teal-border: rgba(52, 211, 153, 0.3);
+
+  --cool-amber: #fbbf24;
+  --cool-amber-bg: rgba(251, 191, 36, 0.12);
+  --cool-amber-border: rgba(251, 191, 36, 0.3);
+
+  --cool-rose: #f87171;
+  --cool-rose-bg: rgba(248, 113, 113, 0.12);
+  --cool-rose-border: rgba(248, 113, 113, 0.3);
+
+  --cool-sky: #60a5fa;
+  --cool-sky-bg: rgba(96, 165, 250, 0.12);
+
+  --cool-indigo: #a78bfa;
+  --cool-indigo-bg: rgba(167, 139, 250, 0.12);
 
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.8);
@@ -134,6 +161,39 @@
   --color-text: #000000;
   --color-text-secondary: #666666;
   --color-text-muted: #999999;
+
+  /* Semantic (Light Theme) */
+  --color-success: #0d9488;
+  --color-warning: #b45309;
+  --color-error: #dc2626;
+  --color-info: #0284c7;
+
+  /* Executive Cool Palette — Global Tokens (Light Theme) */
+  --cool-cyan: #0284c7;
+  --cool-cyan-bg: rgba(2, 132, 199, 0.08);
+  --cool-cyan-border: rgba(2, 132, 199, 0.25);
+
+  --cool-slate-blue: #4f46e5;
+  --cool-slate-blue-bg: rgba(79, 70, 229, 0.08);
+  --cool-slate-blue-border: rgba(79, 70, 229, 0.25);
+
+  --cool-teal: #0d9488;
+  --cool-teal-bg: rgba(13, 148, 136, 0.08);
+  --cool-teal-border: rgba(13, 148, 136, 0.25);
+
+  --cool-amber: #b45309;
+  --cool-amber-bg: rgba(180, 83, 9, 0.08);
+  --cool-amber-border: rgba(180, 83, 9, 0.25);
+
+  --cool-rose: #dc2626;
+  --cool-rose-bg: rgba(220, 38, 38, 0.08);
+  --cool-rose-border: rgba(220, 38, 38, 0.25);
+
+  --cool-sky: #2563eb;
+  --cool-sky-bg: rgba(37, 99, 235, 0.08);
+
+  --cool-indigo: #6d28d9;
+  --cool-indigo-bg: rgba(109, 40, 217, 0.08);
 
   --glass-bg: rgba(255, 255, 255, 0.8);
   --glass-border: #e5e5e5;
@@ -374,28 +434,49 @@ input, textarea, select { font-family: inherit; font-size: inherit; border: none
 
 .status-ready::before,
 .status-delivered::before {
-  background: var(--color-text);
-  box-shadow: 0 0 4px var(--color-text);
+  background: var(--cool-teal);
 }
 
 .status-ready {
-  border-color: var(--color-border-strong);
-  color: var(--color-text);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--cool-teal-border);
+  color: var(--cool-teal);
+  background: var(--cool-teal-bg);
 }
 
 .status-delivered {
-  border-color: var(--color-border-strong);
-  color: var(--color-text);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--cool-teal-border);
+  color: var(--cool-teal);
+  background: var(--cool-teal-bg);
 }
 
 .status-cancelled::before {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--cool-rose);
 }
 
 .status-cancelled {
-  opacity: 0.6;
+  border-color: var(--cool-rose-border);
+  color: var(--cool-rose);
+  background: var(--cool-rose-bg);
+}
+
+.status-in-progress::before {
+  background: var(--cool-cyan);
+}
+
+.status-in-progress {
+  border-color: var(--cool-cyan-border);
+  color: var(--cool-cyan);
+  background: var(--cool-cyan-bg);
+}
+
+.status-pending::before {
+  background: var(--cool-amber);
+}
+
+.status-pending {
+  border-color: var(--cool-amber-border);
+  color: var(--cool-amber);
+  background: var(--cool-amber-bg);
 }
 
 /* =====================================================
@@ -643,3 +724,71 @@ input, textarea, select { font-family: inherit; font-size: inherit; border: none
 .swal2-container {
     z-index: 100000 !important;
 }
+
+/* =====================================================
+   Global Cool Color Utilities (Executive, Scalable)
+   ===================================================== */
+.text-cool-cyan { color: var(--cool-cyan) !important; }
+.text-cool-slate { color: var(--cool-slate-blue) !important; }
+.text-cool-teal { color: var(--cool-teal) !important; }
+.text-cool-amber { color: var(--cool-amber) !important; }
+.text-cool-rose { color: var(--cool-rose) !important; }
+.text-cool-sky { color: var(--cool-sky) !important; }
+.text-cool-indigo { color: var(--cool-indigo) !important; }
+
+.bg-cool-cyan { background: var(--cool-cyan-bg) !important; border: 1px solid var(--cool-cyan-border) !important; color: var(--cool-cyan) !important; }
+.bg-cool-slate { background: var(--cool-slate-blue-bg) !important; border: 1px solid var(--cool-slate-blue-border) !important; color: var(--cool-slate-blue) !important; }
+.bg-cool-teal { background: var(--cool-teal-bg) !important; border: 1px solid var(--cool-teal-border) !important; color: var(--cool-teal) !important; }
+.bg-cool-amber { background: var(--cool-amber-bg) !important; border: 1px solid var(--cool-amber-border) !important; color: var(--cool-amber) !important; }
+.bg-cool-rose { background: var(--cool-rose-bg) !important; border: 1px solid var(--cool-rose-border) !important; color: var(--cool-rose) !important; }
+.bg-cool-sky { background: var(--cool-sky-bg) !important; color: var(--cool-sky) !important; }
+.bg-cool-indigo { background: var(--cool-indigo-bg) !important; color: var(--cool-indigo) !important; }
+
+/* Indicator Badges */
+.badge-cool-active,
+.badge-cool-trial,
+.badge-cool-expired {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm, 4px);
+    background: transparent;
+    border: none;
+}
+
+.badge-cool-active::before,
+.badge-cool-trial::before,
+.badge-cool-expired::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.badge-cool-active { color: var(--color-text); }
+.badge-cool-active::before { background: var(--cool-teal); }
+
+.badge-cool-trial { color: var(--color-text-secondary); }
+.badge-cool-trial::before { background: var(--cool-amber); }
+
+.badge-cool-expired { color: var(--color-text-muted); }
+.badge-cool-expired::before { background: var(--cool-rose); }
+
+/* Semantic Cool Aliases for clean, minimalist tags */
+.bg-success-muted { background: var(--cool-teal-bg) !important; border: 1px solid var(--cool-teal-border) !important; }
+.text-success { color: var(--cool-teal) !important; }
+
+.bg-warning-muted { background: var(--cool-amber-bg) !important; border: 1px solid var(--cool-amber-border) !important; }
+.text-warning { color: var(--cool-amber) !important; }
+
+.bg-error-muted { background: var(--cool-rose-bg) !important; border: 1px solid var(--cool-rose-border) !important; }
+.text-error { color: var(--cool-rose) !important; }
+
+.bg-info-muted { background: var(--cool-cyan-bg) !important; border: 1px solid var(--cool-cyan-border) !important; }
+.text-info { color: var(--cool-cyan) !important; }

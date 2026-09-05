@@ -136,7 +136,7 @@
 .kpi-label { font-family: var(--font-mono); font-size: var(--font-xs); color: var(--color-text-secondary); font-weight: 500; text-transform: uppercase; letter-spacing: 0.1em; }
 .kpi-value { font-family: var(--font-mono); font-size: var(--font-2xl); font-weight: 600; line-height: 1; letter-spacing: 0.02em; color: var(--color-text); }
 .kpi-change { font-size: var(--font-xs); color: var(--color-text-muted); font-weight: 500; }
-.kpi-change.positive { color: #10b981; }
+.kpi-change.positive { color: var(--cool-teal); }
 
 .kpi-badge {
     padding: 2px 8px;
@@ -149,10 +149,14 @@
     color: var(--color-text-secondary);
 }
 .kpi-badge.positive {
-    color: #10b981;
+    color: var(--cool-teal);
+    border-color: var(--cool-teal-border);
+    background: var(--cool-teal-bg);
 }
 .kpi-badge.negative {
-    color: var(--color-accent-red, #ff003c);
+    color: var(--cool-rose);
+    border-color: var(--cool-rose-border);
+    background: var(--cool-rose-bg);
 }
 
 /* Quick Actions Section */

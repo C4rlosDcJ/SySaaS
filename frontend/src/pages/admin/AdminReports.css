@@ -2,63 +2,7 @@
    SYSAAS — Admin Reports & Enterprise Analytics Stylesheet
    ===================================================== */
 
-:root {
-    /* Paleta Fría Ejecutiva - Modo Oscuro (Fondos negros/grises oscuros) */
-    --cool-cyan: #38bdf8;
-    --cool-cyan-bg: rgba(56, 189, 248, 0.12);
-    --cool-cyan-border: rgba(56, 189, 248, 0.3);
-
-    --cool-slate-blue: #818cf8;
-    --cool-slate-blue-bg: rgba(129, 140, 248, 0.12);
-    --cool-slate-blue-border: rgba(129, 140, 248, 0.3);
-
-    --cool-teal: #34d399;
-    --cool-teal-bg: rgba(52, 211, 153, 0.12);
-    --cool-teal-border: rgba(52, 211, 153, 0.3);
-
-    --cool-amber: #fbbf24;
-    --cool-amber-bg: rgba(251, 191, 36, 0.12);
-    --cool-amber-border: rgba(251, 191, 36, 0.3);
-
-    --cool-rose: #f87171;
-    --cool-rose-bg: rgba(248, 113, 113, 0.12);
-    --cool-rose-border: rgba(248, 113, 113, 0.3);
-
-    --cool-sky: #60a5fa;
-    --cool-sky-bg: rgba(96, 165, 250, 0.12);
-
-    --cool-indigo: #a78bfa;
-    --cool-indigo-bg: rgba(167, 139, 250, 0.12);
-}
-
-:root[data-theme='light'] {
-    /* Paleta Fría Ejecutiva - Modo Claro (Contraste óptimo y legible sobre fondos blancos/claros, sin neón) */
-    --cool-cyan: #0284c7;
-    --cool-cyan-bg: rgba(2, 132, 199, 0.08);
-    --cool-cyan-border: rgba(2, 132, 199, 0.25);
-
-    --cool-slate-blue: #4f46e5;
-    --cool-slate-blue-bg: rgba(79, 70, 229, 0.08);
-    --cool-slate-blue-border: rgba(79, 70, 229, 0.25);
-
-    --cool-teal: #0d9488;
-    --cool-teal-bg: rgba(13, 148, 136, 0.08);
-    --cool-teal-border: rgba(13, 148, 136, 0.25);
-
-    --cool-amber: #b45309;
-    --cool-amber-bg: rgba(180, 83, 9, 0.08);
-    --cool-amber-border: rgba(180, 83, 9, 0.25);
-
-    --cool-rose: #dc2626;
-    --cool-rose-bg: rgba(220, 38, 38, 0.08);
-    --cool-rose-border: rgba(220, 38, 38, 0.25);
-
-    --cool-sky: #2563eb;
-    --cool-sky-bg: rgba(37, 99, 235, 0.08);
-
-    --cool-indigo: #6d28d9;
-    --cool-indigo-bg: rgba(109, 40, 217, 0.08);
-}
+/* Global cool tokens and indicators are provided centrally in index.css */
 
 .reports-page {
     padding: var(--sp-6) var(--sp-8);
@@ -656,54 +600,7 @@
     border: 1px solid var(--color-border);
 }
 
-/* ── Badges de Estado de Suscripción (Minimalistas, Elegantes, con Punto Indicador) ── */
-.badge-cool-active,
-.badge-cool-trial,
-.badge-cool-expired {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    padding: 3px 8px;
-    border-radius: var(--radius-sm, 4px);
-    background: transparent;
-    border: none;
-}
-
-.badge-cool-active::before,
-.badge-cool-trial::before,
-.badge-cool-expired::before {
-    content: '';
-    display: inline-block;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-
-.badge-cool-active {
-    color: var(--color-text);
-}
-.badge-cool-active::before {
-    background: #10b981;
-}
-
-.badge-cool-trial {
-    color: var(--color-text-secondary);
-}
-.badge-cool-trial::before {
-    background: #f59e0b;
-}
-
-.badge-cool-expired {
-    color: var(--color-text-muted);
-}
-.badge-cool-expired::before {
-    background: #ef4444;
-}
-
+/* ── Subscriptions & Plan Chips ── */
 .badge-cool-cycle {
     font-size: 11px;
     font-weight: 600;
@@ -723,22 +620,6 @@
     color: var(--color-text-secondary);
     background: transparent;
     border: 1px solid transparent;
-}
-
-.text-cool-cyan {
-    color: var(--cool-cyan) !important;
-}
-
-.text-cool-slate {
-    color: var(--cool-slate-blue) !important;
-}
-
-.text-cool-teal {
-    color: var(--cool-teal) !important;
-}
-
-.text-cool-sky {
-    color: var(--cool-sky) !important;
 }
 
 .plan-yearly-chip {

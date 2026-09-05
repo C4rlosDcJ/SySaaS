@@ -304,55 +304,15 @@ export default function SuperTenantsPage() {
     const getStatusBadge = (status) => {
         switch (status) {
             case 'active':
-                return (
-                    <span style={{
-                        padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
-                        background: 'rgba(16, 185, 129, 0.12)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.25)',
-                        letterSpacing: '0.04em'
-                    }}>
-                        ACTIVA
-                    </span>
-                );
+                return <span className="badge-cool-active">Activa</span>;
             case 'trial':
-                return (
-                    <span style={{
-                        padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
-                        background: 'rgba(59, 130, 246, 0.12)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.25)',
-                        letterSpacing: '0.04em'
-                    }}>
-                        EN PRUEBA
-                    </span>
-                );
+                return <span className="badge-cool-trial">En Prueba</span>;
             case 'suspended':
-                return (
-                    <span style={{
-                        padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
-                        background: 'rgba(239, 68, 68, 0.12)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.25)',
-                        letterSpacing: '0.04em'
-                    }}>
-                        SUSPENDIDA
-                    </span>
-                );
+                return <span className="badge-cool-expired">Suspendida</span>;
             case 'past_due':
-                return (
-                    <span style={{
-                        padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
-                        background: 'rgba(245, 158, 11, 0.12)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.25)',
-                        letterSpacing: '0.04em'
-                    }}>
-                        PAGO PENDIENTE
-                    </span>
-                );
+                return <span className="badge-cool-trial">Pago Pendiente</span>;
             default:
-                return (
-                    <span style={{
-                        padding: '3px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
-                        background: 'rgba(107, 114, 128, 0.12)', color: '#9ca3af', border: '1px solid rgba(107, 114, 128, 0.25)',
-                        letterSpacing: '0.04em'
-                    }}>
-                        CANCELADA
-                    </span>
-                );
+                return <span className="badge-cool-expired">Cancelada</span>;
         }
     };
 
