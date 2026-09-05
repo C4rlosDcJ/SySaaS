@@ -12,20 +12,32 @@ import {
     X, ChevronRight, Info, ExternalLink
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 import './AdminReports.css';
 
-// Paleta de colores pastel y tonos fríos ejecutivos
-const COOL_PALETTE = [
-    '#7dd3fc', // Celeste hielo pastel
-    '#a5b4fc', // Lavanda pastel frío
-    '#6ee7b7', // Menta salvia pastel
-    '#93c5fd', // Azul cielo pastel suave
-    '#c4b5fd', // Violeta pastel suave
-    '#67e8f9', // Cian escarchado pastel
-    '#fed7aa', // Melocotón pastel suave
-    '#cbd5e1', // Pizarra escarchada
-    '#94a3b8'  // Gris frío suave
-];
+// Paleta de colores fríos ejecutivos para gráficos (balanceada para modo oscuro y claro)
+const COOL_PALETTES = {
+    dark: [
+        '#38bdf8', // Celeste hielo ejecutivo
+        '#818cf8', // Azul pizarra lavanda
+        '#34d399', // Menta esmeralda
+        '#60a5fa', // Azul cielo
+        '#a78bfa', // Violeta frío
+        '#2dd4bf', // Turquesa
+        '#cbd5e1', // Pizarra escarchada
+        '#94a3b8'  // Gris frío
+    ],
+    light: [
+        '#0284c7', // Azul petróleo profundo
+        '#4f46e5', // Índigo ejecutivo
+        '#0d9488', // Verde azulado / teal
+        '#2563eb', // Azul cobalto
+        '#6d28d9', // Púrpura frío
+        '#0891b2', // Océano
+        '#475569', // Pizarra oscura
+        '#64748b'  // Gris frío oscuro
+    ]
+};
 
 const ROLE_LABELS = {
     superadmin: 'Super Administradores',
@@ -109,6 +121,10 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function SuperReportsPage() {
+    const { theme } = useTheme();
+    const isLight = theme === 'light';
+    const activePalette = isLight ? COOL_PALETTES.light : COOL_PALETTES.dark;
+
     const [analytics, setAnalytics] = useState(defaultAnalytics);
     const [loading, setLoading] = useState(true);
 
@@ -163,13 +179,13 @@ export default function SuperReportsPage() {
         csvContent += `LTV Estimado:,$${analytics.kpis?.estimated_ltv || 0}\r\n`;
         csvContent += `Tasa de Conversion:,${analytics.kpis?.conversion_rate || 0}%\r\n`;
         csvContent += `Tasa de Retencion:,${analytics.kpis?.retention_rate || 0}%\r\n`;
-        csvContent += `Total Empresas Registradas:,${analytics.kpis?.total_tenants || 0}\r\n\r\n`;
+        csvContent += `Tasa de Churn:,${analytics.kpis?.churn_rate || 0}%\r\n\r\n`;
 
-        // Sección 2: Desglose de Empresas SaaS
-        csvContent += 'LISTADO DE EMPRESAS SAAS\r\n';
-        csvContent += 'Empresa,Subdominio,RFC/TaxID,Plan,Ciclo Facturacion,Tarifa Contratada,Aporte MRR,Cobrado Stripe,Estado Suscripcion,Vencimiento,Sedes,Usuarios\r\n';
-        (analytics.tenants || []).forEach(t => {
-            csvContent += `"${t.name}","${t.slug}","${t.tax_id || ''}","${t.plan_name}","${t.billing_cycle === 'yearly' ? 'Anual' : 'Mensual'}",$${t.plan_price},$${t.mrr_contribution},$${t.total_paid},"${t.subscription_status}","${t.subscription_end_date ? t.subscription_end_date.slice(0, 10) : 'N/A'}",${t.branches_count},${t.users_count}\r\n`;
+        // Sección 2: Detalle por Empresa
+        csvContent += 'LISTADO DE EMPRESAS Y SUSCRIPCIONES\r\n';
+        csvContent += 'ID,Empresa,Slug,Plan,Ciclo,Tarifa,Estado,Vencimiento,Sedes,Usuarios,Aporte MRR,Total Cobrado Stripe\r\n';
+        (analytics.tenantsTable || []).forEach(t => {
+            csvContent += `"${t.id}","${t.name}","${t.slug}","${t.plan_name}","${t.billing_cycle}","${t.plan_price}","${t.subscription_status}","${t.subscription_end_date || 'Ilimitado'}","${t.branches_count}","${t.users_count}","${t.mrr_contribution}","${t.total_paid || t.plan_price}"\r\n`;
         });
 
         const encodedUri = encodeURI(csvContent);
@@ -192,9 +208,9 @@ export default function SuperReportsPage() {
             name: pd.name,
             value: pd.count,
             mrr: pd.mrr,
-            color: COOL_PALETTE[idx % COOL_PALETTE.length]
+            color: activePalette[idx % activePalette.length]
         }));
-    }, [analytics]);
+    }, [analytics, activePalette]);
 
     // Roles de usuarios globales para PieChart
     const usersRolePieData = useMemo(() => {
@@ -202,9 +218,9 @@ export default function SuperReportsPage() {
         return analytics.usersByRole.map((ur, idx) => ({
             name: ROLE_LABELS[ur.role] || ur.role,
             value: ur.count,
-            color: COOL_PALETTE[idx % COOL_PALETTE.length]
+            color: activePalette[idx % activePalette.length]
         }));
-    }, [analytics]);
+    }, [analytics, activePalette]);
 
     // Datos del horizonte predictivo seleccionado
     const selectedForecastData = useMemo(() => {
@@ -338,15 +354,15 @@ export default function SuperReportsPage() {
                                 </div>
                                 <div className="health-pills-row">
                                     <div className="health-pill">
-                                        <Shield size={13} style={{ color: '#7dd3fc' }} />
+                                        <Shield size={13} style={{ color: 'var(--cool-cyan)' }} />
                                         <span>Empresas Activas: <strong>{kpis.paid_tenants || 0}</strong> de {kpis.total_tenants || 0}</span>
                                     </div>
                                     <div className="health-pill">
-                                        <Sparkles size={13} style={{ color: '#a5b4fc' }} />
+                                        <Sparkles size={13} style={{ color: 'var(--cool-slate-blue)' }} />
                                         <span>Planes Anuales: <strong>{kpis.yearly_paid_tenants || 0}</strong></span>
                                     </div>
                                     <div className="health-pill">
-                                        <CheckCircle2 size={13} style={{ color: '#6ee7b7' }} />
+                                        <CheckCircle2 size={13} style={{ color: 'var(--cool-teal)' }} />
                                         <span>Retención: <strong>{kpis.retention_rate || 100}%</strong></span>
                                     </div>
                                 </div>
@@ -363,7 +379,7 @@ export default function SuperReportsPage() {
                                                 explanation="Monto mensual recurrente que genera la plataforma. Para clientes con plan anual, se calcula prorrateando el total anual entre 12 meses."
                                             />
                                         </span>
-                                        <div className="kpi-icon" style={{ background: 'rgba(125, 211, 252, 0.12)', color: '#7dd3fc' }}>
+                                        <div className="kpi-icon" style={{ background: 'var(--cool-cyan-bg)', color: 'var(--cool-cyan)' }}>
                                             <DollarSign size={18} />
                                         </div>
                                     </div>
@@ -382,7 +398,7 @@ export default function SuperReportsPage() {
                                                 explanation="Proyección anual total basada en contratos vigentes. Para planes anuales es su valor total anual; para mensuales, la tarifa multiplicada por 12."
                                             />
                                         </span>
-                                        <div className="kpi-icon" style={{ background: 'rgba(165, 180, 252, 0.12)', color: '#a5b4fc' }}>
+                                        <div className="kpi-icon" style={{ background: 'var(--cool-slate-blue-bg)', color: 'var(--cool-slate-blue)' }}>
                                             <TrendingUp size={18} />
                                         </div>
                                     </div>
@@ -399,11 +415,11 @@ export default function SuperReportsPage() {
                                                 explanation="Dinero real efectivamente cobrado y recibido a través de las transacciones exitosas de Stripe."
                                             />
                                         </span>
-                                        <div className="kpi-icon" style={{ background: 'rgba(110, 231, 183, 0.12)', color: '#6ee7b7' }}>
+                                        <div className="kpi-icon" style={{ background: 'var(--cool-teal-bg)', color: 'var(--cool-teal)' }}>
                                             <CreditCard size={18} />
                                         </div>
                                     </div>
-                                    <div className="kpi-value" style={{ color: '#6ee7b7' }}>{formatCurrency(kpis.total_revenue_collected || 0)}</div>
+                                    <div className="kpi-value text-cool-teal">{formatCurrency(kpis.total_revenue_collected || 0)}</div>
                                     <span className="kpi-subtext">{formatCurrency(kpis.period_revenue_collected || 0)} en el período seleccionado</span>
                                 </div>
 
@@ -416,7 +432,7 @@ export default function SuperReportsPage() {
                                                 explanation="Ingreso promedio mensual que aporta cada empresa con suscripción activa a la plataforma."
                                             />
                                         </span>
-                                        <div className="kpi-icon" style={{ background: 'rgba(147, 197, 253, 0.12)', color: '#93c5fd' }}>
+                                        <div className="kpi-icon" style={{ background: 'var(--cool-sky-bg)', color: 'var(--cool-sky)' }}>
                                             <Building2 size={18} />
                                         </div>
                                     </div>
@@ -433,7 +449,7 @@ export default function SuperReportsPage() {
                                                 explanation="Ingreso estimado que generará un cliente promedio durante todo el tiempo que permanezca suscrito a SySaaS."
                                             />
                                         </span>
-                                        <div className="kpi-icon" style={{ background: 'rgba(196, 181, 253, 0.12)', color: '#c4b5fd' }}>
+                                        <div className="kpi-icon" style={{ background: 'var(--cool-indigo-bg)', color: 'var(--cool-indigo)' }}>
                                             <Shield size={18} />
                                         </div>
                                     </div>
@@ -460,8 +476,8 @@ export default function SuperReportsPage() {
                                                 <AreaChart data={tenantsGrowthData}>
                                                     <defs>
                                                         <linearGradient id="tenantsGrad" x1="0" y1="0" x2="0" y2="1">
-                                                            <stop offset="5%" stopColor="#7dd3fc" stopOpacity={0.35} />
-                                                            <stop offset="95%" stopColor="#7dd3fc" stopOpacity={0} />
+                                                            <stop offset="5%" stopColor={isLight ? '#0284c7' : '#38bdf8'} stopOpacity={0.3} />
+                                                            <stop offset="95%" stopColor={isLight ? '#0284c7' : '#38bdf8'} stopOpacity={0} />
                                                         </linearGradient>
                                                     </defs>
                                                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.4} />
@@ -472,11 +488,11 @@ export default function SuperReportsPage() {
                                                         type="monotone"
                                                         dataKey="new_tenants"
                                                         name="Nuevos Registros"
-                                                        stroke="#7dd3fc"
+                                                        stroke={isLight ? '#0284c7' : '#38bdf8'}
                                                         strokeWidth={2.5}
                                                         fill="url(#tenantsGrad)"
-                                                        dot={{ r: 4, stroke: '#7dd3fc', strokeWidth: 2, fill: 'var(--color-bg-card)' }}
-                                                        activeDot={{ r: 7, stroke: '#7dd3fc', strokeWidth: 2, fill: '#7dd3fc' }}
+                                                        dot={{ r: 4, stroke: isLight ? '#0284c7' : '#38bdf8', strokeWidth: 2, fill: 'var(--color-bg-card)' }}
+                                                        activeDot={{ r: 7, stroke: isLight ? '#0284c7' : '#38bdf8', strokeWidth: 2, fill: isLight ? '#0284c7' : '#38bdf8' }}
                                                     />
                                                 </AreaChart>
                                             </ResponsiveContainer>
@@ -591,14 +607,7 @@ export default function SuperReportsPage() {
                                                         </td>
                                                         <td>
                                                             <span className="badge-neutral" style={{ fontWeight: 600, marginRight: '6px' }}>{t.plan_name}</span>
-                                                            <span style={{
-                                                                fontSize: '11px',
-                                                                fontWeight: 600,
-                                                                color: t.billing_cycle === 'yearly' ? '#7dd3fc' : 'var(--color-text-secondary)',
-                                                                background: t.billing_cycle === 'yearly' ? 'rgba(125, 211, 252, 0.12)' : 'transparent',
-                                                                padding: t.billing_cycle === 'yearly' ? '2px 6px' : '0',
-                                                                borderRadius: '4px'
-                                                            }}>
+                                                            <span className={`badge-cool-cycle ${t.billing_cycle === 'yearly' ? 'yearly' : 'monthly'}`}>
                                                                 {t.billing_cycle === 'yearly' ? 'Anual (1 Año)' : 'Mensual (1 Mes)'}
                                                             </span>
                                                         </td>
@@ -608,10 +617,10 @@ export default function SuperReportsPage() {
                                                                 /{t.billing_cycle === 'yearly' ? 'año' : 'mes'}
                                                             </span>
                                                         </td>
-                                                        <td style={{ fontWeight: 600, color: '#93c5fd' }}>
+                                                        <td className="text-cool-sky" style={{ fontWeight: 600 }}>
                                                             {formatCurrency(t.mrr_contribution)}/mes
                                                         </td>
-                                                        <td style={{ textAlign: 'right', fontWeight: 700, color: '#6ee7b7' }}>
+                                                        <td className="text-cool-teal" style={{ textAlign: 'right', fontWeight: 700 }}>
                                                             {formatCurrency(t.total_paid || t.plan_price)}
                                                         </td>
                                                     </tr>
@@ -758,8 +767,8 @@ export default function SuperReportsPage() {
                                         <AreaChart data={selectedForecastData}>
                                             <defs>
                                                 <linearGradient id="aiForecastGrad" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#a5b4fc" stopOpacity={0.35} />
-                                                    <stop offset="95%" stopColor="#a5b4fc" stopOpacity={0} />
+                                                    <stop offset="5%" stopColor={isLight ? '#4f46e5' : '#818cf8'} stopOpacity={0.3} />
+                                                    <stop offset="95%" stopColor={isLight ? '#4f46e5' : '#818cf8'} stopOpacity={0} />
                                                 </linearGradient>
                                             </defs>
                                             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.5} />
@@ -770,8 +779,8 @@ export default function SuperReportsPage() {
                                                 type="monotone"
                                                 dataKey={forecastHorizon === '3y' ? 'projected_mrr' : 'predicted_mrr'}
                                                 name="MRR Proyectado"
-                                                stroke="#a5b4fc"
-                                                strokeWidth={2}
+                                                stroke={isLight ? '#4f46e5' : '#818cf8'}
+                                                strokeWidth={2.5}
                                                 fill="url(#aiForecastGrad)"
                                             />
                                         </AreaChart>
@@ -891,8 +900,7 @@ export default function SuperReportsPage() {
                                 {/* Pasos de Embudo Escalonados */}
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '12px 0' }}>
                                     {(analytics?.funnel || []).map((step, idx) => {
-                                        const stepColors = ['#7dd3fc', '#a5b4fc', '#6ee7b7', '#93c5fd'];
-                                        const color = stepColors[idx % stepColors.length];
+                                        const color = activePalette[idx % activePalette.length];
                                         return (
                                             <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '13px' }}>
@@ -1080,16 +1088,7 @@ export default function SuperReportsPage() {
                                                                 <td>
                                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
                                                                         <span className="badge-neutral" style={{ fontWeight: 600 }}>{t.plan_name}</span>
-                                                                        <span style={{
-                                                                            fontSize: '11px',
-                                                                            fontWeight: 600,
-                                                                            color: t.billing_cycle === 'yearly' ? '#7dd3fc' : 'var(--color-text-secondary)',
-                                                                            background: t.billing_cycle === 'yearly' ? 'rgba(125, 211, 252, 0.12)' : 'transparent',
-                                                                            padding: t.billing_cycle === 'yearly' ? '2px 6px' : '0',
-                                                                            borderRadius: '4px',
-                                                                            display: 'inline-block',
-                                                                            width: 'fit-content'
-                                                                        }}>
+                                                                        <span className={`badge-cool-cycle ${t.billing_cycle === 'yearly' ? 'yearly' : 'monthly'}`}>
                                                                             {t.billing_cycle === 'yearly' ? 'Anual (1 Año)' : 'Mensual (1 Mes)'}
                                                                         </span>
                                                                     </div>
@@ -1103,17 +1102,11 @@ export default function SuperReportsPage() {
                                                                     </div>
                                                                 </td>
                                                                 <td>
-                                                                    <span style={{
-                                                                        fontSize: '11px',
-                                                                        fontWeight: 700,
-                                                                        letterSpacing: '0.03em',
-                                                                        padding: '3px 8px',
-                                                                        borderRadius: '6px',
-                                                                        display: 'inline-block',
-                                                                        color: t.subscription_status === 'active' ? '#6ee7b7' : (t.subscription_status === 'trial' ? '#fed7aa' : '#fca5a5'),
-                                                                        background: t.subscription_status === 'active' ? 'rgba(110, 231, 183, 0.1)' : (t.subscription_status === 'trial' ? 'rgba(254, 215, 170, 0.1)' : 'rgba(252, 165, 165, 0.1)'),
-                                                                        border: `1px solid ${t.subscription_status === 'active' ? 'rgba(110, 231, 183, 0.25)' : (t.subscription_status === 'trial' ? 'rgba(254, 215, 170, 0.25)' : 'rgba(252, 165, 165, 0.25)')}`
-                                                                    }}>
+                                                                    <span className={
+                                                                        t.subscription_status === 'active'
+                                                                            ? 'badge-cool-active'
+                                                                            : (t.subscription_status === 'trial' ? 'badge-cool-trial' : 'badge-cool-expired')
+                                                                    }>
                                                                         {t.subscription_status === 'active' ? 'PAGO ACTIVO' : (t.subscription_status === 'trial' ? 'EN PRUEBA' : 'VENCIDO')}
                                                                     </span>
                                                                 </td>
@@ -1126,7 +1119,7 @@ export default function SuperReportsPage() {
                                                                 <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--color-text)' }}>
                                                                     {t.subscription_status === 'active' ? `${formatCurrency(t.mrr_contribution)}/m` : '$0.00'}
                                                                 </td>
-                                                                <td style={{ textAlign: 'right', fontWeight: 700, color: '#7dd3fc' }}>
+                                                                <td className="text-cool-cyan" style={{ textAlign: 'right', fontWeight: 700 }}>
                                                                     {t.total_paid > 0 ? formatCurrency(t.total_paid) : (t.subscription_status === 'active' ? formatCurrency(t.plan_price) : '$0.00')}
                                                                 </td>
                                                             </tr>
@@ -1202,16 +1195,7 @@ export default function SuperReportsPage() {
                                             <div className="plan-price-tag">
                                                 {formatCurrency(p.price)} <span className="plan-price-sub">/ mes</span>
                                             </div>
-                                            <div style={{
-                                                fontSize: '12px',
-                                                color: '#7dd3fc',
-                                                fontWeight: 600,
-                                                marginTop: '4px',
-                                                background: 'rgba(125, 211, 252, 0.1)',
-                                                padding: '2px 8px',
-                                                borderRadius: '4px',
-                                                display: 'inline-block'
-                                            }}>
+                                            <div className="plan-yearly-chip">
                                                 {formatCurrency(p.price_yearly)} / año
                                             </div>
                                         </div>
@@ -1224,7 +1208,7 @@ export default function SuperReportsPage() {
                                             fontSize: '11px'
                                         }}>
                                             <span style={{ color: 'var(--color-text-secondary)' }}>Aporte Anual (ARR):</span>
-                                            <strong style={{ color: '#a5b4fc', fontSize: '13px' }}>{formatCurrency(p.arr)}</strong>
+                                            <strong className="text-cool-slate" style={{ fontSize: '13px' }}>{formatCurrency(p.arr)}</strong>
                                         </div>
                                     </div>
                                 ))}
@@ -1255,7 +1239,7 @@ export default function SuperReportsPage() {
                                                 <tr key={idx}>
                                                     <td style={{ fontWeight: 600, color: 'var(--color-text)' }}>{p.name}</td>
                                                     <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(p.price)}/m</td>
-                                                    <td style={{ textAlign: 'right', fontWeight: 600, color: '#7dd3fc' }}>{formatCurrency(p.price_yearly)}/a</td>
+                                                    <td className="text-cool-cyan" style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(p.price_yearly)}/a</td>
                                                     <td style={{ textAlign: 'center', fontWeight: 600 }}>
                                                         <span className="badge-neutral">
                                                             {p.count} ({p.yearly_count || 0} anual, {p.monthly_count || 0} mensual)
@@ -1264,7 +1248,7 @@ export default function SuperReportsPage() {
                                                     <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--color-text)' }}>
                                                         {formatCurrency(p.mrr)}/m
                                                     </td>
-                                                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#a5b4fc' }}>
+                                                    <td className="text-cool-slate" style={{ textAlign: 'right', fontWeight: 800 }}>
                                                         {formatCurrency(p.arr)}/a
                                                     </td>
                                                 </tr>
