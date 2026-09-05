@@ -285,6 +285,9 @@ export const ThemeProvider = ({ children }) => {
   const setBusinessLogoAndPersist = (logo) => {
     isUserChange.current = true;
     setBusinessLogo(logo);
+    if (typeof logo === 'string' && logo.startsWith('blob:')) {
+      return; // No persistir URLs locales efímeras
+    }
     settingsService.update({ business_logo: logo }).catch((err) => {
       console.warn('[Theme] Error al guardar logo en BD:', err.message);
     });

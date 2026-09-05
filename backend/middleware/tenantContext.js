@@ -14,19 +14,23 @@ const db = require('../config/database');
  */
 const tenantContext = async (req, res, next) => {
     try {
-        // SuperAdmin no tiene contexto de tenant -- opera en toda la plataforma
+        // Si es SuperAdmin, verificar si especifica un tenant mediante cabecera X-Tenant-ID
+        let tenantId = req.user.tenant_id;
         if (req.user.role === 'superadmin') {
-            req.tenantCtx = {
-                tenantId: null,
-                branchId: null,
-                tenant: null,
-                planFeatures: null,
-                isSuperAdmin: true
-            };
-            return next();
+            const explicitTenantId = req.headers['x-tenant-id'] ? parseInt(req.headers['x-tenant-id'], 10) : null;
+            if (explicitTenantId) {
+                tenantId = explicitTenantId;
+            } else if (!tenantId) {
+                req.tenantCtx = {
+                    tenantId: null,
+                    branchId: null,
+                    tenant: null,
+                    planFeatures: null,
+                    isSuperAdmin: true
+                };
+                return next();
+            }
         }
-
-        const tenantId = req.user.tenant_id;
 
         if (!tenantId) {
             return res.status(403).json({ 

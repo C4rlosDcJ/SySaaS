@@ -4,12 +4,35 @@ const bcrypt = require('bcryptjs');
 // Obtener todas las configuraciones del tenant
 exports.getAll = async (req, res) => {
     try {
-        const tenantId = req.tenantCtx.tenantId;
+        const tenantId = req.tenantCtx?.tenantId;
+        if (!tenantId) {
+            return res.json({});
+        }
+
         const [rows] = await db.query('SELECT * FROM settings WHERE tenant_id = ?', [tenantId]);
         const settings = rows.reduce((acc, curr) => {
             acc[curr.setting_key] = curr.setting_value;
             return acc;
         }, {});
+
+        // Respaldo bidireccional y sincronización con la tabla tenants
+        const [tenants] = await db.query('SELECT company_name, logo_url FROM tenants WHERE id = ?', [tenantId]);
+        if (tenants.length > 0) {
+            const tenant = tenants[0];
+            // Si no está en settings pero sí en tenants, usar de tenants
+            if (!settings.business_logo && tenant.logo_url) {
+                settings.business_logo = tenant.logo_url;
+            }
+            if (!settings.business_name && tenant.company_name) {
+                settings.business_name = tenant.company_name;
+            }
+
+            // Si está en settings pero no en tenants, asegurar consistencia en tenants
+            if (settings.business_logo && !tenant.logo_url && !settings.business_logo.startsWith('blob:')) {
+                await db.query('UPDATE tenants SET logo_url = ? WHERE id = ?', [settings.business_logo, tenantId]);
+            }
+        }
+
         res.json(settings);
     } catch (error) {
         console.error('[SETTINGS] Error al obtener configuraciones:', error);
@@ -20,8 +43,17 @@ exports.getAll = async (req, res) => {
 // Actualizar una configuración específica
 exports.update = async (req, res) => {
     try {
-        const tenantId = req.tenantCtx.tenantId;
-        const settings = req.body; // Objeto { key: value }
+        const tenantId = req.tenantCtx?.tenantId;
+        if (!tenantId) {
+            return res.status(400).json({ message: 'No se identifico la empresa asignada para actualizar configuraciones.' });
+        }
+
+        const settings = { ...req.body }; // Objeto { key: value }
+
+        // Evitar persistir URLs temporales efímeras de tipo blob:
+        if (settings.business_logo && typeof settings.business_logo === 'string' && settings.business_logo.startsWith('blob:')) {
+            delete settings.business_logo;
+        }
 
         for (const [key, value] of Object.entries(settings)) {
             await db.query(
@@ -32,10 +64,11 @@ exports.update = async (req, res) => {
 
         // Sincronizar tabla tenants para mantener consistencia de logo y razón social
         if (settings.business_logo !== undefined) {
-            await db.query('UPDATE tenants SET logo_url = ? WHERE id = ?', [settings.business_logo, tenantId]);
+            const cleanLogo = settings.business_logo && settings.business_logo.trim() !== '' ? settings.business_logo : null;
+            await db.query('UPDATE tenants SET logo_url = ? WHERE id = ?', [cleanLogo, tenantId]);
         }
-        if (settings.business_name) {
-            await db.query('UPDATE tenants SET company_name = ? WHERE id = ?', [settings.business_name, tenantId]);
+        if (settings.business_name && settings.business_name.trim() !== '') {
+            await db.query('UPDATE tenants SET company_name = ? WHERE id = ?', [settings.business_name.trim(), tenantId]);
         }
 
         res.json({ message: 'Configuraciones actualizadas correctamente.' });
@@ -74,7 +107,13 @@ exports.getGlobalSettings = async (req, res) => {
 // Guardar configuraciones globales (SuperAdmin)
 exports.updateGlobalSettings = async (req, res) => {
     try {
-        const settings = req.body;
+        const settings = { ...req.body };
+
+        // Evitar persistir URLs temporales efímeras de tipo blob:
+        if (settings.platform_logo && typeof settings.platform_logo === 'string' && settings.platform_logo.startsWith('blob:')) {
+            delete settings.platform_logo;
+        }
+
         for (const [key, value] of Object.entries(settings)) {
             await db.query(
                 'INSERT INTO settings (tenant_id, setting_key, setting_value) VALUES (NULL, ?, ?) ON DUPLICATE KEY UPDATE setting_value = ?',

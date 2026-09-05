@@ -8,6 +8,7 @@ export default function SuperSettingsPage() {
     const { user } = useAuth();
     const fileInputRef = useRef(null);
     const [uploadingLogo, setUploadingLogo] = useState(false);
+    const [logoLoadError, setLogoLoadError] = useState(false);
     const [settings, setSettings] = useState({
         platform_name: 'SySaaS',
         platform_logo: '',
@@ -66,6 +67,7 @@ export default function SuperSettingsPage() {
                     max_file_upload_mb: parseInt(res.max_file_upload_mb) || prev.max_file_upload_mb,
                     gemini_api_key: res.gemini_api_key || prev.gemini_api_key
                 }));
+                setLogoLoadError(false);
             }
         } catch (err) {
             setError(err.message || 'Error al obtener configuraciones');
@@ -75,22 +77,31 @@ export default function SuperSettingsPage() {
     };
 
     const handleLogoUpload = async (e) => {
-        const file = e.target.files[0];
+        const file = e.target.files?.[0];
         if (!file) return;
 
         try {
             setUploadingLogo(true);
             setError('');
-            const localPreview = URL.createObjectURL(file);
-            setSettings(prev => ({ ...prev, platform_logo: localPreview }));
+            setLogoLoadError(false);
 
             const compressed = await compressImage(file, { maxWidth: 500, maxHeight: 500, quality: 0.85 });
             const formData = new FormData();
             formData.append('image', compressed);
 
             const res = await uploadService.uploadSingle(formData);
-            setSettings(prev => ({ ...prev, platform_logo: res.url }));
-            localStorage.setItem('platform_logo', res.url);
+            if (res?.url) {
+                const persistentUrl = res.url;
+                // 1. Guardar de inmediato en BD global de la plataforma
+                await superAdminService.updateGlobalSettings({ platform_logo: persistentUrl });
+
+                // 2. Actualizar estado y almacenamiento local
+                setSettings(prev => ({ ...prev, platform_logo: persistentUrl }));
+                localStorage.setItem('platform_logo', persistentUrl);
+
+                setSaved(true);
+                setTimeout(() => setSaved(false), 3000);
+            }
         } catch (err) {
             console.error('Error subiendo logo de plataforma:', err);
             setError('No se pudo subir el logo de la plataforma: ' + err.message);
@@ -100,9 +111,24 @@ export default function SuperSettingsPage() {
         }
     };
 
-    const handleRemoveLogo = () => {
-        setSettings(prev => ({ ...prev, platform_logo: '' }));
-        localStorage.removeItem('platform_logo');
+    const handleRemoveLogo = async () => {
+        try {
+            setUploadingLogo(true);
+            setError('');
+            // Guardar de inmediato la eliminación en BD global
+            await superAdminService.updateGlobalSettings({ platform_logo: '' });
+            setSettings(prev => ({ ...prev, platform_logo: '' }));
+            localStorage.removeItem('platform_logo');
+            setLogoLoadError(false);
+
+            setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
+        } catch (err) {
+            console.error('Error eliminando logo de plataforma:', err);
+            setError('No se pudo eliminar el logo: ' + err.message);
+        } finally {
+            setUploadingLogo(false);
+        }
     };
 
     const handleChange = (key, value) => {
@@ -228,12 +254,16 @@ export default function SuperSettingsPage() {
                             
                             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '6px', background: 'var(--color-bg-tertiary)', padding: '12px 16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
                                 <div style={{ width: '64px', height: '64px', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg-elevated)', border: '1px dashed var(--color-border-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                                    {settings.platform_logo ? (
+                                    {uploadingLogo ? (
+                                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                            <UploadCloud size={20} className="text-primary animate-bounce" />
+                                        </div>
+                                    ) : (settings.platform_logo && !logoLoadError) ? (
                                         <img 
                                             src={getImageUrl(settings.platform_logo)} 
                                             alt="Logo Plataforma" 
                                             style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                            onError={() => setLogoLoadError(true)}
                                         />
                                     ) : (
                                         <Shield size={28} className="text-primary" />

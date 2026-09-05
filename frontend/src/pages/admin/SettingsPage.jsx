@@ -14,7 +14,7 @@ import {
     Bell,
     LayoutGrid
 } from 'lucide-react';
-import { showAlert } from '../../utils/swal';
+import { showAlert, showConfirm } from '../../utils/swal';
 import './SettingsPage.css';
 
 export default function SettingsPage() {
@@ -53,6 +53,8 @@ export default function SettingsPage() {
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [uploadingLogo, setUploadingLogo] = useState(false);
+    const [logoLoadError, setLogoLoadError] = useState(false);
 
     // Cargar configuraciones exclusivas de este tenant
     // Only run when we have a real tenant id to prevent fetching with wrong context
@@ -61,6 +63,17 @@ export default function SettingsPage() {
         fetchSettings();
     }, [tenantId]);
 
+    // Sincronizar si tenant cargó de forma asíncrona
+    useEffect(() => {
+        if (tenant?.logo_url && !settings.business_logo) {
+            setSettings(prev => ({
+                ...prev,
+                business_logo: prev.business_logo || tenant.logo_url
+            }));
+            setLogoLoadError(false);
+        }
+    }, [tenant?.logo_url]);
+
     const fetchSettings = async () => {
         try {
             setLoading(true);
@@ -68,13 +81,10 @@ export default function SettingsPage() {
             if (data) {
                 setSettings(prev => ({
                     ...prev,
-                    ...data
+                    ...data,
+                    business_logo: data.business_logo || prev.business_logo || tenant?.logo_url || ''
                 }));
-                // NOTE: Do NOT call updateTenantInfo here.
-                // Mutating the global TenantContext on every settings load causes
-                // the active tenant to be overwritten with potentially wrong data,
-                // which then persists across all other modules. The tenant context
-                // is managed exclusively by AuthContext via the JWT token.
+                setLogoLoadError(false);
             }
         } catch (error) {
             console.error('Error al cargar configuraciones:', error);
@@ -84,12 +94,12 @@ export default function SettingsPage() {
     };
 
     const handleLogoUpload = async (e) => {
-        const file = e.target.files[0];
+        const file = e.target.files?.[0];
         if (!file) return;
 
         try {
-            const localPreview = URL.createObjectURL(file);
-            setSettings(prev => ({ ...prev, business_logo: localPreview }));
+            setUploadingLogo(true);
+            setLogoLoadError(false);
 
             const compressed = await compressImage(file, { maxWidth: 500, maxHeight: 500, quality: 0.85 });
             const formData = new FormData();
@@ -97,54 +107,129 @@ export default function SettingsPage() {
 
             const res = await uploadService.uploadSingle(formData);
             if (res?.url) {
-                setSettings(prev => ({ ...prev, business_logo: res.url }));
+                const persistentUrl = res.url;
+
+                // 1. Guardar de forma inmediata en la base de datos para que nunca se pierda
+                await settingsService.update({ business_logo: persistentUrl });
+
+                // 2. Actualizar estado local del formulario
+                setSettings(prev => ({ ...prev, business_logo: persistentUrl }));
+
+                // 3. Sincronizar contextos globales
                 if (updateTenantInfo) {
-                    updateTenantInfo({ logo_url: res.url });
+                    updateTenantInfo({ logo_url: persistentUrl });
                 }
+                if (setBusinessLogo) {
+                    setBusinessLogo(persistentUrl);
+                }
+
+                showAlert({
+                    title: 'Logotipo Actualizado',
+                    text: 'El logotipo de tu empresa se ha subido y guardado exitosamente.',
+                    icon: 'success'
+                });
             }
         } catch (err) {
             console.error('Error subiendo logo de empresa:', err);
             // Fallback base64
             const reader = new FileReader();
-            reader.onload = (event) => {
+            reader.onload = async (event) => {
                 const img = new window.Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 250;
-                    const MAX_HEIGHT = 250;
-                    let width = img.width;
-                    let height = img.height;
-                    if (width > height) {
-                        if (width > MAX_WIDTH) {
-                            height *= MAX_WIDTH / width;
-                            width = MAX_WIDTH;
+                img.onload = async () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 250;
+                        const MAX_HEIGHT = 250;
+                        let width = img.width;
+                        let height = img.height;
+                        if (width > height) {
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                        } else {
+                            if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
                         }
-                    } else {
-                        if (height > MAX_HEIGHT) {
-                            width *= MAX_HEIGHT / height;
-                            height = MAX_HEIGHT;
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        const compressedBase64 = canvas.toDataURL('image/png', 0.8);
+
+                        // Persistir base64 de inmediato en la base de datos
+                        await settingsService.update({ business_logo: compressedBase64 });
+                        setSettings(prev => ({ ...prev, business_logo: compressedBase64 }));
+                        if (updateTenantInfo) {
+                            updateTenantInfo({ logo_url: compressedBase64 });
                         }
-                    }
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    const compressedBase64 = canvas.toDataURL('image/png', 0.8);
-                    setSettings(prev => ({ ...prev, business_logo: compressedBase64 }));
-                    if (updateTenantInfo) {
-                        updateTenantInfo({ logo_url: compressedBase64 });
+                        if (setBusinessLogo) {
+                            setBusinessLogo(compressedBase64);
+                        }
+
+                        showAlert({
+                            title: 'Logotipo Actualizado',
+                            text: 'El logotipo se ha guardado correctamente.',
+                            icon: 'success'
+                        });
+                    } catch (persistErr) {
+                        showAlert({
+                            title: 'Error al Guardar Logo',
+                            text: persistErr.message || 'No se pudo guardar el logotipo.',
+                            icon: 'error'
+                        });
+                    } finally {
+                        setUploadingLogo(false);
                     }
                 };
                 img.src = event.target.result;
             };
             reader.readAsDataURL(file);
+            return;
+        } finally {
+            setUploadingLogo(false);
+            if (e.target) e.target.value = '';
         }
     };
 
-    const handleRemoveLogo = () => {
-        setSettings(prev => ({ ...prev, business_logo: '' }));
-        if (updateTenantInfo) {
-            updateTenantInfo({ logo_url: '' });
+    const handleRemoveLogo = async () => {
+        const confirmed = await showConfirm({
+            title: '¿Eliminar Logotipo?',
+            text: '¿Estás seguro de que deseas quitar el logotipo de tu empresa?',
+            icon: 'warning',
+            confirmText: 'Sí, eliminar'
+        });
+        if (!confirmed) return;
+
+        try {
+            setSaving(true);
+            // Persistir inmediatamente en BD
+            await settingsService.update({ business_logo: '' });
+            setSettings(prev => ({ ...prev, business_logo: '' }));
+            setLogoLoadError(false);
+
+            if (updateTenantInfo) {
+                updateTenantInfo({ logo_url: '' });
+            }
+            if (setBusinessLogo) {
+                setBusinessLogo('');
+            }
+
+            showAlert({
+                title: 'Logotipo Eliminado',
+                text: 'El logotipo ha sido eliminado correctamente.',
+                icon: 'info'
+            });
+        } catch (error) {
+            showAlert({
+                title: 'Error',
+                text: error.message || 'No se pudo eliminar el logotipo.',
+                icon: 'error'
+            });
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -557,7 +642,18 @@ export default function SettingsPage() {
                                     Logotipo de la Empresa
                                 </label>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
-                                    {settings.business_logo ? (
+                                    {uploadingLogo ? (
+                                        <div style={{
+                                            width: '80px', height: '80px', borderRadius: 'var(--radius-md)',
+                                            border: '1px solid var(--color-border)', display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center', justifyContent: 'center',
+                                            background: 'var(--color-bg-tertiary)', gap: '6px'
+                                        }}>
+                                            <RefreshCw size={20} className="animate-spin text-primary" />
+                                            <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Subiendo...</span>
+                                        </div>
+                                    ) : (settings.business_logo && !logoLoadError) ? (
                                         <div style={{
                                             width: '80px', height: '80px', borderRadius: 'var(--radius-md)',
                                             border: '1px solid var(--color-border)', display: 'flex',
@@ -568,32 +664,36 @@ export default function SettingsPage() {
                                                 src={getImageUrl(settings.business_logo)} 
                                                 alt="Logo" 
                                                 style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-                                                onError={(e) => { e.target.style.display = 'none'; }}
+                                                onError={() => setLogoLoadError(true)}
                                             />
                                         </div>
                                     ) : (
                                         <div style={{
                                             width: '80px', height: '80px', borderRadius: 'var(--radius-md)',
                                             border: '1px dashed var(--color-border)', display: 'flex',
+                                            flexDirection: 'column',
                                             alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)',
-                                            background: 'var(--color-bg-tertiary)'
+                                            background: 'var(--color-bg-tertiary)', fontSize: '10px', textAlign: 'center', padding: '4px'
                                         }}>
-                                            <Image size={32} />
+                                            <Image size={28} style={{ marginBottom: '2px', opacity: 0.6 }} />
+                                            {logoLoadError ? <span>Error al cargar</span> : <span>Sin logo</span>}
                                         </div>
                                     )}
 
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                            <Upload size={14} /> Seleccionar Imagen
+                                        <label className={`btn btn-secondary btn-sm ${uploadingLogo ? 'disabled' : ''}`} style={{ cursor: uploadingLogo ? 'not-allowed' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                            {uploadingLogo ? <RefreshCw size={14} className="animate-spin" /> : <Upload size={14} />}
+                                            <span>{uploadingLogo ? 'Subiendo...' : (settings.business_logo ? 'Cambiar Imagen' : 'Seleccionar Imagen')}</span>
                                             <input
                                                 type="file"
                                                 accept="image/*"
                                                 onChange={handleLogoUpload}
+                                                disabled={uploadingLogo}
                                                 style={{ display: 'none' }}
                                             />
                                         </label>
 
-                                        {settings.business_logo && (
+                                        {settings.business_logo && !uploadingLogo && (
                                             <button
                                                 type="button"
                                                 className="btn btn-secondary btn-sm"
