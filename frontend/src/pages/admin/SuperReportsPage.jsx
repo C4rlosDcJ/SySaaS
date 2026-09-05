@@ -8,7 +8,7 @@ import {
     DollarSign, Building2, Users, TrendingUp, Shield,
     RefreshCw, ArrowUpRight, ArrowDownRight, Layers,
     Download, Printer, Calendar, Clock, AlertTriangle, CheckCircle2,
-    Search, UserCheck, Sparkles, Cpu, Target, HelpCircle
+    Search, UserCheck, Sparkles, Cpu, Target, HelpCircle, CreditCard
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/constants';
 import './AdminReports.css';
@@ -40,6 +40,10 @@ const defaultAnalytics = {
         active_tenants: 0,
         trial_tenants: 0,
         paid_tenants: 0,
+        yearly_paid_tenants: 0,
+        monthly_paid_tenants: 0,
+        total_revenue_collected: 0,
+        period_revenue_collected: 0,
         expired_tenants: 0,
         total_users: 0,
         mrr: 0,
@@ -129,7 +133,9 @@ export default function SuperReportsPage() {
         csvContent += 'REPORTE FINANCIERO Y DE SUSCRIPCIONES SAAS SYSAAS\r\n';
         csvContent += `Periodo:,${period}\r\n`;
         csvContent += `MRR (Ingresos Mensuales Recurrentes):,$${analytics.kpis?.mrr || 0}\r\n`;
-        csvContent += `ARR Proyectado:,$${analytics.kpis?.arr || 0}\r\n`;
+        csvContent += `ARR Real Contratado:,$${analytics.kpis?.arr || 0}\r\n`;
+        csvContent += `Recaudado en Periodo:,$${analytics.kpis?.period_revenue_collected || 0}\r\n`;
+        csvContent += `Total Historico Stripe:,$${analytics.kpis?.total_revenue_collected || 0}\r\n`;
         csvContent += `ARPU (Ingreso Promedio por Tenant):,$${analytics.kpis?.arpu || 0}\r\n`;
         csvContent += `LTV Estimado:,$${analytics.kpis?.estimated_ltv || 0}\r\n`;
         csvContent += `Tasa de Conversion:,${analytics.kpis?.conversion_rate || 0}%\r\n`;
@@ -138,9 +144,9 @@ export default function SuperReportsPage() {
 
         // Sección 2: Desglose de Empresas SaaS
         csvContent += 'LISTADO DE EMPRESAS SAAS\r\n';
-        csvContent += 'Empresa,Subdominio,RFC/TaxID,Plan,Precio Plan,Estado Suscripcion,Vencimiento,Sedes,Usuarios\r\n';
+        csvContent += 'Empresa,Subdominio,RFC/TaxID,Plan,Ciclo Facturacion,Tarifa Contratada,Aporte MRR,Cobrado Stripe,Estado Suscripcion,Vencimiento,Sedes,Usuarios\r\n';
         (analytics.tenants || []).forEach(t => {
-            csvContent += `"${t.name}","${t.slug}","${t.tax_id || ''}","${t.plan_name}",$${t.plan_price},"${t.subscription_status}","${t.subscription_end_date ? t.subscription_end_date.slice(0, 10) : 'N/A'}",${t.branches_count},${t.users_count}\r\n`;
+            csvContent += `"${t.name}","${t.slug}","${t.tax_id || ''}","${t.plan_name}","${t.billing_cycle === 'yearly' ? 'Anual' : 'Mensual'}",$${t.plan_price},$${t.mrr_contribution},$${t.total_paid},"${t.subscription_status}","${t.subscription_end_date ? t.subscription_end_date.slice(0, 10) : 'N/A'}",${t.branches_count},${t.users_count}\r\n`;
         });
 
         const encodedUri = encodeURI(csvContent);
@@ -302,18 +308,29 @@ export default function SuperReportsPage() {
                                         </div>
                                     </div>
                                     <div className="kpi-value">{formatCurrency(kpis.mrr || 0)}</div>
-                                    <span className="kpi-subtext">{kpis.paid_tenants || 0} empresas de pago activas</span>
+                                    <span className="kpi-subtext">{kpis.paid_tenants || 0} activas ({kpis.yearly_paid_tenants || 0} anual, {kpis.monthly_paid_tenants || 0} mensual)</span>
                                 </div>
 
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
-                                        <span className="kpi-label">ARR Proyectado (Anual)</span>
+                                        <span className="kpi-label">ARR Real (Anual Contratado)</span>
                                         <div className="kpi-icon" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
                                             <TrendingUp size={18} />
                                         </div>
                                     </div>
                                     <div className="kpi-value">{formatCurrency(kpis.arr || 0)}</div>
-                                    <span className="kpi-subtext">Facturación anual recurrente estimada</span>
+                                    <span className="kpi-subtext">Facturación anual recurrente normalizada</span>
+                                </div>
+
+                                <div className="kpi-card">
+                                    <div className="kpi-card-header">
+                                        <span className="kpi-label">Cobrado en Stripe (Total Real)</span>
+                                        <div className="kpi-icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981' }}>
+                                            <CreditCard size={18} />
+                                        </div>
+                                    </div>
+                                    <div className="kpi-value" style={{ color: '#10b981' }}>{formatCurrency(kpis.total_revenue_collected || 0)}</div>
+                                    <span className="kpi-subtext">{formatCurrency(kpis.period_revenue_collected || 0)} en el período seleccionado</span>
                                 </div>
 
                                 <div className="kpi-card">
@@ -755,11 +772,13 @@ export default function SuperReportsPage() {
                                                     <thead>
                                                         <tr>
                                                             <th>Empresa</th>
-                                                            <th>Plan</th>
+                                                            <th>Plan & Ciclo</th>
+                                                            <th>Tarifa Contratada</th>
                                                             <th>Estado Suscripción</th>
                                                             <th>Vencimiento</th>
-                                                            <th style={{ textAlign: 'center' }}>Sedes / Usuarios</th>
-                                                            <th style={{ textAlign: 'right' }}>MRR Aporte</th>
+                                                            <th style={{ textAlign: 'center' }}>Sedes / Usu.</th>
+                                                            <th style={{ textAlign: 'right' }}>Aporte MRR</th>
+                                                            <th style={{ textAlign: 'right' }}>Cobrado Stripe</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody>
@@ -772,10 +791,30 @@ export default function SuperReportsPage() {
                                                                     </div>
                                                                 </td>
                                                                 <td>
-                                                                    <span className="badge-neutral">{t.plan_name}</span>
+                                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                                                        <span className="badge-neutral" style={{ fontWeight: 600 }}>{t.plan_name}</span>
+                                                                        <span style={{
+                                                                            fontSize: '11px',
+                                                                            fontWeight: 600,
+                                                                            color: t.billing_cycle === 'yearly' ? '#2563eb' : 'var(--color-text-secondary)'
+                                                                        }}>
+                                                                            {t.billing_cycle === 'yearly' ? 'Anual (1 Año)' : 'Mensual (1 Mes)'}
+                                                                        </span>
+                                                                    </div>
                                                                 </td>
                                                                 <td>
-                                                                    <span className="badge-neutral" style={{ fontWeight: 700 }}>
+                                                                    <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>
+                                                                        {formatCurrency(t.plan_price)}
+                                                                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginLeft: '3px' }}>
+                                                                            /{t.billing_cycle === 'yearly' ? 'año' : 'mes'}
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td>
+                                                                    <span className="badge-neutral" style={{
+                                                                        fontWeight: 700,
+                                                                        color: t.subscription_status === 'active' ? '#16a34a' : (t.subscription_status === 'trial' ? '#d97706' : '#dc2626')
+                                                                    }}>
                                                                         {t.subscription_status === 'active' ? 'PAGO ACTIVO' : (t.subscription_status === 'trial' ? 'EN PRUEBA' : 'VENCIDO')}
                                                                     </span>
                                                                 </td>
@@ -785,8 +824,11 @@ export default function SuperReportsPage() {
                                                                 <td style={{ textAlign: 'center' }}>
                                                                     <span className="badge-neutral">{t.branches_count} sedes | {t.users_count} usu.</span>
                                                                 </td>
-                                                                <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--color-text)' }}>
-                                                                    {t.subscription_status === 'active' ? formatCurrency(t.plan_price) : '$0.00'}
+                                                                <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--color-text)' }}>
+                                                                    {t.subscription_status === 'active' ? `${formatCurrency(t.mrr_contribution)}/m` : '$0.00'}
+                                                                </td>
+                                                                <td style={{ textAlign: 'right', fontWeight: 700, color: '#2563eb' }}>
+                                                                    {t.total_paid > 0 ? formatCurrency(t.total_paid) : (t.subscription_status === 'active' ? formatCurrency(t.plan_price) : '$0.00')}
                                                                 </td>
                                                             </tr>
                                                         ))}
@@ -860,20 +902,28 @@ export default function SuperReportsPage() {
                                             <tr>
                                                 <th>Plan</th>
                                                 <th style={{ textAlign: 'right' }}>Precio Mensual</th>
+                                                <th style={{ textAlign: 'right' }}>Precio Anual</th>
                                                 <th style={{ textAlign: 'center' }}>Empresas Suscritas</th>
-                                                <th style={{ textAlign: 'right' }}>Aporte Total al MRR</th>
+                                                <th style={{ textAlign: 'right' }}>Aporte al MRR</th>
+                                                <th style={{ textAlign: 'right' }}>Aporte al ARR</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {(analytics?.planDistribution || []).map((p, idx) => (
                                                 <tr key={idx}>
                                                     <td style={{ fontWeight: 600, color: 'var(--color-text)' }}>{p.name}</td>
-                                                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(p.price)}</td>
-                                                    <td style={{ textAlign: 'center', fontWeight: 700 }}>
-                                                        <span className="badge-neutral">{p.count} empresas</span>
+                                                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(p.price)}/m</td>
+                                                    <td style={{ textAlign: 'right', fontWeight: 600, color: '#2563eb' }}>{formatCurrency(p.price_yearly)}/a</td>
+                                                    <td style={{ textAlign: 'center', fontWeight: 600 }}>
+                                                        <span className="badge-neutral">
+                                                            {p.count} ({p.yearly_count || 0} anual, {p.monthly_count || 0} mensual)
+                                                        </span>
                                                     </td>
-                                                    <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--color-text)' }}>
-                                                        {formatCurrency(p.mrr)}
+                                                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--color-text)' }}>
+                                                        {formatCurrency(p.mrr)}/m
+                                                    </td>
+                                                    <td style={{ textAlign: 'right', fontWeight: 800, color: '#2563eb' }}>
+                                                        {formatCurrency(p.arr)}/a
                                                     </td>
                                                 </tr>
                                             ))}

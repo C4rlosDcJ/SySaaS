@@ -738,10 +738,17 @@ exports.extendTrial = async (req, res) => {
 // Métricas Financieras y Analítica Global de la Plataforma SaaS (SuperAdmin)
 exports.getGlobalAnalytics = async (req, res) => {
     try {
-        // Cálculo de MRR (Monthly Recurring Revenue) basado en empresas activas y precios de planes
+        // Cálculo de MRR (Monthly Recurring Revenue) basado en empresas activas y precios de planes (anual y mensual)
         const [mrrRows] = await db.query(`
             SELECT 
-                SUM(sp.price_monthly) as mrr,
+                COALESCE(SUM(CASE 
+                    WHEN t.billing_cycle = 'yearly' THEN sp.price_yearly / 12
+                    ELSE sp.price_monthly 
+                END), 0) as mrr,
+                COALESCE(SUM(CASE 
+                    WHEN t.billing_cycle = 'yearly' THEN sp.price_yearly
+                    ELSE sp.price_monthly * 12 
+                END), 0) as arr,
                 COUNT(t.id) as active_subscriptions
             FROM tenants t
             JOIN saas_plans sp ON t.plan_id = sp.id
@@ -765,12 +772,13 @@ exports.getGlobalAnalytics = async (req, res) => {
                 (SELECT COUNT(*) FROM sales) as total_sales
         `);
 
-        const mrr = parseFloat(mrrRows[0]?.mrr || 999);
+        const mrr = parseFloat(mrrRows[0]?.mrr || 0);
+        const arr = parseFloat(mrrRows[0]?.arr || (mrr * 12));
 
         res.json({
             mrr,
-            arr: mrr * 12,
-            active_subscriptions: parseInt(mrrRows[0]?.active_subscriptions || 1, 10),
+            arr,
+            active_subscriptions: parseInt(mrrRows[0]?.active_subscriptions || 0, 10),
             plan_distribution: planDist.map(p => ({ name: p.name, count: parseInt(p.count || 0, 10) })),
             platform_usage: {
                 total_repairs: parseInt(platformUsage[0]?.total_repairs || 0, 10),

@@ -322,11 +322,19 @@ exports.getSuperAdminStats = async (req, res) => {
             GROUP BY sp.id
         `);
 
-        // Cálculo de MRR (Monthly Recurring Revenue) y ARR
+        // Cálculo de MRR (Monthly Recurring Revenue) y ARR considerando ciclo anual y mensual
         const [revenueMetrics] = await db.query(`
             SELECT 
-                SUM(CASE WHEN t.subscription_status = 'active' THEN sp.price_monthly ELSE 0 END) as mrr,
-                SUM(CASE WHEN t.subscription_status = 'active' THEN sp.price_yearly ELSE 0 END) as arr
+                SUM(CASE 
+                    WHEN t.subscription_status = 'active' AND t.billing_cycle = 'yearly' THEN sp.price_yearly / 12
+                    WHEN t.subscription_status = 'active' THEN sp.price_monthly 
+                    ELSE 0 
+                END) as mrr,
+                SUM(CASE 
+                    WHEN t.subscription_status = 'active' AND t.billing_cycle = 'yearly' THEN sp.price_yearly
+                    WHEN t.subscription_status = 'active' THEN sp.price_monthly * 12 
+                    ELSE 0 
+                END) as arr
             FROM tenants t
             JOIN saas_plans sp ON t.plan_id = sp.id
         `);
@@ -1009,20 +1017,66 @@ exports.getSuperAdminAnalytics = async (req, res) => {
 
         const totalUsers = usersByRole.reduce((acc, r) => acc + parseInt(r.count, 10), 0);
 
-        // 3. Métricas Financieras de Suscripciones SaaS (MRR / ARR / ARPU)
+        // 3. Métricas Financieras de Suscripciones SaaS (MRR / ARR / ARPU / Facturación Real Stripe)
         const [subsStats] = await db.query(`
             SELECT 
-                COALESCE(SUM(sp.price_monthly), 0) as estimated_mrr,
-                COUNT(t.id) as paying_tenants_count
+                COALESCE(SUM(CASE 
+                    WHEN t.billing_cycle = 'yearly' THEN sp.price_yearly / 12
+                    ELSE sp.price_monthly 
+                END), 0) as estimated_mrr,
+                COALESCE(SUM(CASE 
+                    WHEN t.billing_cycle = 'yearly' THEN sp.price_yearly
+                    ELSE sp.price_monthly * 12 
+                END), 0) as estimated_arr,
+                COUNT(t.id) as paying_tenants_count,
+                COUNT(CASE WHEN t.billing_cycle = 'yearly' THEN 1 END) as yearly_paying_count,
+                COUNT(CASE WHEN t.billing_cycle = 'monthly' THEN 1 END) as monthly_paying_count
             FROM tenants t
             JOIN saas_plans sp ON t.plan_id = sp.id
             WHERE t.subscription_status = 'active'
         `);
 
+        // Facturación real recaudada en Stripe (Historial de Pagos de Suscripción)
+        let dateConditionPayments = '';
+        switch (period) {
+            case 'today':
+                dateConditionPayments = 'AND DATE(created_at) = CURDATE()';
+                break;
+            case '7d':
+                dateConditionPayments = 'AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)';
+                break;
+            case '30d':
+                dateConditionPayments = 'AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)';
+                break;
+            case 'last_month':
+                dateConditionPayments = 'AND created_at >= DATE_SUB(DATE_FORMAT(NOW(), "%Y-%m-01"), INTERVAL 1 MONTH) AND created_at < DATE_FORMAT(NOW(), "%Y-%m-01")';
+                break;
+            case 'year':
+                dateConditionPayments = 'AND YEAR(created_at) = YEAR(CURDATE())';
+                break;
+            case 'this_month':
+            default:
+                dateConditionPayments = 'AND created_at >= DATE_FORMAT(NOW(), "%Y-%m-01")';
+                break;
+        }
+
+        const [paymentStats] = await db.query(`
+            SELECT 
+                COALESCE(SUM(amount), 0) as total_revenue,
+                COALESCE(SUM(CASE WHEN 1=1 ${dateConditionPayments} THEN amount ELSE 0 END), 0) as period_revenue,
+                COUNT(*) as total_transactions
+            FROM subscription_payments
+            WHERE status = 'succeeded'
+        `);
+
         const mrr = parseFloat(subsStats[0]?.estimated_mrr || 0);
-        const arr = mrr * 12;
+        const arr = parseFloat(subsStats[0]?.estimated_arr || (mrr * 12));
         const payingCount = parseInt(subsStats[0]?.paying_tenants_count || 0, 10);
+        const yearlyPayingCount = parseInt(subsStats[0]?.yearly_paying_count || 0, 10);
+        const monthlyPayingCount = parseInt(subsStats[0]?.monthly_paying_count || 0, 10);
         const arpu = payingCount > 0 ? (mrr / payingCount) : 0;
+        const totalRevenueCollected = parseFloat(paymentStats[0]?.total_revenue || 0);
+        const periodRevenueCollected = parseFloat(paymentStats[0]?.period_revenue || 0);
 
         // 4. Ranking / Listado Detallado de Empresas SaaS
         const [tenantsList] = await db.query(`
@@ -1032,27 +1086,50 @@ exports.getSuperAdminAnalytics = async (req, res) => {
                 t.slug,
                 t.tax_id,
                 t.subscription_status,
+                t.billing_cycle,
                 COALESCE(t.subscription_expires_at, t.trial_ends_at) as subscription_end_date,
                 t.created_at,
                 COALESCE(sp.name, 'Sin Plan') as plan_name,
-                COALESCE(sp.price_monthly, 0) as plan_price,
+                sp.price_monthly,
+                sp.price_yearly,
+                CASE 
+                    WHEN t.billing_cycle = 'yearly' THEN COALESCE(sp.price_yearly, sp.price_monthly * 10)
+                    ELSE COALESCE(sp.price_monthly, 0)
+                END as plan_price,
+                CASE 
+                    WHEN t.billing_cycle = 'yearly' THEN ROUND(COALESCE(sp.price_yearly, sp.price_monthly * 10) / 12, 2)
+                    ELSE COALESCE(sp.price_monthly, 0)
+                END as mrr_contribution,
                 (SELECT COUNT(*) FROM users u WHERE u.tenant_id = t.id) as users_count,
-                (SELECT COUNT(*) FROM branches b WHERE b.tenant_id = t.id) as branches_count
+                (SELECT COUNT(*) FROM branches b WHERE b.tenant_id = t.id) as branches_count,
+                COALESCE((SELECT SUM(spay.amount) FROM subscription_payments spay WHERE spay.tenant_id = t.id AND spay.status = 'succeeded'), 0) as total_paid
             FROM tenants t
             LEFT JOIN saas_plans sp ON t.plan_id = sp.id
             ORDER BY t.created_at DESC
         `);
 
-        // 5. Desglose de Planes SaaS
+        // 5. Desglose de Planes SaaS con soporte Anual y Mensual
         const [planDistribution] = await db.query(`
             SELECT 
                 sp.name as plan_name,
                 sp.price_monthly,
+                sp.price_yearly,
                 COUNT(t.id) as tenant_count,
-                COALESCE(SUM(CASE WHEN t.subscription_status = 'active' THEN sp.price_monthly ELSE 0 END), 0) as total_mrr_contribution
+                COUNT(CASE WHEN t.billing_cycle = 'yearly' AND t.subscription_status = 'active' THEN 1 END) as yearly_count,
+                COUNT(CASE WHEN t.billing_cycle = 'monthly' AND t.subscription_status = 'active' THEN 1 END) as monthly_count,
+                COALESCE(SUM(CASE 
+                    WHEN t.subscription_status = 'active' AND t.billing_cycle = 'yearly' THEN sp.price_yearly / 12 
+                    WHEN t.subscription_status = 'active' THEN sp.price_monthly 
+                    ELSE 0 
+                END), 0) as total_mrr_contribution,
+                COALESCE(SUM(CASE 
+                    WHEN t.subscription_status = 'active' AND t.billing_cycle = 'yearly' THEN sp.price_yearly 
+                    WHEN t.subscription_status = 'active' THEN sp.price_monthly * 12 
+                    ELSE 0 
+                END), 0) as total_arr_contribution
             FROM saas_plans sp
             LEFT JOIN tenants t ON t.plan_id = sp.id AND t.subscription_status IN ('active', 'trial')
-            GROUP BY sp.id, sp.name, sp.price_monthly
+            GROUP BY sp.id, sp.name, sp.price_monthly, sp.price_yearly
             ORDER BY tenant_count DESC
         `);
 
@@ -1203,11 +1280,15 @@ exports.getSuperAdminAnalytics = async (req, res) => {
                 active_tenants: parseInt(tenantsStats[0]?.active_tenants || 0, 10),
                 trial_tenants: trialTenantsCount,
                 paid_tenants: paidTenantsCount,
+                yearly_paid_tenants: yearlyPayingCount,
+                monthly_paid_tenants: monthlyPayingCount,
                 expired_tenants: expiredTenantsCount,
                 total_users: totalUsers,
                 mrr,
                 arr,
                 arpu,
+                total_revenue_collected: totalRevenueCollected,
+                period_revenue_collected: periodRevenueCollected,
                 conversion_rate: parseFloat(conversionRate),
                 churn_rate: parseFloat(churnRate),
                 retention_rate: parseFloat(retentionRate),
@@ -1228,7 +1309,10 @@ exports.getSuperAdminAnalytics = async (req, res) => {
                 slug: t.slug,
                 tax_id: t.tax_id,
                 plan_name: t.plan_name,
+                billing_cycle: t.billing_cycle || 'monthly',
                 plan_price: parseFloat(t.plan_price || 0),
+                mrr_contribution: parseFloat(t.mrr_contribution || 0),
+                total_paid: parseFloat(t.total_paid || 0),
                 is_active: t.subscription_status === 'active' || t.subscription_status === 'trial',
                 subscription_status: t.subscription_status,
                 subscription_end_date: t.subscription_end_date,
@@ -1239,8 +1323,12 @@ exports.getSuperAdminAnalytics = async (req, res) => {
             planDistribution: planDistribution.map(p => ({
                 name: p.plan_name,
                 price: parseFloat(p.price_monthly || 0),
+                price_yearly: parseFloat(p.price_yearly || 0),
                 count: parseInt(p.tenant_count || 0, 10),
-                mrr: parseFloat(p.total_mrr_contribution || 0)
+                yearly_count: parseInt(p.yearly_count || 0, 10),
+                monthly_count: parseInt(p.monthly_count || 0, 10),
+                mrr: parseFloat(p.total_mrr_contribution || 0),
+                arr: parseFloat(p.total_arr_contribution || 0)
             })),
             expiringSoon: expiringSoon.map(es => ({
                 id: es.id,
