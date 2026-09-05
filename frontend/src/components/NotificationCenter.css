@@ -220,8 +220,8 @@
 }
 
 .notif-icon.type-status_change {
-    background: color-mix(in srgb, #f59e0b 12%, transparent);
-    color: #f59e0b;
+    background: var(--cool-amber-bg);
+    color: var(--cool-amber);
 }
 
 .notif-icon.type-payment {

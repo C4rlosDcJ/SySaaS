@@ -64,8 +64,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: linear-gradient(90deg, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.05) 100%);
-    border: 1px solid rgba(245, 158, 11, 0.25);
+    background: var(--cool-amber-bg);
+    border: 1px solid var(--cool-amber-border);
     padding: var(--sp-3) var(--sp-5);
     border-radius: var(--radius-md);
     margin-bottom: var(--sp-5);

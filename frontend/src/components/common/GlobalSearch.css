@@ -193,8 +193,8 @@
 }
 
 .product-icon {
-    background: rgba(245, 158, 11, 0.15);
-    color: #f59e0b;
+    background: var(--cool-amber-bg);
+    color: var(--cool-amber);
 }
 
 .gs-item-info {

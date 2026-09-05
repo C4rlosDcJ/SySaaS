@@ -729,11 +729,11 @@ export default function SuperTenantsPage() {
                                                 {/* Operational Metric Cards */}
                                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
                                                     {[
-                                                        { label: 'Usuarios', value: tenantDetail.operations?.total_users || 0, icon: Users, color: '#3b82f6' },
-                                                        { label: 'Sucursales', value: tenantDetail.branches?.length || 0, icon: GitBranch, color: '#8b5cf6' },
-                                                        { label: 'Reparaciones', value: tenantDetail.operations?.total_repairs || 0, icon: Wrench, color: '#f59e0b' },
-                                                        { label: 'Ventas POS', value: tenantDetail.operations?.total_sales || 0, icon: ShoppingBag, color: '#10b981' },
-                                                        { label: 'Facturación', value: `$${parseFloat(tenantDetail.operations?.total_revenue || 0).toLocaleString('es-MX', { minimumFractionDigits: 0 })}`, icon: DollarSign, color: '#10b981' },
+                                                        { label: 'Usuarios', value: tenantDetail.operations?.total_users || 0, icon: Users, color: 'var(--cool-cyan)' },
+                                                        { label: 'Sucursales', value: tenantDetail.branches?.length || 0, icon: GitBranch, color: 'var(--cool-indigo)' },
+                                                        { label: 'Reparaciones', value: tenantDetail.operations?.total_repairs || 0, icon: Wrench, color: 'var(--cool-slate-blue)' },
+                                                        { label: 'Ventas POS', value: tenantDetail.operations?.total_sales || 0, icon: ShoppingBag, color: 'var(--cool-teal)' },
+                                                        { label: 'Facturación', value: `$${parseFloat(tenantDetail.operations?.total_revenue || 0).toLocaleString('es-MX', { minimumFractionDigits: 0 })}`, icon: DollarSign, color: 'var(--cool-teal)' },
                                                     ].map((kpi, i) => (
                                                         <div
                                                             key={i}

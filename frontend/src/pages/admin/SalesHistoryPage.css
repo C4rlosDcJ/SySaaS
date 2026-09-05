@@ -230,11 +230,11 @@
 }
 
 .sale-status-indicator.status-pending {
-    color: var(--color-text);
+    color: var(--cool-amber);
 }
 
 .sale-status-indicator.status-pending .status-dot {
-    background-color: #f59e0b;
+    background-color: var(--cool-amber);
 }
 
 /* Table Clean Styling */

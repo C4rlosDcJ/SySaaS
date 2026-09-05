@@ -300,12 +300,12 @@ export default function AdminDashboard() {
                         <div key={bc.id} style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                             padding: '12px 18px', borderRadius: 'var(--radius-md)',
-                            background: bc.type === 'urgent' ? 'rgba(239, 68, 68, 0.12)' : bc.type === 'warning' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(59, 130, 246, 0.12)',
-                            border: `1px solid ${bc.type === 'urgent' ? 'rgba(239, 68, 68, 0.25)' : bc.type === 'warning' ? 'rgba(245, 158, 11, 0.25)' : 'rgba(59, 130, 246, 0.25)'}`,
+                            background: bc.type === 'urgent' ? 'var(--cool-rose-bg)' : bc.type === 'warning' ? 'var(--cool-amber-bg)' : 'var(--cool-cyan-bg)',
+                            border: `1px solid ${bc.type === 'urgent' ? 'var(--cool-rose-border)' : bc.type === 'warning' ? 'var(--cool-amber-border)' : 'var(--cool-cyan-border)'}`,
                             color: 'var(--color-text)', gap: '12px'
                         }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                <Megaphone size={18} style={{ color: bc.type === 'urgent' ? '#ef4444' : bc.type === 'warning' ? '#f59e0b' : '#3b82f6', flexShrink: 0 }} />
+                                <Megaphone size={18} style={{ color: bc.type === 'urgent' ? 'var(--cool-rose)' : bc.type === 'warning' ? 'var(--cool-amber)' : 'var(--cool-cyan)', flexShrink: 0 }} />
                                 <div>
                                     <strong style={{ fontSize: '13px', display: 'block' }}>{bc.title}</strong>
                                     <span style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>{bc.message}</span>
@@ -318,9 +318,9 @@ export default function AdminDashboard() {
 
             {/* Banner de Notificaciones Operativas Críticas */}
             {(lowStockCount > 0 || pendingApprovalCount > 0) && (
-                <div className="alert-banner" style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)' }}>
+                <div className="alert-banner" style={{ background: 'var(--cool-amber-bg)', border: '1px solid var(--cool-amber-border)' }}>
                     <div className="alert-banner-content">
-                        <AlertTriangle size={18} style={{ color: '#d97706', flexShrink: 0 }} />
+                        <AlertTriangle size={18} style={{ color: 'var(--cool-amber)', flexShrink: 0 }} />
                         <span style={{ fontSize: '13px' }}>
                             {lowStockCount > 0 && `Tienes ${lowStockCount} producto${lowStockCount > 1 ? 's' : ''} con bajo stock. `}
                             {pendingApprovalCount > 0 && `${pendingApprovalCount} reparación${pendingApprovalCount > 1 ? 'es' : ''} esperan cotización o aprobación del cliente.`}

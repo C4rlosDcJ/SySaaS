@@ -157,12 +157,12 @@ export default function ClientPaymentsPage() {
                 </div>
 
                 <div className="card payment-stat-card">
-                    <div className="stat-icon" style={{ background: stats.totalPending > 0 ? 'rgba(245, 158, 11, 0.1)' : 'var(--color-bg-tertiary)' }}>
-                        <Clock size={22} style={{ color: stats.totalPending > 0 ? '#f59e0b' : 'var(--color-text-secondary)' }} />
+                    <div className="stat-icon" style={{ background: stats.totalPending > 0 ? 'var(--cool-amber-bg)' : 'var(--color-bg-tertiary)' }}>
+                        <Clock size={22} style={{ color: stats.totalPending > 0 ? 'var(--cool-amber)' : 'var(--color-text-secondary)' }} />
                     </div>
                     <div>
                         <div className="stat-label">Saldo por Liquidar</div>
-                        <div className="stat-value" style={{ color: stats.totalPending > 0 ? '#f59e0b' : 'var(--color-text)' }}>
+                        <div className="stat-value" style={{ color: stats.totalPending > 0 ? 'var(--cool-amber)' : 'var(--color-text)' }}>
                             ${stats.totalPending.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                         </div>
                         <div className="stat-sub">Al momento de la entrega</div>
@@ -263,9 +263,9 @@ export default function ClientPaymentsPage() {
                                             <td style={{ fontSize: '13px', color: deposit > 0 ? '#10b981' : 'var(--color-text-secondary)' }}>
                                                 ${deposit.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
                                             </td>
-                                            <td style={{ fontSize: '14px', fontWeight: 700, color: remaining > 0 ? '#f59e0b' : '#10b981' }}>
-                                                ${remaining.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
-                                            </td>
+                                            <td style={{ fontSize: '14px', fontWeight: 700, color: remaining > 0 ? 'var(--cool-amber)' : 'var(--cool-teal)' }}>
+                                            ${Math.max(0, remaining).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                        </td>
                                             <td>{getPaymentBadge(repair)}</td>
                                             <td style={{ textAlign: 'right' }}>
                                                 <Link

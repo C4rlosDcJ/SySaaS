@@ -206,7 +206,7 @@
 }
 
 .stock-low { 
-    color: #f59e0b; 
+    color: var(--cool-amber); 
 }
 
 .stock-out { 

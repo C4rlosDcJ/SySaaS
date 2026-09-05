@@ -174,17 +174,17 @@ function DashboardLayout({ children, adminOnly = false, superAdminOnly = false, 
         {/* Banner de pago vencido */}
         {!isSuperAdmin && !isImpersonating && tenant?.subscription_status === 'past_due' && (
           <div style={{
-            background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.35)',
+            background: 'var(--cool-amber-bg)', border: '1px solid var(--cool-amber-border)',
             borderRadius: 'var(--radius-md)', padding: '10px 18px', marginBottom: '12px',
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <AlertCircle size={18} style={{ color: '#f59e0b', flexShrink: 0 }} />
+              <AlertCircle size={18} style={{ color: 'var(--cool-amber)', flexShrink: 0 }} />
               <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text)' }}>
                 Tienes un pago pendiente. Solo puedes consultar informacion hasta regularizar tu cuenta.
               </span>
             </div>
-            <Link to="/admin/suscripcion" className="btn btn-sm" style={{ background: '#f59e0b', color: '#000', fontWeight: 700, whiteSpace: 'nowrap' }}>
+            <Link to="/admin/suscripcion" className="btn btn-sm" style={{ background: 'var(--cool-amber)', color: '#000', fontWeight: 700, whiteSpace: 'nowrap' }}>
               Regularizar pago
             </Link>
           </div>
@@ -200,13 +200,13 @@ function DashboardLayout({ children, adminOnly = false, superAdminOnly = false, 
           const isUrgent = daysLeft <= 3;
           return (
             <div style={{
-              background: isUrgent ? 'rgba(239,68,68,0.1)' : 'rgba(245,158,11,0.1)',
-              border: `1px solid ${isUrgent ? 'rgba(239,68,68,0.35)' : 'rgba(245,158,11,0.35)'}`,
+              background: isUrgent ? 'var(--cool-rose-bg)' : 'var(--cool-amber-bg)',
+              border: `1px solid ${isUrgent ? 'var(--cool-rose-border)' : 'var(--cool-amber-border)'}`,
               borderRadius: 'var(--radius-md)', padding: '10px 18px', marginBottom: '12px',
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <AlertCircle size={18} style={{ color: isUrgent ? '#ef4444' : '#f59e0b', flexShrink: 0 }} />
+                <AlertCircle size={18} style={{ color: isUrgent ? 'var(--cool-rose)' : 'var(--cool-amber)', flexShrink: 0 }} />
                 <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--color-text)' }}>
                   {daysLeft === 0 
                     ? 'Aviso urgente: Tu suscripcion vence hoy. Renueva para evitar el bloqueo del servicio.'
@@ -214,8 +214,8 @@ function DashboardLayout({ children, adminOnly = false, superAdminOnly = false, 
                 </span>
               </div>
               <Link to="/admin/suscripcion" className="btn btn-sm" style={{ 
-                background: isUrgent ? '#ef4444' : '#f59e0b', 
-                color: '#ffffff', 
+                background: isUrgent ? 'var(--cool-rose)' : 'var(--cool-amber)', 
+                color: isUrgent ? '#ffffff' : '#000000', 
                 fontWeight: 700, 
                 whiteSpace: 'nowrap' 
               }}>

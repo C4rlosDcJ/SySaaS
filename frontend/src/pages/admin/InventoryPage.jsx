@@ -18,14 +18,14 @@ import './InventoryPage.css';
 
 // Predefined palette colors for category indicators
 const CATEGORY_COLORS = [
-    '#3b82f6', // Azul
-    '#10b981', // Verde
-    '#f59e0b', // Naranja/Amarillo
-    '#ef4444', // Rojo
-    '#a855f7', // Púrpura
-    '#ec4899', // Rosa
-    '#06b6d4', // Cyan
-    '#6b7280'  // Gris
+    '#38bdf8', // Cool Cyan
+    '#34d399', // Cool Teal
+    '#818cf8', // Cool Slate Blue
+    '#60a5fa', // Cool Sky
+    '#a78bfa', // Cool Indigo
+    '#f87171', // Cool Rose
+    '#fbbf24', // Cool Amber
+    '#94a3b8'  // Slate Gray
 ];
 
 export default function InventoryPage() {
