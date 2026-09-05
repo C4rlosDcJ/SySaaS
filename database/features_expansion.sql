@@ -75,3 +75,6 @@ CREATE TABLE IF NOT EXISTS coupons (
 CREATE INDEX idx_suppliers_tenant ON suppliers(tenant_id);
 CREATE INDEX idx_po_tenant_branch ON purchase_orders(tenant_id, branch_id);
 CREATE INDEX idx_coupons_tenant_code ON coupons(tenant_id, code);
+
+-- Permitir persistencia de imagenes WebP optimizadas en productos
+ALTER TABLE products MODIFY COLUMN image_url MEDIUMTEXT;

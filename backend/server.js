@@ -13,7 +13,8 @@ app.set('trust proxy', 1);
 
 // Helmet.js para cabeceras de seguridad HTTP
 app.use(helmet({
-    crossOriginResourcePolicy: false, // Permitir cargar imágenes locales en frontend
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false
 }));
 
 // Rate limiting general
@@ -58,8 +59,12 @@ app.use((req, res, next) => {
 });
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-// Servir archivos estáticos (uploads)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Servir archivos estáticos (uploads) con cabeceras CORS y CORP
+app.use('/uploads', (req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    next();
+}, express.static(path.join(__dirname, 'uploads')));
 
 // Activity logger para operaciones CRUD
 app.use('/api', activityLogger);

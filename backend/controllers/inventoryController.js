@@ -277,6 +277,19 @@ exports.createProduct = async (req, res) => {
             return res.status(400).json({ message: 'Nombre y precio de venta son obligatorios.' });
         }
 
+        // Restricción de plan: Fotografías de productos exclusivas para Pro y Enterprise
+        const planSlug = (req.tenantCtx?.tenant?.plan_slug || req.tenantCtx?.tenant?.plan_name || '').toLowerCase();
+        const isPhotoPlanAllowed = 
+            ['pro', 'enterprise'].some(p => planSlug.includes(p)) || 
+            (req.tenantCtx?.tenant?.plan_id && Number(req.tenantCtx.tenant.plan_id) >= 2);
+
+        if (image_url && typeof image_url === 'string' && image_url.trim() !== '' && !isPhotoPlanAllowed) {
+            await connection.rollback();
+            return res.status(403).json({
+                message: 'La subida de fotografías de productos está reservada para los planes Pro y Enterprise.'
+            });
+        }
+
         // Generar SKU automático si no se proporciona
         const finalSku = sku || `PRD-${Date.now().toString(36).toUpperCase()}`;
 
@@ -333,6 +346,19 @@ exports.updateProduct = async (req, res) => {
         const tenantId = req.tenantCtx.tenantId;
         const isAdmin = ['tenant_admin', 'admin', 'superadmin', 'branch_manager'].includes(req.user.role);
         const branchId = (isAdmin && target_branch_id) ? parseInt(target_branch_id, 10) : req.tenantCtx.branchId;
+
+        // Restricción de plan: Fotografías de productos exclusivas para Pro y Enterprise
+        const planSlug = (req.tenantCtx?.tenant?.plan_slug || req.tenantCtx?.tenant?.plan_name || '').toLowerCase();
+        const isPhotoPlanAllowed = 
+            ['pro', 'enterprise'].some(p => planSlug.includes(p)) || 
+            (req.tenantCtx?.tenant?.plan_id && Number(req.tenantCtx.tenant.plan_id) >= 2);
+
+        if (image_url && typeof image_url === 'string' && image_url.trim() !== '' && !isPhotoPlanAllowed) {
+            await connection.rollback();
+            return res.status(403).json({
+                message: 'La subida de fotografías de productos está reservada para los planes Pro y Enterprise.'
+            });
+        }
 
         // Obtener stock actual de esta sucursal
         const [existing] = await connection.query(

@@ -174,10 +174,13 @@ export default function InventoryPage() {
     const processAndUploadProductImage = async (file) => {
         if (!file) return;
 
+        if (!isPhotoUploadPlanAllowed) {
+            showPhotoUploadPlanAlert();
+            return;
+        }
+
         try {
             setUploadingImage(true);
-            const localPreview = URL.createObjectURL(file);
-            setForm(prev => ({ ...prev, image_url: localPreview }));
             showToast('Comprimiendo y optimizando imagen...', 'info');
             
             // Comprimir imagen usando Canvas en el navegador
@@ -187,10 +190,15 @@ export default function InventoryPage() {
             formData.append('image', compressed);
 
             const res = await uploadService.uploadSingle(formData);
-            setForm(prev => ({ ...prev, image_url: res.url }));
-            showToast('Imagen guardada exitosamente', 'success');
+            if (res && res.url) {
+                setForm(prev => ({ ...prev, image_url: res.url }));
+                showToast('Imagen guardada exitosamente', 'success');
+            } else {
+                setForm(prev => ({ ...prev, image_url: '' }));
+            }
         } catch (err) {
             console.error('Error subiendo imagen:', err);
+            setForm(prev => ({ ...prev, image_url: editingProduct?.image_url || '' }));
             showAlert({ title: 'Error', text: err.message || 'No se pudo subir la imagen.', icon: 'error' });
         } finally {
             setUploadingImage(false);
@@ -199,6 +207,11 @@ export default function InventoryPage() {
     };
 
     const handleImageChange = (e) => {
+        if (!isPhotoUploadPlanAllowed) {
+            showPhotoUploadPlanAlert();
+            if (e.target) e.target.value = '';
+            return;
+        }
         const file = e.target.files?.[0];
         if (file) {
             processAndUploadProductImage(file);
@@ -673,6 +686,20 @@ export default function InventoryPage() {
     const isBarcodePlanAllowed = 
         (tenant?.plan_id && Number(tenant.plan_id) >= 2) || 
         ['pro', 'enterprise'].some(p => planSlug.includes(p));
+
+    // ─── Plan Check: Subida de fotos de productos exclusivo para Pro y Enterprise ───
+    const isPhotoUploadPlanAllowed = 
+        (tenant?.plan_id && Number(tenant.plan_id) >= 2) || 
+        ['pro', 'enterprise'].some(p => planSlug.includes(p));
+
+    const showPhotoUploadPlanAlert = () => {
+        showAlert({
+            title: 'Función Pro y Enterprise',
+            text: 'La subida de fotografías de productos está reservada para los planes Pro y Enterprise.',
+            icon: 'warning',
+            confirmButtonText: 'Aceptar'
+        });
+    };
 
     // ─── Barcode Printing ───
     const openBarcodeModal = (product) => {
@@ -1283,7 +1310,10 @@ export default function InventoryPage() {
                                                             src={getImageUrl(p.image_url)} 
                                                             alt={p.name} 
                                                             className="product-thumbnail" 
-                                                            onError={(e) => { e.target.style.display = 'none'; }}
+                                                            onError={(e) => {
+                                                                e.target.onerror = null;
+                                                                e.target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="1.5"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                                                            }}
                                                         />
                                                     </div>
                                                 ) : (
@@ -1581,9 +1611,26 @@ export default function InventoryPage() {
                             <div className="product-top-grid">
                                 {/* Columna Izquierda: Fotografía */}
                                 <div className="product-photo-card">
-                                    <label className="section-subtitle">
-                                        <ImageIcon size={13} />
-                                        <span>Fotografía</span>
+                                    <label className="section-subtitle" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <ImageIcon size={13} />
+                                            <span>Fotografía</span>
+                                        </span>
+                                        {!isPhotoUploadPlanAllowed && (
+                                            <span style={{
+                                                fontSize: '9px',
+                                                fontWeight: 800,
+                                                textTransform: 'uppercase',
+                                                letterSpacing: '0.05em',
+                                                padding: '2px 6px',
+                                                borderRadius: '4px',
+                                                background: 'rgba(239, 68, 68, 0.1)',
+                                                color: '#ef4444',
+                                                border: '1px solid rgba(239, 68, 68, 0.25)'
+                                            }}>
+                                                Pro & Enterprise
+                                            </span>
+                                        )}
                                     </label>
                                     <div className="photo-dropzone-box">
                                         {form.image_url ? (
@@ -1601,7 +1648,13 @@ export default function InventoryPage() {
                                                     <button 
                                                         type="button" 
                                                         className="btn-photo-action btn-photo-change" 
-                                                        onClick={() => fileInputRef.current?.click()}
+                                                        onClick={() => {
+                                                            if (!isPhotoUploadPlanAllowed) {
+                                                                showPhotoUploadPlanAlert();
+                                                                return;
+                                                            }
+                                                            fileInputRef.current?.click();
+                                                        }}
                                                         disabled={uploadingImage}
                                                         title="Elegir archivo del dispositivo"
                                                     >
@@ -1610,7 +1663,13 @@ export default function InventoryPage() {
                                                     <button 
                                                         type="button" 
                                                         className="btn-photo-action btn-photo-camera" 
-                                                        onClick={() => setShowProductCamera(true)}
+                                                        onClick={() => {
+                                                            if (!isPhotoUploadPlanAllowed) {
+                                                                showPhotoUploadPlanAlert();
+                                                                return;
+                                                            }
+                                                            setShowProductCamera(true);
+                                                        }}
                                                         disabled={uploadingImage}
                                                         title="Tomar foto con la cámara"
                                                     >
@@ -1630,7 +1689,13 @@ export default function InventoryPage() {
                                             <div className="photo-empty-container">
                                                 <div 
                                                     className={`photo-empty-box ${uploadingImage ? 'uploading' : ''}`}
-                                                    onClick={() => fileInputRef.current?.click()}
+                                                    onClick={() => {
+                                                        if (!isPhotoUploadPlanAllowed) {
+                                                            showPhotoUploadPlanAlert();
+                                                            return;
+                                                        }
+                                                        fileInputRef.current?.click();
+                                                    }}
                                                 >
                                                     <UploadCloud size={30} className="text-primary" style={{ marginBottom: '4px' }} />
                                                     <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--color-text)' }}>
@@ -1643,7 +1708,13 @@ export default function InventoryPage() {
                                                 <button
                                                     type="button"
                                                     className="btn-take-camera-photo"
-                                                    onClick={() => setShowProductCamera(true)}
+                                                    onClick={() => {
+                                                        if (!isPhotoUploadPlanAllowed) {
+                                                            showPhotoUploadPlanAlert();
+                                                            return;
+                                                        }
+                                                        setShowProductCamera(true);
+                                                    }}
                                                     disabled={uploadingImage}
                                                 >
                                                     <Camera size={14} /> Tomar con Cámara
@@ -2192,6 +2263,10 @@ export default function InventoryPage() {
                         <img 
                             src={getImageUrl(previewImageUrl)} 
                             alt="Preview ampliado" 
+                            onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="1.5"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>';
+                            }}
                             style={{ maxWidth: '100%', maxHeight: '450px', borderRadius: 'var(--radius-md)', objectFit: 'contain' }} 
                         />
                     </div>
@@ -2280,7 +2355,7 @@ export default function InventoryPage() {
             )}
 
             {/* Modal de Captura de Fotografía con Cámara */}
-            {showProductCamera && (
+            {showProductCamera && isPhotoUploadPlanAllowed && (
                 <CameraCaptureModal
                     isOpen={showProductCamera}
                     onClose={() => setShowProductCamera(false)}
