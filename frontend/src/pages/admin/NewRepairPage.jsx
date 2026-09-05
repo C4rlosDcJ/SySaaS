@@ -11,8 +11,9 @@ import { formatCurrency } from '../../utils/constants';
 import {
     Save, X, User, Smartphone, Wrench, ClipboardCheck,
     DollarSign, Search, ChevronRight, CheckCircle2,
-    Image as ImageIcon, Plus, Trash2, Camera
+    Image as ImageIcon, Plus, Trash2, Camera, UploadCloud
 } from 'lucide-react';
+import CameraCaptureModal from '../../components/CameraCaptureModal';
 import './NewRepairPage.css';
 
 export default function NewRepairPage() {
@@ -27,6 +28,7 @@ export default function NewRepairPage() {
 
     const [selectedImages, setSelectedImages] = useState([]);
     const [imagePreviews, setImagePreviews] = useState([]);
+    const [showCameraModal, setShowCameraModal] = useState(false);
     
     // Checkbox explicitly needed to submit if there are conditions
     const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -211,6 +213,15 @@ export default function NewRepairPage() {
         setSelectedImages(prev => [...prev, ...files]);
 
         const newPreviews = files.map(file => URL.createObjectURL(file));
+        setImagePreviews(prev => [...prev, ...newPreviews]);
+    };
+
+    const handleAddCameraImages = (files) => {
+        const fileList = Array.isArray(files) ? files : [files];
+        if (fileList.length === 0) return;
+
+        setSelectedImages(prev => [...prev, ...fileList]);
+        const newPreviews = fileList.map(file => URL.createObjectURL(file));
         setImagePreviews(prev => [...prev, ...newPreviews]);
     };
 
@@ -493,13 +504,22 @@ export default function NewRepairPage() {
                         </div>
 
                         <div className="form-group mt-md">
-                            <label className="flex justify-between items-center mb-xs">
-                                <span>Fotografías del Equipo (Recepción)</span>
-                                <label className="btn btn-ghost btn-sm text-primary pointer m-0">
-                                    <Camera size={16} className="mr-xs" /> Agregar Fotos
-                                    <input type="file" multiple hidden accept="image/*" onChange={handleImageSelect} />
-                                </label>
-                            </label>
+                            <div className="flex justify-between items-center mb-xs" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                                <span style={{ fontWeight: 600 }}>Fotografías del Equipo (Recepción)</span>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost btn-sm text-primary pointer m-0"
+                                        onClick={() => setShowCameraModal(true)}
+                                    >
+                                        <Camera size={16} className="mr-xs" /> Tomar con Cámara
+                                    </button>
+                                    <label className="btn btn-ghost btn-sm text-muted pointer m-0">
+                                        <UploadCloud size={16} className="mr-xs" /> Archivo
+                                        <input type="file" multiple hidden accept="image/*" onChange={handleImageSelect} />
+                                    </label>
+                                </div>
+                            </div>
                             
                             {imagePreviews.length > 0 ? (
                                 <div className="image-preview-grid">
@@ -723,6 +743,17 @@ export default function NewRepairPage() {
             >
                 <DollarSign size={24} />
             </button>
+
+            {/* Modal de Captura de Fotografía con Cámara */}
+            {showCameraModal && (
+                <CameraCaptureModal
+                    isOpen={showCameraModal}
+                    onClose={() => setShowCameraModal(false)}
+                    onCapture={handleAddCameraImages}
+                    title="Evidencias de Recepción"
+                    multiple={true}
+                />
+            )}
         </div>
     );
 }

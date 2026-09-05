@@ -5,7 +5,7 @@ import {
     Tag, Palette, Check, FolderPlus, Barcode, Printer, ArrowLeftRight,
     Store, ChevronDown, ChevronUp, Layers, Info, History, Download,
     FileSpreadsheet, Image as ImageIcon, UploadCloud, Eye, CheckSquare,
-    Square, Building2, Globe, Sparkles, FileText
+    Square, Building2, Globe, Sparkles, FileText, Camera
 } from 'lucide-react';
 import { inventoryService, transferService, branchService, uploadService, getImageUrl } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -13,6 +13,7 @@ import { useTenant } from '../../context/TenantContext';
 import { formatCurrency } from '../../utils/constants';
 import { showAlert, showConfirm } from '../../utils/swal';
 import { compressImage } from '../../utils/imageCompressor';
+import CameraCaptureModal from '../../components/CameraCaptureModal';
 import './InventoryPage.css';
 
 // Predefined palette colors for category indicators
@@ -107,6 +108,7 @@ export default function InventoryPage() {
 
     // Image Uploading State
     const [uploadingImage, setUploadingImage] = useState(false);
+    const [showProductCamera, setShowProductCamera] = useState(false);
     const fileInputRef = useRef(null);
 
     const [saving, setSaving] = useState(false);
@@ -169,8 +171,7 @@ export default function InventoryPage() {
     };
 
     // ─── Image Upload with Compression ───
-    const handleImageChange = async (e) => {
-        const file = e.target.files[0];
+    const processAndUploadProductImage = async (file) => {
         if (!file) return;
 
         try {
@@ -187,13 +188,20 @@ export default function InventoryPage() {
 
             const res = await uploadService.uploadSingle(formData);
             setForm(prev => ({ ...prev, image_url: res.url }));
-            showToast('Imagen comprimida y guardada exitosamente', 'success');
+            showToast('Imagen guardada exitosamente', 'success');
         } catch (err) {
             console.error('Error subiendo imagen:', err);
             showAlert({ title: 'Error', text: err.message || 'No se pudo subir la imagen.', icon: 'error' });
         } finally {
             setUploadingImage(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleImageChange = (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            processAndUploadProductImage(file);
         }
     };
 
@@ -1580,8 +1588,18 @@ export default function InventoryPage() {
                                                         className="btn-photo-action btn-photo-change" 
                                                         onClick={() => fileInputRef.current?.click()}
                                                         disabled={uploadingImage}
+                                                        title="Elegir archivo del dispositivo"
                                                     >
-                                                        Cambiar
+                                                        Archivo
+                                                    </button>
+                                                    <button 
+                                                        type="button" 
+                                                        className="btn-photo-action btn-photo-camera" 
+                                                        onClick={() => setShowProductCamera(true)}
+                                                        disabled={uploadingImage}
+                                                        title="Tomar foto con la cámara"
+                                                    >
+                                                        <Camera size={12} /> Cámara
                                                     </button>
                                                     <button 
                                                         type="button" 
@@ -1594,17 +1612,27 @@ export default function InventoryPage() {
                                                 <span className="photo-badge-webp">WebP Optimizado</span>
                                             </div>
                                         ) : (
-                                            <div 
-                                                className={`photo-empty-box ${uploadingImage ? 'uploading' : ''}`}
-                                                onClick={() => fileInputRef.current?.click()}
-                                            >
-                                                <UploadCloud size={36} className="text-primary" style={{ marginBottom: '8px' }} />
-                                                <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--color-text)' }}>
-                                                    {uploadingImage ? 'Comprimiendo...' : 'Subir Imagen'}
+                                            <div className="photo-empty-container">
+                                                <div 
+                                                    className={`photo-empty-box ${uploadingImage ? 'uploading' : ''}`}
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                >
+                                                    <UploadCloud size={30} className="text-primary" style={{ marginBottom: '4px' }} />
+                                                    <div style={{ fontWeight: 700, fontSize: '12px', color: 'var(--color-text)' }}>
+                                                        {uploadingImage ? 'Comprimiendo...' : 'Subir Archivo'}
+                                                    </div>
+                                                    <p style={{ margin: '2px 0 0 0', fontSize: '10px', color: 'var(--color-text-secondary)', lineHeight: 1.2 }}>
+                                                        JPG, PNG o WebP
+                                                    </p>
                                                 </div>
-                                                <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: 'var(--color-text-secondary)', lineHeight: 1.3 }}>
-                                                    JPG, PNG o foto de celular (se optimiza a &lt; 70KB)
-                                                </p>
+                                                <button
+                                                    type="button"
+                                                    className="btn-take-camera-photo"
+                                                    onClick={() => setShowProductCamera(true)}
+                                                    disabled={uploadingImage}
+                                                >
+                                                    <Camera size={14} /> Tomar con Cámara
+                                                </button>
                                             </div>
                                         )}
                                         <input 
@@ -2225,6 +2253,17 @@ export default function InventoryPage() {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {/* Modal de Captura de Fotografía con Cámara */}
+            {showProductCamera && (
+                <CameraCaptureModal
+                    isOpen={showProductCamera}
+                    onClose={() => setShowProductCamera(false)}
+                    onCapture={processAndUploadProductImage}
+                    title="Tomar Foto del Producto"
+                    multiple={false}
+                />
             )}
 
             {/* Toast Notification */}

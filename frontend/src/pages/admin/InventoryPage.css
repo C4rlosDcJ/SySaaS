@@ -775,13 +775,21 @@
     border-color: var(--color-primary);
 }
 
+.photo-empty-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+}
+
 .photo-empty-box {
     flex: 1;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: var(--sp-4);
+    padding: var(--sp-3);
     text-align: center;
     cursor: pointer;
     transition: background var(--transition-fast);
@@ -794,6 +802,28 @@
 .photo-empty-box.uploading {
     opacity: 0.6;
     pointer-events: none;
+}
+
+.btn-take-camera-photo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 12px;
+    background: var(--color-bg-input, rgba(255, 255, 255, 0.06));
+    border: none;
+    border-top: 1px solid var(--color-border);
+    color: var(--color-text);
+    font-size: 11px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    width: 100%;
+}
+
+.btn-take-camera-photo:hover {
+    background: var(--color-bg-hover, rgba(255, 255, 255, 0.12));
+    color: var(--color-primary, #e50914);
 }
 
 .photo-preview-active {
@@ -816,9 +846,9 @@
     left: 8px;
     right: 8px;
     display: flex;
-    gap: 8px;
+    gap: 6px;
     justify-content: center;
-    background: rgba(15, 23, 42, 0.75);
+    background: rgba(15, 23, 42, 0.85);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     padding: 6px 8px;
@@ -828,14 +858,18 @@
 
 .btn-photo-action {
     flex: 1;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
-    padding: 5px 10px;
+    padding: 5px 6px;
     border-radius: var(--radius-sm);
     cursor: pointer;
     border: none;
     transition: all var(--transition-fast);
     text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
 }
 
 .btn-photo-change {
@@ -845,6 +879,16 @@
 
 .btn-photo-change:hover {
     background: #e2e8f0;
+}
+
+.btn-photo-camera {
+    background: rgba(255, 255, 255, 0.18);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.btn-photo-camera:hover {
+    background: rgba(255, 255, 255, 0.3);
 }
 
 .btn-photo-delete {

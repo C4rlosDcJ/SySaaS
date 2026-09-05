@@ -7,9 +7,10 @@ import {
     Wrench, Clock, User, MessageSquare, AlertCircle, CheckCircle2,
     ChevronLeft, Smartphone, CreditCard, ShieldCheck, Send, Plus, X,
     Image as ImageIcon, DollarSign, Save as SaveIcon, ClipboardCheck,
-    Printer, PenTool, Edit3, ShoppingCart, Star
+    Printer, PenTool, Edit3, ShoppingCart, Star, Camera
 } from 'lucide-react';
 import SignatureModal from '../../components/common/SignatureModal';
+import CameraCaptureModal from '../../components/CameraCaptureModal';
 import { generateServiceTicket } from '../../utils/pdfGenerator';
 import PrintReceipt from '../../components/common/PrintReceipt';
 import './RepairDetailPage.css';
@@ -33,6 +34,7 @@ export default function RepairDetailPage() {
     const [isEditingCosts, setIsEditingCosts] = useState(false);
     
     const [uploadingImages, setUploadingImages] = useState(false);
+    const [showCameraModal, setShowCameraModal] = useState(false);
     const [showSigModal, setShowSigModal] = useState(false);
     const [sigType, setSigType] = useState(null);
     const [showPrintReceipt, setShowPrintReceipt] = useState(false);
@@ -302,6 +304,17 @@ export default function RepairDetailPage() {
             await uploadService.uploadImages(id, files, 'during');
             await fetchRepairData();
         } catch (err) { alert('Error al subir imágenes: ' + err.message); } 
+        finally { setUploadingImages(false); }
+    };
+
+    const handleCameraUpload = async (files) => {
+        const fileList = Array.isArray(files) ? files : [files];
+        if (fileList.length === 0) return;
+        try {
+            setUploadingImages(true);
+            await uploadService.uploadImages(id, fileList, 'during');
+            await fetchRepairData();
+        } catch (err) { alert('Error al subir imágenes: ' + err.message); }
         finally { setUploadingImages(false); }
     };
 
@@ -703,10 +716,20 @@ export default function RepairDetailPage() {
                         <div className="card-header spread">
                             <div className="flex items-center gap-xs"><ImageIcon size={18} className="text-primary"/> <h3>Imágenes del Equipo</h3></div>
                             {isAdmin && (
-                                <label className="btn btn-ghost btn-sm text-primary pointer">
-                                    <Plus size={16} /> Agregar
-                                    <input type="file" multiple hidden accept="image/*" onChange={handleFileUpload} disabled={uploadingImages}/>
-                                </label>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost btn-sm text-primary pointer"
+                                        onClick={() => setShowCameraModal(true)}
+                                        disabled={uploadingImages}
+                                    >
+                                        <Camera size={16} /> Cámara
+                                    </button>
+                                    <label className="btn btn-ghost btn-sm text-muted pointer" style={{ margin: 0 }}>
+                                        <Plus size={16} /> Archivo
+                                        <input type="file" multiple hidden accept="image/*" onChange={handleFileUpload} disabled={uploadingImages}/>
+                                    </label>
+                                </div>
                             )}
                         </div>
                         {uploadingImages && <div className="text-center py-md text-sm text-muted">Subiendo imágenes...</div>}
@@ -1056,6 +1079,17 @@ export default function RepairDetailPage() {
                         </form>
                     </div>
                 </div>
+            )}
+
+            {/* Modal de Captura de Fotografía con Cámara */}
+            {showCameraModal && (
+                <CameraCaptureModal
+                    isOpen={showCameraModal}
+                    onClose={() => setShowCameraModal(false)}
+                    onCapture={handleCameraUpload}
+                    title="Evidencias de Reparación"
+                    multiple={true}
+                />
             )}
         </div>
     );
