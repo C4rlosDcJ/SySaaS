@@ -630,41 +630,52 @@
     border: 1px solid var(--color-border);
 }
 
-/* ── Badges y Etiquetas Frías Adaptativas (Óptimas en Modo Claro y Oscuro) ── */
-.badge-cool-active {
-    display: inline-block;
+/* ── Badges de Estado de Suscripción (Minimalistas, Elegantes, con Punto Indicador) ── */
+.badge-cool-active,
+.badge-cool-trial,
+.badge-cool-expired {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: 0.03em;
     padding: 3px 8px;
-    border-radius: 6px;
-    color: var(--cool-teal);
-    background: var(--cool-teal-bg);
-    border: 1px solid var(--cool-teal-border);
+    border-radius: var(--radius-sm, 4px);
+    background: transparent;
+    border: none;
+}
+
+.badge-cool-active::before,
+.badge-cool-trial::before,
+.badge-cool-expired::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.badge-cool-active {
+    color: var(--color-text);
+}
+.badge-cool-active::before {
+    background: #10b981;
 }
 
 .badge-cool-trial {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    padding: 3px 8px;
-    border-radius: 6px;
-    color: var(--cool-amber);
-    background: var(--cool-amber-bg);
-    border: 1px solid var(--cool-amber-border);
+    color: var(--color-text-secondary);
+}
+.badge-cool-trial::before {
+    background: #f59e0b;
 }
 
 .badge-cool-expired {
-    display: inline-block;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.03em;
-    padding: 3px 8px;
-    border-radius: 6px;
-    color: var(--cool-rose);
-    background: var(--cool-rose-bg);
-    border: 1px solid var(--cool-rose-border);
+    color: var(--color-text-muted);
+}
+.badge-cool-expired::before {
+    background: #ef4444;
 }
 
 .badge-cool-cycle {
