@@ -1025,7 +1025,7 @@ export default function InventoryPage() {
             {/* Stats */}
             <div className="inventory-stats">
                 <div className="inv-stat-card">
-                    <div className="inv-stat-icon" style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8' }}>
+                    <div className="inv-stat-icon" style={{ background: 'var(--cool-slate-blue-bg)', color: 'var(--cool-slate-blue)', border: '1px solid var(--cool-slate-blue-border)' }}>
                         <Package size={22} />
                     </div>
                     <div>
@@ -1034,7 +1034,7 @@ export default function InventoryPage() {
                     </div>
                 </div>
                 <div className="inv-stat-card">
-                    <div className="inv-stat-icon" style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>
+                    <div className="inv-stat-icon" style={{ background: 'var(--cool-amber-bg)', color: 'var(--cool-amber)', border: '1px solid var(--cool-amber-border)' }}>
                         <AlertTriangle size={22} />
                     </div>
                     <div>
@@ -1043,7 +1043,7 @@ export default function InventoryPage() {
                     </div>
                 </div>
                 <div className="inv-stat-card">
-                    <div className="inv-stat-icon" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>
+                    <div className="inv-stat-icon" style={{ background: 'var(--cool-rose-bg)', color: 'var(--cool-rose)', border: '1px solid var(--cool-rose-border)' }}>
                         <PackageX size={22} />
                     </div>
                     <div>
@@ -1052,7 +1052,7 @@ export default function InventoryPage() {
                     </div>
                 </div>
                 <div className="inv-stat-card">
-                    <div className="inv-stat-icon" style={{ background: 'rgba(34,197,94,0.12)', color: '#10b981' }}>
+                    <div className="inv-stat-icon" style={{ background: 'var(--cool-teal-bg)', color: 'var(--cool-teal)', border: '1px solid var(--cool-teal-border)' }}>
                         <DollarSign size={22} />
                     </div>
                     <div>

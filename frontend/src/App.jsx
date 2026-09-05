@@ -110,31 +110,32 @@ function DashboardLayout({ children, adminOnly = false, superAdminOnly = false, 
       <div className="main-content">
         {isImpersonating && (
           <div style={{
-            background: 'linear-gradient(90deg, #1e40af, #3b82f6)',
-            color: '#ffffff',
+            background: 'linear-gradient(90deg, var(--cool-cyan-bg), var(--cool-slate-blue-bg))',
+            color: 'var(--color-text)',
+            border: '1px solid var(--cool-cyan-border)',
             padding: '10px 20px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             fontSize: '13px',
             fontWeight: 600,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            boxShadow: 'var(--shadow-sm)',
             marginBottom: '16px',
             borderRadius: 'var(--radius-md)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Shield size={18} />
-              <span>Modo Soporte Asistido: Visualizando empresa <strong>{tenant?.company_name || 'Empresa Cliente'}</strong></span>
+              <Shield size={18} style={{ color: 'var(--cool-cyan)' }} />
+              <span>Modo Soporte Asistido: Visualizando empresa <strong style={{ color: 'var(--cool-cyan)' }}>{tenant?.company_name || 'Empresa Cliente'}</strong></span>
             </div>
             <button 
               onClick={exitImpersonation}
               style={{
-                background: '#ffffff',
-                color: '#1e40af',
-                border: 'none',
+                background: 'var(--color-bg-card)',
+                color: 'var(--color-text)',
+                border: '1px solid var(--cool-cyan-border)',
                 padding: '6px 14px',
                 borderRadius: '6px',
-                fontWeight: 700,
+                fontWeight: 600,
                 fontSize: '12px',
                 cursor: 'pointer'
               }}

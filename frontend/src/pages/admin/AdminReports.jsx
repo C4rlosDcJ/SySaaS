@@ -517,7 +517,7 @@ export default function AdminReports() {
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
                                         <span className="kpi-label">Ingresos Consolidados</span>
-                                        <div className="kpi-icon" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3b82f6' }}>
+                                        <div className="kpi-icon" style={{ background: 'var(--cool-cyan-bg)', color: 'var(--cool-cyan)', border: '1px solid var(--cool-cyan-border)' }}>
                                             <DollarSign size={18} />
                                         </div>
                                     </div>
@@ -533,7 +533,7 @@ export default function AdminReports() {
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
                                         <span className="kpi-label">Ventas Mostrador (POS)</span>
-                                        <div className="kpi-icon" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
+                                        <div className="kpi-icon" style={{ background: 'var(--cool-slate-blue-bg)', color: 'var(--cool-slate-blue)', border: '1px solid var(--cool-slate-blue-border)' }}>
                                             <ShoppingBag size={18} />
                                         </div>
                                     </div>
@@ -544,7 +544,7 @@ export default function AdminReports() {
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
                                         <span className="kpi-label">Facturación Taller</span>
-                                        <div className="kpi-icon" style={{ background: 'rgba(2, 132, 199, 0.1)', color: '#0284c7' }}>
+                                        <div className="kpi-icon" style={{ background: 'var(--cool-teal-bg)', color: 'var(--cool-teal)', border: '1px solid var(--cool-teal-border)' }}>
                                             <Wrench size={18} />
                                         </div>
                                     </div>
@@ -555,7 +555,7 @@ export default function AdminReports() {
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
                                         <span className="kpi-label">Ticket Promedio (POS)</span>
-                                        <div className="kpi-icon" style={{ background: 'rgba(96, 165, 250, 0.1)', color: '#60a5fa' }}>
+                                        <div className="kpi-icon" style={{ background: 'var(--cool-amber-bg)', color: 'var(--cool-amber)', border: '1px solid var(--cool-amber-border)' }}>
                                             <CreditCard size={18} />
                                         </div>
                                     </div>
@@ -580,12 +580,12 @@ export default function AdminReports() {
                                                 <AreaChart data={temporalRevenueData}>
                                                     <defs>
                                                         <linearGradient id="posGrad" x1="0" y1="0" x2="0" y2="1">
-                                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} />
-                                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                                            <stop offset="5%" stopColor="var(--cool-slate-blue)" stopOpacity={0.35} />
+                                                            <stop offset="95%" stopColor="var(--cool-slate-blue)" stopOpacity={0} />
                                                         </linearGradient>
                                                         <linearGradient id="repGrad" x1="0" y1="0" x2="0" y2="1">
-                                                            <stop offset="5%" stopColor="#0284c7" stopOpacity={0.4} />
-                                                            <stop offset="95%" stopColor="#0284c7" stopOpacity={0} />
+                                                            <stop offset="5%" stopColor="var(--cool-cyan)" stopOpacity={0.35} />
+                                                            <stop offset="95%" stopColor="var(--cool-cyan)" stopOpacity={0} />
                                                         </linearGradient>
                                                     </defs>
                                                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.5} />
@@ -593,8 +593,8 @@ export default function AdminReports() {
                                                     <YAxis stroke="var(--color-text-secondary)" fontSize={11} tickLine={false} tickFormatter={v => `$${v}`} />
                                                     <Tooltip content={<CustomTooltip />} />
                                                     <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                                                    <Area type="monotone" dataKey="pos_revenue" name="Ventas Mostrador" stroke="#3b82f6" strokeWidth={2} fill="url(#posGrad)" />
-                                                    <Area type="monotone" dataKey="repairs_revenue" name="Taller / Reparaciones" stroke="#0284c7" strokeWidth={2} fill="url(#repGrad)" />
+                                                    <Area type="monotone" dataKey="pos_revenue" name="Ventas Mostrador" stroke="var(--cool-slate-blue)" strokeWidth={2} fill="url(#posGrad)" />
+                                                    <Area type="monotone" dataKey="repairs_revenue" name="Taller / Reparaciones" stroke="var(--cool-cyan)" strokeWidth={2} fill="url(#repGrad)" />
                                                 </AreaChart>
                                             </ResponsiveContainer>
                                         ) : (
@@ -622,26 +622,26 @@ export default function AdminReports() {
                                                     <div className="split-item">
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
                                                             <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#3b82f6' }} />
+                                                                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--cool-slate-blue)' }} />
                                                                 Ventas de Mostrador (POS)
                                                             </span>
                                                             <span style={{ fontWeight: 700 }}>{formatCurrency(kpis.pos_revenue || 0)} ({posPct}%)</span>
                                                         </div>
                                                         <div className="progress-track">
-                                                            <div className="progress-fill" style={{ width: `${posPct}%`, background: '#3b82f6' }} />
+                                                            <div className="progress-fill" style={{ width: `${posPct}%`, background: 'var(--cool-slate-blue)' }} />
                                                         </div>
                                                     </div>
 
                                                     <div className="split-item">
                                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '6px' }}>
                                                             <span style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#0284c7' }} />
+                                                                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--cool-cyan)' }} />
                                                                 Servicios de Reparación
                                                             </span>
                                                             <span style={{ fontWeight: 700 }}>{formatCurrency(kpis.repairs_revenue || 0)} ({repPct}%)</span>
                                                         </div>
                                                         <div className="progress-track">
-                                                            <div className="progress-fill" style={{ width: `${repPct}%`, background: '#0284c7' }} />
+                                                            <div className="progress-fill" style={{ width: `${repPct}%`, background: 'var(--cool-cyan)' }} />
                                                         </div>
                                                     </div>
                                                 </>
