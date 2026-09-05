@@ -22,6 +22,10 @@ export default function SettingsPage() {
         theme,
         borderRadius,
         setBorderRadius,
+        logoBorderRadius,
+        setLogoBorderRadius,
+        companyNameTransform,
+        setCompanyNameTransform,
         setBusinessName,
         setBusinessLogo
     } = useTheme();
@@ -245,7 +249,12 @@ export default function SettingsPage() {
         e.preventDefault();
         try {
             setSaving(true);
-            await settingsService.update(settings);
+            await settingsService.update({
+                ...settings,
+                border_radius: borderRadius,
+                logo_border_radius: logoBorderRadius,
+                company_name_transform: companyNameTransform
+            });
             // Only update TenantContext after a successful explicit save by the user.
             // Limit the update to visible branding fields to avoid contaminating other tenant data.
             if (updateTenantInfo) {
@@ -644,36 +653,39 @@ export default function SettingsPage() {
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '8px' }}>
                                     {uploadingLogo ? (
                                         <div style={{
-                                            width: '80px', height: '80px', borderRadius: 'var(--radius-md)',
+                                            width: '80px', height: '80px', borderRadius: logoBorderRadius || '12px',
                                             border: '1px solid var(--color-border)', display: 'flex',
                                             flexDirection: 'column',
                                             alignItems: 'center', justifyContent: 'center',
-                                            background: 'var(--color-bg-tertiary)', gap: '6px'
+                                            background: 'var(--color-bg-tertiary)', gap: '6px',
+                                            transition: 'border-radius 0.2s ease'
                                         }}>
                                             <RefreshCw size={20} className="animate-spin text-primary" />
                                             <span style={{ fontSize: '10px', color: 'var(--color-text-secondary)', fontWeight: 600 }}>Subiendo...</span>
                                         </div>
                                     ) : (settings.business_logo && !logoLoadError) ? (
                                         <div style={{
-                                            width: '80px', height: '80px', borderRadius: 'var(--radius-md)',
+                                            width: '80px', height: '80px', borderRadius: logoBorderRadius || '12px',
                                             border: '1px solid var(--color-border)', display: 'flex',
                                             alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-                                            background: 'var(--color-bg-tertiary)'
+                                            background: 'var(--color-bg-tertiary)',
+                                            transition: 'border-radius 0.2s ease'
                                         }}>
                                             <img 
                                                 src={getImageUrl(settings.business_logo)} 
                                                 alt="Logo" 
-                                                style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                                                style={{ width: '100%', height: '100%', objectFit: 'contain', borderRadius: logoBorderRadius || '12px' }} 
                                                 onError={() => setLogoLoadError(true)}
                                             />
                                         </div>
                                     ) : (
                                         <div style={{
-                                            width: '80px', height: '80px', borderRadius: 'var(--radius-md)',
+                                            width: '80px', height: '80px', borderRadius: logoBorderRadius || '12px',
                                             border: '1px dashed var(--color-border)', display: 'flex',
                                             flexDirection: 'column',
                                             alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-secondary)',
-                                            background: 'var(--color-bg-tertiary)', fontSize: '10px', textAlign: 'center', padding: '4px'
+                                            background: 'var(--color-bg-tertiary)', fontSize: '10px', textAlign: 'center', padding: '4px',
+                                            transition: 'border-radius 0.2s ease'
                                         }}>
                                             <Image size={28} style={{ marginBottom: '2px', opacity: 0.6 }} />
                                             {logoLoadError ? <span>Error al cargar</span> : <span>Sin logo</span>}
@@ -707,7 +719,39 @@ export default function SettingsPage() {
                                 </div>
                             </div>
 
-                            {/* Bordes */}
+                            {/* Curvatura de Bordes del Logotipo */}
+                            <div>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '8px' }}>
+                                    Curvatura de Bordes del Logotipo
+                                </label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '8px', marginTop: '8px' }}>
+                                    {[
+                                        { id: '0px', label: 'Recto (0px)' },
+                                        { id: '6px', label: 'Suave (6px)' },
+                                        { id: '12px', label: 'Redondeado (12px)' },
+                                        { id: '20px', label: 'Máximo (20px)' },
+                                        { id: '9999px', label: 'Circular' }
+                                    ].map(b => (
+                                        <button
+                                            key={b.id}
+                                            type="button"
+                                            onClick={() => setLogoBorderRadius(b.id)}
+                                            style={{
+                                                padding: '8px', fontSize: '12px', fontWeight: 600,
+                                                borderRadius: 'var(--radius-sm)',
+                                                border: (logoBorderRadius || '12px') === b.id ? '1px solid var(--color-border-strong)' : '1px solid var(--color-border)',
+                                                background: (logoBorderRadius || '12px') === b.id ? 'var(--color-bg-tertiary)' : 'transparent',
+                                                color: (logoBorderRadius || '12px') === b.id ? 'var(--color-text)' : 'var(--color-text-secondary)',
+                                                cursor: 'pointer'
+                                            }}
+                                        >
+                                            {b.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Curvatura de Bordes en Interfaz */}
                             <div>
                                 <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '8px' }}>
                                     Curvatura de Bordes en Interfaz
@@ -733,6 +777,42 @@ export default function SettingsPage() {
                                             }}
                                         >
                                             {b.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Formato del Nombre de la Empresa */}
+                            <div>
+                                <label style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--color-text-secondary)', display: 'block', marginBottom: '8px' }}>
+                                    Formato del Nombre de la Empresa
+                                </label>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '8px' }}>
+                                    {[
+                                        { id: 'none', label: 'Tal cual se guardó', sample: settings.business_name || 'SysTeck' },
+                                        { id: 'uppercase', label: 'TODO MAYÚSCULAS', sample: (settings.business_name || 'SysTeck').toUpperCase() },
+                                        { id: 'capitalize', label: 'Capitalizado', sample: (settings.business_name || 'SysTeck').charAt(0).toUpperCase() + (settings.business_name || 'SysTeck').slice(1).toLowerCase() },
+                                        { id: 'lowercase', label: 'todo minúsculas', sample: (settings.business_name || 'SysTeck').toLowerCase() }
+                                    ].map(c => (
+                                        <button
+                                            key={c.id}
+                                            type="button"
+                                            onClick={() => setCompanyNameTransform(c.id)}
+                                            style={{
+                                                padding: '8px', fontSize: '12px', fontWeight: 600,
+                                                borderRadius: 'var(--radius-sm)',
+                                                border: (companyNameTransform || 'none') === c.id ? '1px solid var(--color-border-strong)' : '1px solid var(--color-border)',
+                                                background: (companyNameTransform || 'none') === c.id ? 'var(--color-bg-tertiary)' : 'transparent',
+                                                color: (companyNameTransform || 'none') === c.id ? 'var(--color-text)' : 'var(--color-text-secondary)',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                flexDirection: 'column',
+                                                alignItems: 'flex-start',
+                                                gap: '2px'
+                                            }}
+                                        >
+                                            <span>{c.label}</span>
+                                            <span style={{ fontSize: '10px', opacity: 0.6, textTransform: c.id }}>{c.sample}</span>
                                         </button>
                                     ))}
                                 </div>

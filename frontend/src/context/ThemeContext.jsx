@@ -57,13 +57,27 @@ const applyAccentToDOM = (color) => {
 
   root.style.setProperty('--color-accent-dark', darkenHex(color, 40));
   root.style.setProperty('--color-accent-muted', `${color}1e`);
-};// Apply border radius to CSS custom properties on :root
+};
+
+// Apply border radius to CSS custom properties on :root
 const applyRadiusToDOM = (radius) => {
   const root = document.documentElement;
   root.style.setProperty('--radius-lg', radius);
   const num = parseInt(radius);
   root.style.setProperty('--radius-md', `${Math.max(4, num - 4)}px`);
   root.style.setProperty('--radius-sm', `${Math.max(2, num - 8)}px`);
+};
+
+// Apply logo border radius to CSS custom properties on :root
+const applyLogoRadiusToDOM = (radius) => {
+  const root = document.documentElement;
+  root.style.setProperty('--logo-radius', radius || '12px');
+};
+
+// Apply company name casing/transform to CSS custom properties on :root
+const applyCompanyTransformToDOM = (transform) => {
+  const root = document.documentElement;
+  root.style.setProperty('--company-name-transform', transform || 'none');
 };
 
 export const ThemeProvider = ({ children }) => {
@@ -80,6 +94,8 @@ export const ThemeProvider = ({ children }) => {
     return (saved === '#e63358' || !saved) ? '#4f46e5' : saved;
   });
   const [borderRadius, setBorderRadius] = useState(() => localStorage.getItem('borderRadius') || '12px');
+  const [logoBorderRadius, setLogoBorderRadius] = useState(() => localStorage.getItem('logoBorderRadius') || '12px');
+  const [companyNameTransform, setCompanyNameTransform] = useState(() => localStorage.getItem('companyNameTransform') || 'none');
   const [businessName, setBusinessName] = useState(() => localStorage.getItem('businessName') || 'Sys-Teck');
   const [businessLogo, setBusinessLogo] = useState(() => localStorage.getItem('businessLogo') || '');
 
@@ -134,6 +150,16 @@ export const ThemeProvider = ({ children }) => {
           if (data.border_radius) {
             setBorderRadius(data.border_radius);
             localStorage.setItem('borderRadius', data.border_radius);
+          }
+          if (data.logo_border_radius) {
+            setLogoBorderRadius(data.logo_border_radius);
+            applyLogoRadiusToDOM(data.logo_border_radius);
+            localStorage.setItem('logoBorderRadius', data.logo_border_radius);
+          }
+          if (data.company_name_transform) {
+            setCompanyNameTransform(data.company_name_transform);
+            applyCompanyTransformToDOM(data.company_name_transform);
+            localStorage.setItem('companyNameTransform', data.company_name_transform);
           }
           if (data.business_name) {
             setBusinessName(data.business_name);
@@ -253,6 +279,18 @@ export const ThemeProvider = ({ children }) => {
     localStorage.setItem('borderRadius', borderRadius);
   }, [borderRadius]);
 
+  // ── Apply logo border radius to DOM ───────────────────────
+  useEffect(() => {
+    applyLogoRadiusToDOM(logoBorderRadius);
+    localStorage.setItem('logoBorderRadius', logoBorderRadius);
+  }, [logoBorderRadius]);
+
+  // ── Apply company name transform to DOM ───────────────────
+  useEffect(() => {
+    applyCompanyTransformToDOM(companyNameTransform);
+    localStorage.setItem('companyNameTransform', companyNameTransform);
+  }, [companyNameTransform]);
+
   // ── Persist business name locally ──
   useEffect(() => {
     localStorage.setItem('businessName', businessName);
@@ -279,6 +317,26 @@ export const ThemeProvider = ({ children }) => {
     setBorderRadius(radius);
     settingsService.update({ border_radius: radius }).catch((err) => {
       console.warn('[Theme] Error al guardar radio en BD:', err.message);
+    });
+  };
+
+  const setLogoBorderRadiusAndPersist = (radius) => {
+    isUserChange.current = true;
+    setLogoBorderRadius(radius);
+    applyLogoRadiusToDOM(radius);
+    localStorage.setItem('logoBorderRadius', radius);
+    settingsService.update({ logo_border_radius: radius }).catch((err) => {
+      console.warn('[Theme] Error al guardar radio de logo en BD:', err.message);
+    });
+  };
+
+  const setCompanyNameTransformAndPersist = (transform) => {
+    isUserChange.current = true;
+    setCompanyNameTransform(transform);
+    applyCompanyTransformToDOM(transform);
+    localStorage.setItem('companyNameTransform', transform);
+    settingsService.update({ company_name_transform: transform }).catch((err) => {
+      console.warn('[Theme] Error al guardar formato de nombre en BD:', err.message);
     });
   };
 
@@ -413,6 +471,10 @@ export const ThemeProvider = ({ children }) => {
       setAccentColor: setAccentColorAndPersist,
       borderRadius,
       setBorderRadius: setBorderRadiusAndPersist,
+      logoBorderRadius,
+      setLogoBorderRadius: setLogoBorderRadiusAndPersist,
+      companyNameTransform,
+      setCompanyNameTransform: setCompanyNameTransformAndPersist,
       businessName,
       setBusinessName,
       businessLogo,

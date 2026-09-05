@@ -40,7 +40,7 @@ export default function Navbar() {
                         <img
                             src={getImageUrl(businessLogo)}
                             alt="Logo"
-                            style={{ width: '26px', height: '26px', objectFit: 'contain', borderRadius: '4px' }}
+                            style={{ width: '26px', height: '26px', objectFit: 'contain', borderRadius: 'var(--logo-radius, 6px)' }}
                             onError={(e) => { e.target.style.display = 'none'; }}
                         />
                     ) : (

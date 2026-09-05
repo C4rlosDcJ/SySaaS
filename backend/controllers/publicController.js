@@ -161,6 +161,8 @@ exports.getTheme = async (req, res) => {
                 const theme = {
                     accent_color: tenant.primary_color || '#4f46e5',
                     border_radius: '12px',
+                    logo_border_radius: '12px',
+                    company_name_transform: 'none',
                     business_name: tenant.company_name,
                     business_logo: tenant.logo_url || '',
                     landing_show_stats: 'true',

@@ -68,7 +68,7 @@
     font-size: var(--font-md);
     font-weight: 600;
     letter-spacing: 0.08em;
-    text-transform: uppercase;
+    text-transform: var(--company-name-transform, none);
     color: var(--color-text);
 }
 

@@ -238,8 +238,7 @@ export default function Sidebar({ isOpen, toggleMenu }) {
             const parts = name.split(' ');
             return <>{parts[0]} <span className="text-primary">{parts.slice(1).join(' ')}</span></>;
         }
-        const mid = Math.ceil(name.length / 2);
-        return <>{name.substring(0, mid)}<span className="text-primary">{name.substring(mid)}</span></>;
+        return <>{name}</>;
     };
 
     const getUserRoleLabel = () => {
@@ -265,7 +264,7 @@ export default function Sidebar({ isOpen, toggleMenu }) {
                                 src={getImageUrl(currentLogo)} 
                                 alt="Logo" 
                                 className="logo-img-sidebar" 
-                                style={{ width: '28px', height: '28px', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }}
+                                style={{ width: '28px', height: '28px', objectFit: 'contain', borderRadius: 'var(--logo-radius, 8px)' }}
                                 onError={(e) => { e.target.style.display = 'none'; }}
                             />
                         ) : (isSuperAdmin && !isImpersonating) ? (

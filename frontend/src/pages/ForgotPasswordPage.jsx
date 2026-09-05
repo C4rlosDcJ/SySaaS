@@ -46,8 +46,7 @@ export default function ForgotPasswordPage() {
             const parts = name.split(' ');
             return <>{parts[0]} <span className="text-primary">{parts.slice(1).join(' ')}</span></>;
         }
-        const mid = Math.ceil(name.length / 2);
-        return <>{name.substring(0, mid)}<span className="text-primary">{name.substring(mid)}</span></>;
+        return <>{name}</>;
     };
 
     return (
@@ -61,7 +60,7 @@ export default function ForgotPasswordPage() {
                                     src={getImageUrl(businessLogo)} 
                                     alt="Logo" 
                                     className="logo-img-auth" 
-                                    style={{ width: '36px', height: '36px', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }}
+                                    style={{ width: '36px', height: '36px', objectFit: 'contain', borderRadius: 'var(--logo-radius, 8px)' }}
                                     onError={(e) => { e.target.style.display = 'none'; }}
                                 />
                             ) : (

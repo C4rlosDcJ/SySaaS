@@ -42,8 +42,7 @@ export default function MobileHeader({ isOpen, toggleMenu }) {
             const parts = name.split(' ');
             return <>{parts[0]} <span className="text-primary">{parts.slice(1).join(' ')}</span></>;
         }
-        const mid = Math.ceil(name.length / 2);
-        return <>{name.substring(0, mid)}<span className="text-primary">{name.substring(mid)}</span></>;
+        return <>{name}</>;
     };
 
     return (
@@ -62,7 +61,7 @@ export default function MobileHeader({ isOpen, toggleMenu }) {
                             src={getImageUrl(currentLogo)} 
                             alt="Logo" 
                             className="logo-img-mobile" 
-                            style={{ width: '24px', height: '24px', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }} 
+                            style={{ width: '24px', height: '24px', objectFit: 'contain', borderRadius: 'var(--logo-radius, 6px)' }} 
                             onError={(e) => { e.target.style.display = 'none'; }}
                         />
                     ) : (isSuperAdmin && !isImpersonating) ? (
