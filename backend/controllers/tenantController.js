@@ -430,7 +430,23 @@ exports.resetUserPassword = async (req, res) => {
 exports.getPlans = async (req, res) => {
     try {
         const [plans] = await db.query('SELECT * FROM saas_plans ORDER BY price_monthly ASC');
-        res.json(plans);
+        const formatted = plans.map(p => {
+            let features = {};
+            try {
+                features = typeof p.features === 'string' ? JSON.parse(p.features) : (p.features || {});
+            } catch (e) {
+                features = {};
+            }
+            return {
+                ...p,
+                price_monthly: parseFloat(p.price_monthly || 0),
+                price_yearly: parseFloat(p.price_yearly || 0),
+                description: features.description || '',
+                popular: !!features.popular,
+                features
+            };
+        });
+        res.json(formatted);
     } catch (error) {
         console.error('[PLANS] Error al obtener planes:', error);
         res.status(500).json({ message: 'Error al obtener planes SaaS.' });
@@ -444,10 +460,12 @@ exports.createPlan = async (req, res) => {
             return res.status(400).json({ message: 'El nombre y el slug del plan son obligatorios.' });
         }
 
+        const featuresJson = features ? (typeof features === 'string' ? features : JSON.stringify(features)) : JSON.stringify({});
+
         const [result] = await db.query(
             `INSERT INTO saas_plans (name, slug, price_monthly, price_yearly, max_branches, max_users, max_monthly_repairs, features)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [name, slug, price_monthly || 0, price_yearly || 0, max_branches || 1, max_users || 3, max_monthly_repairs || null, JSON.stringify(features || {})]
+            [name, slug, price_monthly || 0, price_yearly || 0, max_branches || 1, max_users || 3, max_monthly_repairs || null, featuresJson]
         );
 
         res.status(201).json({ id: result.insertId, message: 'Plan SaaS creado exitosamente.' });
@@ -462,6 +480,10 @@ exports.updatePlan = async (req, res) => {
         const { id } = req.params;
         const { name, price_monthly, price_yearly, max_branches, max_users, max_monthly_repairs, features, is_active } = req.body;
 
+        const featuresJson = features !== undefined 
+            ? (typeof features === 'string' ? features : JSON.stringify(features))
+            : null;
+
         await db.query(
             `UPDATE saas_plans SET
                 name = COALESCE(?, name),
@@ -469,11 +491,11 @@ exports.updatePlan = async (req, res) => {
                 price_yearly = COALESCE(?, price_yearly),
                 max_branches = COALESCE(?, max_branches),
                 max_users = COALESCE(?, max_users),
-                max_monthly_repairs = COALESCE(?, max_monthly_repairs),
+                max_monthly_repairs = ?,
                 features = COALESCE(?, features),
                 is_active = COALESCE(?, is_active)
              WHERE id = ?`,
-            [name, price_monthly, price_yearly, max_branches, max_users, max_monthly_repairs, features ? JSON.stringify(features) : null, is_active, id]
+            [name, price_monthly, price_yearly, max_branches, max_users, max_monthly_repairs !== undefined ? max_monthly_repairs : null, featuresJson, is_active, id]
         );
 
         res.json({ message: 'Plan SaaS actualizado exitosamente.' });
@@ -542,6 +564,8 @@ exports.getMyTenant = async (req, res) => {
                 ...p,
                 price_monthly: parseFloat(p.price_monthly || 0),
                 price_yearly: parseFloat(p.price_yearly || 0),
+                description: pFeatures.description || '',
+                popular: !!pFeatures.popular,
                 features: pFeatures
             };
         });

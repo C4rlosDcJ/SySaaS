@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { publicService } from '../services/api';
 import Navbar from '../components/Navbar';
 import Nothing3DCanvas from '../components/Nothing3DCanvas';
 import Tilt3DCard from '../components/Tilt3DCard';
@@ -74,7 +75,7 @@ export default function LandingPage() {
         }
     ];
 
-    const plans = [
+    const defaultPlans = [
         {
             name: 'Plan Básico',
             slug: 'basico',
@@ -126,9 +127,82 @@ export default function LandingPage() {
                 'Soporte 24/7 y Onboarding dedicado'
             ],
             popular: false,
-            cta: 'Contactar Ventas'
+            cta: 'Comenzar Prueba'
         }
     ];
+
+    const [plans, setPlans] = useState(defaultPlans);
+
+    useEffect(() => {
+        publicService.getPlans()
+            .then(data => {
+                if (data?.plans && data.plans.length > 0) {
+                    const mapped = data.plans.map(p => {
+                        const feats = [];
+                        if (p.max_branches >= 99) {
+                            feats.push('Sucursales ilimitadas');
+                        } else if (p.max_branches > 1) {
+                            feats.push(`Hasta ${p.max_branches} Sucursales en red`);
+                        } else {
+                            feats.push('1 Sucursal matriz');
+                        }
+
+                        if (p.max_users >= 999) {
+                            feats.push('Usuarios y técnicos ilimitados');
+                        } else {
+                            feats.push(`Hasta ${p.max_users} usuarios de staff`);
+                        }
+
+                        if (!p.max_monthly_repairs) {
+                            feats.push('Tickets y reparaciones ilimitadas');
+                        } else {
+                            feats.push(`${p.max_monthly_repairs} tickets de reparación al mes`);
+                        }
+
+                        if (p.slug === 'basico') {
+                            feats.push('Punto de Venta POS e Inventario');
+                            feats.push('Rastreo público para clientes');
+                        } else if (p.slug === 'pro') {
+                            feats.push('Punto de Venta POS & Traspasos');
+                            if (p.features?.ai_assistant) feats.push('Diagnósticos predictivos con IA');
+                            if (p.features?.whatsapp_notifications) feats.push('Notificaciones por WhatsApp');
+                        } else {
+                            feats.push('Módulo POS & Traspasos avanzados');
+                            if (p.features?.ai_assistant) feats.push('Inteligencia Artificial y ML avanzada');
+                            if (p.features?.advanced_reports) feats.push('Reportes ejecutivos de red');
+                        }
+
+                        if (p.features?.support_tier) {
+                            feats.push(p.features.support_tier);
+                        }
+
+                        if (Array.isArray(p.features?.custom_features)) {
+                            p.features.custom_features.forEach(cf => {
+                                if (!feats.includes(cf)) feats.push(cf);
+                            });
+                        }
+
+                        return {
+                            id: p.id,
+                            name: p.name,
+                            slug: p.slug,
+                            priceMonthly: p.price_monthly,
+                            priceYearly: p.price_yearly,
+                            description: p.description || p.features?.description || (
+                                p.slug === 'basico' ? 'Para talleres individuales o negocios en crecimiento.' :
+                                p.slug === 'pro' ? 'La opción recomendada para cadenas en expansión.' :
+                                'Para cadenas corporativas y redes a gran escala.'
+                            ),
+                            features: feats,
+                            popular: p.popular || p.features?.popular || p.slug === 'pro',
+                            cta: p.slug === 'basico' ? 'Comenzar Prueba' : p.slug === 'pro' ? 'Adquirir Plan Pro' : 'Comenzar Prueba'
+                        };
+                    });
+                    setPlans(mapped);
+                }
+            })
+            .catch(() => {});
+    }, []);
 
     return (
         <div className={`landing-page ${isDark ? 'theme-dark' : 'theme-light'}`}>
@@ -338,7 +412,7 @@ export default function LandingPage() {
                                     </ul>
 
                                     <Link
-                                        to="/register"
+                                        to={`/register?plan=${plan.slug || 'pro'}`}
                                         className={plan.popular ? 'nothing-btn-primary w-full' : 'nothing-btn-secondary w-full'}
                                     >
                                         {plan.cta}

@@ -524,7 +524,28 @@ export default function RegisterPage() {
                                         {visiblePlans.map(plan => {
                                             const isSelected = selectedPlanSlug === plan.slug;
                                             const price = getPlanPrice(plan);
-                                            const isPro = plan.slug === 'pro';
+                                            const isRecommended = plan.popular || plan.features?.popular || plan.slug === 'pro';
+
+                                            const planFeatureItems = [
+                                                { label: 'Punto de Venta y Facturacion', included: plan.features?.pos_sales !== false },
+                                                { label: 'Control de Inventario y Stock', included: plan.features?.inventory !== false },
+                                                { label: 'Rastreo Publico para Clientes', included: plan.features?.public_tracking !== false },
+                                                { label: 'Traspasos entre Sucursales', included: !!plan.features?.transfers },
+                                                { label: 'Notificaciones por WhatsApp', included: !!plan.features?.whatsapp_notifications },
+                                                { label: 'Asistente de Inteligencia Artificial', included: !!plan.features?.ai_assistant },
+                                                { label: 'Catalogo y Pedidos Web', included: !!plan.features?.ecommerce },
+                                                { label: 'Reportes con Machine Learning', included: !!plan.features?.advanced_reports }
+                                            ];
+
+                                            if (plan.features?.support_tier) {
+                                                planFeatureItems.push({ label: plan.features.support_tier, included: true });
+                                            }
+
+                                            if (Array.isArray(plan.features?.custom_features)) {
+                                                plan.features.custom_features.forEach(cf => {
+                                                    planFeatureItems.push({ label: cf, included: true });
+                                                });
+                                            }
 
                                             return (
                                                 <div
@@ -532,7 +553,7 @@ export default function RegisterPage() {
                                                     className={`pricing-card ${isSelected ? 'selected' : ''}`}
                                                     onClick={() => setSelectedPlanSlug(plan.slug)}
                                                 >
-                                                    {isPro && (
+                                                    {isRecommended && (
                                                         <div className="pricing-card-badge-top">
                                                             RECOMENDADO
                                                         </div>
@@ -545,6 +566,12 @@ export default function RegisterPage() {
                                                                 {isSelected && <Check size={12} strokeWidth={3} />}
                                                             </div>
                                                         </div>
+
+                                                        {(plan.description || plan.features?.description) && (
+                                                            <div style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary)', marginBottom: '8px', lineHeight: 1.3 }}>
+                                                                {plan.description || plan.features?.description}
+                                                            </div>
+                                                        )}
 
                                                         <div className="pricing-price-box">
                                                             <div className="pricing-price-row">
@@ -562,10 +589,10 @@ export default function RegisterPage() {
 
                                                         <div className="pricing-quota-tags">
                                                             <span className="quota-tag">
-                                                                {plan.max_branches === 99 ? 'Sucursales ilimitadas' : `${plan.max_branches} sucursal${plan.max_branches > 1 ? 'es' : ''}`}
+                                                                {plan.max_branches >= 99 ? 'Sucursales ilimitadas' : `${plan.max_branches} sucursal${plan.max_branches > 1 ? 'es' : ''}`}
                                                             </span>
                                                             <span className="quota-tag">
-                                                                {plan.max_users === 999 ? 'Usuarios ilimitados' : `${plan.max_users} usuarios staff`}
+                                                                {plan.max_users >= 999 ? 'Usuarios ilimitados' : `${plan.max_users} usuarios staff`}
                                                             </span>
                                                             <span className="quota-tag">
                                                                 {plan.max_monthly_repairs ? `${plan.max_monthly_repairs} ordenes/mes` : 'Ordenes ilimitadas'}
@@ -573,40 +600,14 @@ export default function RegisterPage() {
                                                         </div>
 
                                                         <div className="pricing-features-list">
-                                                            <div className="pricing-feature-row included">
-                                                                <div className="pricing-feature-icon check">
-                                                                    <Check size={10} strokeWidth={3} />
+                                                            {planFeatureItems.map((feat, idx) => (
+                                                                <div key={idx} className={`pricing-feature-row ${feat.included ? 'included' : ''}`}>
+                                                                    <div className={`pricing-feature-icon ${feat.included ? 'check' : 'cross'}`}>
+                                                                        {feat.included ? <Check size={10} strokeWidth={3} /> : <X size={10} />}
+                                                                    </div>
+                                                                    <span>{feat.label}</span>
                                                                 </div>
-                                                                <span>Punto de Venta y Facturacion</span>
-                                                            </div>
-
-                                                            <div className="pricing-feature-row included">
-                                                                <div className="pricing-feature-icon check">
-                                                                    <Check size={10} strokeWidth={3} />
-                                                                </div>
-                                                                <span>Control de Inventario y Stock</span>
-                                                            </div>
-
-                                                            <div className={`pricing-feature-row ${plan.features?.ai_assistant ? 'included' : ''}`}>
-                                                                <div className={`pricing-feature-icon ${plan.features?.ai_assistant ? 'check' : 'cross'}`}>
-                                                                    {plan.features?.ai_assistant ? <Check size={10} strokeWidth={3} /> : <X size={10} />}
-                                                                </div>
-                                                                <span>Asistente de Inteligencia Artificial</span>
-                                                            </div>
-
-                                                            <div className={`pricing-feature-row ${plan.features?.ecommerce ? 'included' : ''}`}>
-                                                                <div className={`pricing-feature-icon ${plan.features?.ecommerce ? 'check' : 'cross'}`}>
-                                                                    {plan.features?.ecommerce ? <Check size={10} strokeWidth={3} /> : <X size={10} />}
-                                                                </div>
-                                                                <span>Catalogo y Pedidos Web</span>
-                                                            </div>
-
-                                                            <div className={`pricing-feature-row ${plan.features?.advanced_reports ? 'included' : ''}`}>
-                                                                <div className={`pricing-feature-icon ${plan.features?.advanced_reports ? 'check' : 'cross'}`}>
-                                                                    {plan.features?.advanced_reports ? <Check size={10} strokeWidth={3} /> : <X size={10} />}
-                                                                </div>
-                                                                <span>Reportes con Machine Learning</span>
-                                                            </div>
+                                                            ))}
                                                         </div>
                                                     </div>
                                                 </div>
