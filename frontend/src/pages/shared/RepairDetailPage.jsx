@@ -735,12 +735,29 @@ export default function RepairDetailPage() {
                         {uploadingImages && <div className="text-center py-md text-sm text-muted">Subiendo imágenes...</div>}
                         
                         <div className="image-gallery mt-md">
-                            {repair.images?.length > 0 ? repair.images.map((img) => (
-                                <div key={img.id} className="gallery-thumbnail">
-                                    <img src={`${BACKEND_URL}${img.image_path}`} alt="Repair" onClick={() => window.open(`${BACKEND_URL}${img.image_path}`, '_blank')} />
-                                    {isAdmin && <button className="delete-btn" onClick={() => handleDeleteImage(img.id)}><X size={12}/></button>}
-                                </div>
-                            )) : <p className="text-muted text-sm text-center py-lg">No hay fotos registradas</p>}
+                            {repair.images?.length > 0 ? repair.images.map((img) => {
+                                // Usar base64 directo si existe; fallback a ruta de disco para imagenes antiguas
+                                const imgSrc = img.image_data || (img.image_path ? `${BACKEND_URL}${img.image_path}` : null);
+                                if (!imgSrc) return null;
+                                return (
+                                    <div key={img.id} className="gallery-thumbnail">
+                                        <img
+                                            src={imgSrc}
+                                            alt="Repair"
+                                            onClick={() => {
+                                                if (img.image_data) {
+                                                    // Abrir base64 en ventana nueva
+                                                    const w = window.open();
+                                                    if (w) w.document.write(`<img src="${img.image_data}" style="max-width:100%" />`);
+                                                } else {
+                                                    window.open(`${BACKEND_URL}${img.image_path}`, '_blank');
+                                                }
+                                            }}
+                                        />
+                                        {isAdmin && <button className="delete-btn" onClick={() => handleDeleteImage(img.id)}><X size={12}/></button>}
+                                    </div>
+                                );
+                            }) : <p className="text-muted text-sm text-center py-lg">No hay fotos registradas</p>}
                         </div>
                     </section>
 

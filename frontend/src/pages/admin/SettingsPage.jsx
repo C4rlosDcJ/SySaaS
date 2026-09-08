@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { settingsService, uploadService, getImageUrl } from '../../services/api';
+import { settingsService, getImageUrl } from '../../services/api';
 import { useTheme } from '../../context/ThemeContext';
 import { useTenant } from '../../context/TenantContext';
-import { compressImage } from '../../utils/imageCompressor';
+import { compressToBase64 } from '../../utils/imageCompressor';
 import {
     Save,
     RefreshCw,
@@ -107,93 +107,34 @@ export default function SettingsPage() {
             setUploadingLogo(true);
             setLogoLoadError(false);
 
-            const compressed = await compressImage(file, { maxWidth: 500, maxHeight: 500, quality: 0.85 });
-            const formData = new FormData();
-            formData.append('image', compressed);
+            // Comprimir y convertir a base64 directamente en el navegador
+            // El base64 se persiste en la BD, sobreviviendo deploys en Render
+            const base64DataUrl = await compressToBase64(file, { maxWidth: 500, maxHeight: 500, quality: 0.85 });
 
-            const res = await uploadService.uploadSingle(formData);
-            if (res?.url) {
-                const persistentUrl = res.url;
-
-                // 1. Guardar de forma inmediata en la base de datos para que nunca se pierda
-                await settingsService.update({ business_logo: persistentUrl });
-
-                // 2. Actualizar estado local del formulario
-                setSettings(prev => ({ ...prev, business_logo: persistentUrl }));
-
-                // 3. Sincronizar contextos globales
-                if (updateTenantInfo) {
-                    updateTenantInfo({ logo_url: persistentUrl });
-                }
-                if (setBusinessLogo) {
-                    setBusinessLogo(persistentUrl);
-                }
-
-                showAlert({
-                    title: 'Logotipo Actualizado',
-                    text: 'El logotipo de tu empresa se ha subido y guardado exitosamente.',
-                    icon: 'success'
-                });
+            if (!base64DataUrl || !base64DataUrl.startsWith('data:image')) {
+                throw new Error('No se pudo procesar la imagen.');
             }
+
+            // Guardar de inmediato en la base de datos
+            await settingsService.update({ business_logo: base64DataUrl });
+
+            // Actualizar estado local y contextos globales
+            setSettings(prev => ({ ...prev, business_logo: base64DataUrl }));
+            if (updateTenantInfo) updateTenantInfo({ logo_url: base64DataUrl });
+            if (setBusinessLogo) setBusinessLogo(base64DataUrl);
+
+            showAlert({
+                title: 'Logotipo Actualizado',
+                text: 'El logotipo de tu empresa se ha guardado exitosamente.',
+                icon: 'success'
+            });
         } catch (err) {
-            console.error('Error subiendo logo de empresa:', err);
-            // Fallback base64
-            const reader = new FileReader();
-            reader.onload = async (event) => {
-                const img = new window.Image();
-                img.onload = async () => {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 250;
-                        const MAX_HEIGHT = 250;
-                        let width = img.width;
-                        let height = img.height;
-                        if (width > height) {
-                            if (width > MAX_WIDTH) {
-                                height *= MAX_WIDTH / width;
-                                width = MAX_WIDTH;
-                            }
-                        } else {
-                            if (height > MAX_HEIGHT) {
-                                width *= MAX_HEIGHT / height;
-                                height = MAX_HEIGHT;
-                            }
-                        }
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-                        const compressedBase64 = canvas.toDataURL('image/png', 0.8);
-
-                        // Persistir base64 de inmediato en la base de datos
-                        await settingsService.update({ business_logo: compressedBase64 });
-                        setSettings(prev => ({ ...prev, business_logo: compressedBase64 }));
-                        if (updateTenantInfo) {
-                            updateTenantInfo({ logo_url: compressedBase64 });
-                        }
-                        if (setBusinessLogo) {
-                            setBusinessLogo(compressedBase64);
-                        }
-
-                        showAlert({
-                            title: 'Logotipo Actualizado',
-                            text: 'El logotipo se ha guardado correctamente.',
-                            icon: 'success'
-                        });
-                    } catch (persistErr) {
-                        showAlert({
-                            title: 'Error al Guardar Logo',
-                            text: persistErr.message || 'No se pudo guardar el logotipo.',
-                            icon: 'error'
-                        });
-                    } finally {
-                        setUploadingLogo(false);
-                    }
-                };
-                img.src = event.target.result;
-            };
-            reader.readAsDataURL(file);
-            return;
+            console.error('Error al guardar logotipo:', err);
+            showAlert({
+                title: 'Error al Guardar Logo',
+                text: err.message || 'No se pudo guardar el logotipo.',
+                icon: 'error'
+            });
         } finally {
             setUploadingLogo(false);
             if (e.target) e.target.value = '';

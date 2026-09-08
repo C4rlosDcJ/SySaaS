@@ -221,11 +221,50 @@ async function dbInit() {
 
             const [imageUrlCol] = await connection.query(`SHOW COLUMNS FROM products LIKE 'image_url'`);
             if (imageUrlCol.length === 0) {
-                await connection.query(`ALTER TABLE products ADD COLUMN image_url VARCHAR(500) NULL`);
+                await connection.query(`ALTER TABLE products ADD COLUMN image_url LONGTEXT NULL`);
                 console.log(`[DB-INIT] Columna image_url añadida a la tabla products.`);
+            } else {
+                // Asegurar que image_url soporte base64 (LONGTEXT)
+                const colType = imageUrlCol[0].Type ? imageUrlCol[0].Type.toLowerCase() : '';
+                if (!colType.includes('text') && !colType.includes('blob')) {
+                    await connection.query(`ALTER TABLE products MODIFY COLUMN image_url LONGTEXT NULL`);
+                    console.log(`[DB-INIT] Columna image_url en products ampliada a LONGTEXT para soporte de base64.`);
+                }
             }
         } catch (e) {
             console.error(`[DB-INIT] Error al verificar/alterar la tabla products:`, e.message);
+        }
+
+        // 11.1. Crear tabla repair_images si no existe y asegurar columna image_data
+        console.log(`[DB-INIT] Verificando tabla "repair_images" y soporte de base64...`);
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS repair_images (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    repair_id INT NOT NULL,
+                    image_path VARCHAR(255) NULL,
+                    image_data LONGTEXT NULL,
+                    image_type ENUM('before', 'during', 'after') DEFAULT 'before',
+                    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (repair_id) REFERENCES repairs(id) ON DELETE CASCADE
+                ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+            `);
+
+            // Agregar columna image_data si no existe (tabla ya existia)
+            const [imageDataCol] = await connection.query(`SHOW COLUMNS FROM repair_images LIKE 'image_data'`);
+            if (imageDataCol.length === 0) {
+                await connection.query(`ALTER TABLE repair_images ADD COLUMN image_data LONGTEXT NULL AFTER image_path`);
+                console.log(`[DB-INIT] Columna image_data (LONGTEXT) añadida a repair_images para persistencia base64.`);
+            }
+
+            // Asegurar que image_path permita NULL para nuevas subidas base64
+            const [imagePathCol] = await connection.query(`SHOW COLUMNS FROM repair_images LIKE 'image_path'`);
+            if (imagePathCol.length > 0 && imagePathCol[0].Null === 'NO') {
+                await connection.query(`ALTER TABLE repair_images MODIFY COLUMN image_path VARCHAR(255) NULL DEFAULT NULL`);
+                console.log(`[DB-INIT] Columna image_path en repair_images modificada a NULL DEFAULT NULL.`);
+            }
+        } catch (e) {
+            console.error(`[DB-INIT] Error al verificar/alterar la tabla repair_images:`, e.message);
         }
 
         // 12. Asegurar que la columna barcode exista en la tabla services_catalog
