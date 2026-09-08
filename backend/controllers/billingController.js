@@ -216,6 +216,7 @@ exports.verifyCheckoutSession = async (req, res) => {
                  stripe_customer_id = COALESCE(?, stripe_customer_id),
                  subscription_expires_at = ?,
                  billing_cycle = ?,
+                 has_used_trial = 1,
                  trial_ends_at = NULL
              WHERE id = ?`,
             [planId, stripeSubscriptionId || null, stripeCustomerId || null, currentPeriodEnd, billingCycle, tenantId]
@@ -347,6 +348,7 @@ exports.handleWebhook = async (req, res) => {
                          stripe_customer_id = COALESCE(?, stripe_customer_id),
                          subscription_expires_at = ?,
                          billing_cycle = ?,
+                         has_used_trial = 1,
                          trial_ends_at = NULL
                      WHERE id = ?`,
                     [planId, stripeSubscriptionId || null, stripeCustomerId || null, expiresAt, billingCycle, tenantId]
@@ -506,6 +508,7 @@ exports.subscribePlan = async (req, res) => {
              SET plan_id = ?, subscription_status = 'active',
                  subscription_expires_at = ?,
                  billing_cycle = ?,
+                 has_used_trial = 1,
                  trial_ends_at = NULL
              WHERE id = ?`,
             [plan.id, expiresAt, billing_cycle, tenantId]

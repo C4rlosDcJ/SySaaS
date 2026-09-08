@@ -150,10 +150,8 @@ export default function RegisterPage() {
         }
     };
 
-    // Para prueba gratis: solo basico y pro. Enterprise solo con suscripcion
-    const visiblePlans = isTrial
-        ? plans.filter(p => p.slug !== 'enterprise')
-        : plans;
+    // Todos los planes (incluyendo Enterprise) estan disponibles para prueba gratuita
+    const visiblePlans = plans;
 
     const selectedPlan = plans.find(p => p.slug === selectedPlanSlug);
 
@@ -466,12 +464,7 @@ export default function RegisterPage() {
                                     <button
                                         type="button"
                                         className={`mode-segment-btn ${isTrial ? 'active' : ''}`}
-                                        onClick={() => {
-                                            setIsTrial(true);
-                                            if (selectedPlanSlug === 'enterprise') {
-                                                setSelectedPlanSlug('pro');
-                                            }
-                                        }}
+                                        onClick={() => setIsTrial(true)}
                                     >
                                         <Zap size={16} />
                                         <span>Prueba Gratuita</span>
@@ -494,7 +487,7 @@ export default function RegisterPage() {
                                     <div className="trial-info-banner">
                                         <Zap size={15} style={{ flexShrink: 0 }} />
                                         <span>
-                                            Disfruta de 30 dias de acceso completo sin requerir tarjeta de credito. En modalidad de prueba puedes seleccionar los planes Basico y Pro.
+                                            Disfruta de 30 dias de acceso completo sin requerir tarjeta de credito en cualquiera de nuestros planes (Basico, Pro o Enterprise). Periodo de prueba gratuito unico por empresa.
                                         </span>
                                     </div>
                                 ) : (

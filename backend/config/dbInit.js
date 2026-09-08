@@ -372,6 +372,20 @@ async function dbInit() {
                 console.log(`[DB-INIT] Columna billing_cycle añadida a tenants.`);
             }
 
+            const [hasUsedTrialCol] = await connection.query(`SHOW COLUMNS FROM tenants LIKE 'has_used_trial'`);
+            if (hasUsedTrialCol.length === 0) {
+                await connection.query(`ALTER TABLE tenants ADD COLUMN has_used_trial TINYINT(1) DEFAULT 0 AFTER billing_cycle`);
+                console.log(`[DB-INIT] Columna has_used_trial añadida a tenants.`);
+
+                await connection.query(`
+                    UPDATE tenants 
+                    SET has_used_trial = 1 
+                    WHERE subscription_status IN ('trial', 'active', 'past_due', 'canceled') 
+                       OR trial_ends_at IS NOT NULL
+                `);
+                console.log(`[DB-INIT] Estado has_used_trial inicializado para empresas existentes.`);
+            }
+
             // Sincronizar y corregir inquilinos que contrataron suscripción anual
             // Si el monto de su último pago fue >= 2000 MXN o se especificó yearly
             const [yearlyPayments] = await connection.query(`
