@@ -75,6 +75,72 @@ export default function LandingPage() {
         }
     ];
 
+    const buildPlanFeaturesList = (p) => {
+        const feats = [];
+        const featObj = typeof p.features === 'string' ? JSON.parse(p.features) : (p.features || {});
+
+        // Quotas
+        if (p.max_branches >= 99) {
+            feats.push('Sucursales ilimitadas');
+        } else if (p.max_branches > 1) {
+            feats.push(`Hasta ${p.max_branches} Sucursales en red`);
+        } else {
+            feats.push('1 Sucursal matriz');
+        }
+
+        if (p.max_users >= 999) {
+            feats.push('Usuarios y técnicos ilimitados');
+        } else {
+            feats.push(`Hasta ${p.max_users} usuarios de staff`);
+        }
+
+        if (!p.max_monthly_repairs) {
+            feats.push('Tickets y reparaciones ilimitadas');
+        } else {
+            feats.push(`${p.max_monthly_repairs} tickets de reparación al mes`);
+        }
+
+        // Modulos del sistema reales
+        if (featObj.pos_sales !== false) {
+            feats.push(featObj.transfers ? 'Punto de Venta POS & Traspasos' : 'Punto de Venta POS y Facturación');
+        }
+        if (featObj.inventory !== false) {
+            feats.push('Control de Inventario y Stock');
+        }
+        if (featObj.public_tracking !== false) {
+            feats.push('Rastreo público para clientes');
+        }
+        if (featObj.transfers && !featObj.pos_sales) {
+            feats.push('Traspasos entre Sucursales');
+        }
+        if (featObj.whatsapp_notifications) {
+            feats.push('Notificaciones por WhatsApp');
+        }
+        if (featObj.ai_assistant) {
+            feats.push(p.slug === 'enterprise' ? 'Inteligencia Artificial y ML avanzada' : 'Diagnósticos predictivos con IA');
+        }
+        if (featObj.ecommerce) {
+            feats.push('Catálogo E-Commerce y Pedidos Web');
+        }
+        if (featObj.advanced_reports) {
+            feats.push(p.slug === 'enterprise' ? 'Reportes ejecutivos de red y ML' : 'Reportes Financieros y Machine Learning');
+        }
+
+        // Nivel de soporte
+        if (featObj.support_tier) {
+            feats.push(featObj.support_tier);
+        }
+
+        // Caracteristicas personalizadas
+        if (Array.isArray(featObj.custom_features)) {
+            featObj.custom_features.forEach(cf => {
+                if (!feats.includes(cf)) feats.push(cf);
+            });
+        }
+
+        return feats;
+    };
+
     const defaultPlans = [
         {
             name: 'Plan Básico',
@@ -86,7 +152,8 @@ export default function LandingPage() {
                 '1 Sucursal matriz',
                 'Hasta 3 usuarios de staff',
                 '100 tickets de reparación al mes',
-                'Punto de Venta POS e Inventario',
+                'Punto de Venta POS y Facturación',
+                'Control de Inventario y Stock',
                 'Rastreo público para clientes',
                 'Soporte técnico por correo'
             ],
@@ -104,8 +171,11 @@ export default function LandingPage() {
                 'Hasta 10 usuarios de staff',
                 '500 tickets de reparación al mes',
                 'Punto de Venta POS & Traspasos',
+                'Control de Inventario y Stock',
+                'Rastreo público para clientes',
                 'Diagnósticos predictivos con IA',
                 'Notificaciones por WhatsApp',
+                'Catálogo E-Commerce y Pedidos Web',
                 'Soporte prioritario'
             ],
             popular: true,
@@ -121,9 +191,13 @@ export default function LandingPage() {
                 'Sucursales ilimitadas',
                 'Usuarios y técnicos ilimitados',
                 'Tickets y reparaciones ilimitadas',
-                'Módulo POS & Traspasos avanzados',
+                'Punto de Venta POS & Traspasos',
+                'Control de Inventario y Stock',
+                'Rastreo público para clientes',
                 'Inteligencia Artificial y ML avanzada',
-                'Reportes ejecutivos de red',
+                'Notificaciones por WhatsApp',
+                'Catálogo E-Commerce y Pedidos Web',
+                'Reportes ejecutivos de red y ML',
                 'Soporte 24/7 y Onboarding dedicado'
             ],
             popular: false,
@@ -138,50 +212,6 @@ export default function LandingPage() {
             .then(data => {
                 if (data?.plans && data.plans.length > 0) {
                     const mapped = data.plans.map(p => {
-                        const feats = [];
-                        if (p.max_branches >= 99) {
-                            feats.push('Sucursales ilimitadas');
-                        } else if (p.max_branches > 1) {
-                            feats.push(`Hasta ${p.max_branches} Sucursales en red`);
-                        } else {
-                            feats.push('1 Sucursal matriz');
-                        }
-
-                        if (p.max_users >= 999) {
-                            feats.push('Usuarios y técnicos ilimitados');
-                        } else {
-                            feats.push(`Hasta ${p.max_users} usuarios de staff`);
-                        }
-
-                        if (!p.max_monthly_repairs) {
-                            feats.push('Tickets y reparaciones ilimitadas');
-                        } else {
-                            feats.push(`${p.max_monthly_repairs} tickets de reparación al mes`);
-                        }
-
-                        if (p.slug === 'basico') {
-                            feats.push('Punto de Venta POS e Inventario');
-                            feats.push('Rastreo público para clientes');
-                        } else if (p.slug === 'pro') {
-                            feats.push('Punto de Venta POS & Traspasos');
-                            if (p.features?.ai_assistant) feats.push('Diagnósticos predictivos con IA');
-                            if (p.features?.whatsapp_notifications) feats.push('Notificaciones por WhatsApp');
-                        } else {
-                            feats.push('Módulo POS & Traspasos avanzados');
-                            if (p.features?.ai_assistant) feats.push('Inteligencia Artificial y ML avanzada');
-                            if (p.features?.advanced_reports) feats.push('Reportes ejecutivos de red');
-                        }
-
-                        if (p.features?.support_tier) {
-                            feats.push(p.features.support_tier);
-                        }
-
-                        if (Array.isArray(p.features?.custom_features)) {
-                            p.features.custom_features.forEach(cf => {
-                                if (!feats.includes(cf)) feats.push(cf);
-                            });
-                        }
-
                         return {
                             id: p.id,
                             name: p.name,
@@ -193,7 +223,7 @@ export default function LandingPage() {
                                 p.slug === 'pro' ? 'La opción recomendada para cadenas en expansión.' :
                                 'Para cadenas corporativas y redes a gran escala.'
                             ),
-                            features: feats,
+                            features: buildPlanFeaturesList(p),
                             popular: p.popular || p.features?.popular || p.slug === 'pro',
                             cta: p.slug === 'basico' ? 'Comenzar Prueba' : p.slug === 'pro' ? 'Adquirir Plan Pro' : 'Comenzar Prueba'
                         };
