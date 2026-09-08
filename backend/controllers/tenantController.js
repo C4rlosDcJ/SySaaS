@@ -123,8 +123,8 @@ exports.createTenant = async (req, res) => {
         trialEndsAt.setDate(trialEndsAt.getDate() + trialDays);
 
         const [tenantResult] = await connection.query(`
-            INSERT INTO tenants (uuid, company_name, slug, tax_id, plan_id, subscription_status, trial_ends_at)
-            VALUES (?, ?, ?, ?, ?, 'trial', ?)
+            INSERT INTO tenants (uuid, company_name, slug, tax_id, plan_id, subscription_status, billing_cycle, has_used_trial, trial_ends_at)
+            VALUES (?, ?, ?, ?, ?, 'trial', 'monthly', 1, ?)
         `, [tenantUuid, company_name, slug, tax_id || null, plan_id, trialEndsAt]);
 
         const newTenantId = tenantResult.insertId;
@@ -300,6 +300,7 @@ exports.changeTenantPlan = async (req, res) => {
                      subscription_status = 'active', 
                      subscription_expires_at = ?, 
                      billing_cycle = ?,
+                     has_used_trial = 1,
                      trial_ends_at = NULL 
                  WHERE id = ?`,
                 [plan_id, expiresAt, billing_cycle, id]
@@ -665,6 +666,7 @@ exports.getMyTenant = async (req, res) => {
 
         res.json({
             ...tenantData,
+            has_used_trial: tenantData.has_used_trial === 1 || tenantData.has_used_trial === true || !!tenantData.trial_ends_at || tenantData.subscription_status === 'active',
             price_monthly: parseFloat(tenantData.price_monthly || 0),
             price_yearly: parseFloat(tenantData.price_yearly || 0),
             used_branches: parseInt(tenantData.used_branches || 0, 10),

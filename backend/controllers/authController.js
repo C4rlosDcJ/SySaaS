@@ -58,6 +58,27 @@ exports.registerCompany = async (req, res) => {
         let subscriptionStatus = 'trial';
         let trialEndsAt = null;
         let subscriptionExpiresAt = null;
+        const hasUsedTrial = wantsTrial ? 1 : 0;
+
+        // Validacion anti-abuso de prueba gratuita por numero de telefono
+        if (wantsTrial && phone) {
+            const cleanPhone = phone.replace(/[^0-9]/g, '');
+            if (cleanPhone.length >= 8) {
+                const [existingPhone] = await connection.query(
+                    `SELECT t.id, t.company_name FROM tenants t 
+                     JOIN branches b ON b.tenant_id = t.id 
+                     WHERE REPLACE(REPLACE(REPLACE(REPLACE(b.phone, ' ', ''), '-', ''), '+', ''), '(', '') LIKE ? 
+                     AND t.has_used_trial = 1 LIMIT 1`,
+                    [`%${cleanPhone.slice(-8)}%`]
+                );
+                if (existingPhone.length > 0) {
+                    await connection.rollback();
+                    return res.status(400).json({ 
+                        message: 'Este numero de contacto ya ha sido utilizado en una empresa que disfruto del periodo de prueba gratuito. Para registrar esta nueva empresa, debes seleccionar una suscripcion de pago.' 
+                    });
+                }
+            }
+        }
 
         if (wantsTrial) {
             subscriptionStatus = 'trial';
@@ -85,9 +106,9 @@ exports.registerCompany = async (req, res) => {
         const { v4: uuidv4 } = require('uuid');
         const tenantUuid = uuidv4();
         const [tenantResult] = await connection.query(
-            `INSERT INTO tenants (uuid, company_name, slug, plan_id, subscription_status, billing_cycle, trial_ends_at, subscription_expires_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [tenantUuid, company_name, finalSlug, plan.id, subscriptionStatus, billing_cycle, trialEndsAt, subscriptionExpiresAt]
+            `INSERT INTO tenants (uuid, company_name, slug, plan_id, subscription_status, billing_cycle, has_used_trial, trial_ends_at, subscription_expires_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [tenantUuid, company_name, finalSlug, plan.id, subscriptionStatus, billing_cycle, hasUsedTrial, trialEndsAt, subscriptionExpiresAt]
         );
         const tenantId = tenantResult.insertId;
 
@@ -154,6 +175,7 @@ exports.registerCompany = async (req, res) => {
                 plan_features: planFeatures,
                 subscription_status: subscriptionStatus,
                 billing_cycle: billing_cycle,
+                has_used_trial: hasUsedTrial,
                 trial_ends_at: trialEndsAt,
                 subscription_expires_at: subscriptionExpiresAt,
                 max_branches: plan.max_branches,
@@ -230,7 +252,7 @@ exports.login = async (req, res) => {
         if (user.tenant_id) {
             const [tenants] = await db.query(
                 `SELECT t.id, t.plan_id, t.company_name, t.slug, t.logo_url, t.primary_color, t.currency, 
-                        t.tax_rate, t.subscription_status, t.trial_ends_at,
+                        t.tax_rate, t.subscription_status, t.billing_cycle, t.has_used_trial, t.trial_ends_at, t.subscription_expires_at,
                         sp.name as plan_name, sp.slug as plan_slug, sp.features as plan_features
                  FROM tenants t
                  JOIN saas_plans sp ON t.plan_id = sp.id
@@ -339,7 +361,7 @@ exports.getMe = async (req, res) => {
         if (userData.tenant_id) {
             const [tenants] = await db.query(
                 `SELECT t.id, t.plan_id, t.company_name, t.slug, t.logo_url, t.primary_color, t.currency, 
-                        t.tax_rate, t.subscription_status, t.trial_ends_at,
+                        t.tax_rate, t.subscription_status, t.billing_cycle, t.has_used_trial, t.trial_ends_at, t.subscription_expires_at,
                         sp.name as plan_name, sp.slug as plan_slug, sp.features as plan_features
                  FROM tenants t
                  JOIN saas_plans sp ON t.plan_id = sp.id
@@ -610,7 +632,7 @@ exports.impersonateTenant = async (req, res) => {
         // Obtener datos de la empresa
         const [tenants] = await db.query(
             `SELECT t.id, t.plan_id, t.company_name, t.slug, t.logo_url, t.primary_color, t.currency, 
-                    t.tax_rate, t.subscription_status, t.trial_ends_at,
+                    t.tax_rate, t.subscription_status, t.billing_cycle, t.has_used_trial, t.trial_ends_at, t.subscription_expires_at,
                     sp.name as plan_name, sp.slug as plan_slug, sp.features as plan_features
              FROM tenants t
              JOIN saas_plans sp ON t.plan_id = sp.id

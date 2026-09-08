@@ -211,9 +211,12 @@ export default function SubscriptionPage() {
             : plan.price_monthly;
         const cycleLabel = billingCycle === 'yearly' ? 'Anual (2 meses de descuento)' : 'Mensual';
 
+        const isTrialTransition = tenant?.subscription_status === 'trial' || isTrialExpired || tenant?.has_used_trial;
         const confirmed = await showConfirm({
-            title: `Activar Plan ${plan.name}`,
-            text: `Seras redirigido a la pasarela segura de Stripe para procesar el pago de ${formatCurrency(price)} MXN (${cycleLabel}).`,
+            title: isTrialTransition ? `Contratar Plan ${plan.name}` : `Cambiar a Plan ${plan.name}`,
+            text: isTrialTransition
+                ? `El periodo de prueba es valido por unica vez. Seras redirigido a la pasarela segura de Stripe para formalizar la contratacion del Plan ${plan.name} por ${formatCurrency(price)} MXN (${cycleLabel}).`
+                : `Seras redirigido a la pasarela segura de Stripe para procesar el pago de ${formatCurrency(price)} MXN (${cycleLabel}).`,
             icon: 'question',
             confirmText: 'Continuar a Stripe'
         });
@@ -334,9 +337,9 @@ export default function SubscriptionPage() {
                             <AlertCircle size={22} />
                         </div>
                         <div>
-                            <div className="sub-banner-title">Periodo de Prueba Concluido</div>
+                            <div className="sub-banner-title">Periodo de Prueba Concluido (Uso Unico Agotado)</div>
                             <p className="sub-banner-text">
-                                Tus 30 dias de prueba han finalizado. Selecciona un plan a continuacion para reactivar tu operacion de forma inmediata sin perder tus datos.
+                                Tus 30 dias de prueba gratuita han finalizado. Como regla de la plataforma, el periodo de prueba solo puede utilizarse una vez. Para reactivar tu operacion de forma inmediata sin perder tus datos, selecciona y contrata una suscripcion de pago en el plan de tu preferencia.
                             </p>
                         </div>
                     </div>
@@ -349,10 +352,10 @@ export default function SubscriptionPage() {
                         </div>
                         <div>
                             <div className="sub-banner-title">
-                                Periodo de Prueba Activo: {timeRemaining ? timeRemaining.text : 'Activo'}
+                                Periodo de Prueba Activo: {timeRemaining ? timeRemaining.text : 'Activo'} (Prueba Unica)
                             </div>
                             <p className="sub-banner-text">
-                                Cuentas con acceso a todas las caracteristicas de tu plan. Puedes formalizar tu suscripcion en cualquier momento antes del vencimiento.
+                                Cuentas con acceso a todas las caracteristicas de tu plan. Recuerda que la prueba gratuita es valida por unica vez por empresa; al finalizar, deberas formalizar tu suscripcion mediante pago para continuar usando el sistema.
                             </p>
                         </div>
                     </div>
@@ -574,6 +577,24 @@ export default function SubscriptionPage() {
                         <p className="sub-plans-subtitle">
                             Aumenta tus capacidades operativas y desbloquea funciones avanzadas de inteligencia artificial
                         </p>
+                        {(tenant?.has_used_trial || isTrialExpired) && (
+                            <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                marginTop: '8px',
+                                padding: '4px 10px',
+                                borderRadius: 'var(--radius-sm)',
+                                background: 'rgba(234, 179, 8, 0.08)',
+                                border: '1px solid rgba(234, 179, 8, 0.25)',
+                                color: '#ca8a04',
+                                fontSize: '12px',
+                                fontWeight: 600
+                            }}>
+                                <AlertCircle size={13} />
+                                <span>Periodo de prueba unico utilizado. La activacion de planes se realiza mediante suscripcion de pago.</span>
+                            </div>
+                        )}
                     </div>
 
                     {/* Segmented Switch para ciclo de facturación */}
@@ -633,7 +654,9 @@ export default function SubscriptionPage() {
                                             <span className="sub-plan-badge active">ACTIVO</span>
                                         )}
                                         {!isCurrentActive && isCurrentPlan && (
-                                            <span className="sub-plan-badge trial">EN PRUEBA</span>
+                                            <span className={`sub-plan-badge ${isTrialExpired ? 'expired' : 'trial'}`}>
+                                                {isTrialExpired ? 'PRUEBA EXPIRADA' : 'EN PRUEBA'}
+                                            </span>
                                         )}
                                     </div>
 

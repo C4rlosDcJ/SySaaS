@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS tenants (
     plan_id INT NOT NULL,
     subscription_status ENUM('trial','active','past_due','canceled','suspended') DEFAULT 'trial',
     billing_cycle VARCHAR(20) DEFAULT 'monthly',
+    has_used_trial TINYINT(1) DEFAULT 0,
     trial_ends_at TIMESTAMP NULL,
     subscription_expires_at TIMESTAMP NULL,
     stripe_customer_id VARCHAR(100) NULL,
