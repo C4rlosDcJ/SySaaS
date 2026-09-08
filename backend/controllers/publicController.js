@@ -429,6 +429,8 @@ exports.getPlans = async (req, res) => {
                 max_branches: p.max_branches,
                 max_users: p.max_users,
                 max_monthly_repairs: p.max_monthly_repairs,
+                description: features.description || '',
+                popular: !!features.popular,
                 features
             };
         });

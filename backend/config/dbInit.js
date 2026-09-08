@@ -460,6 +460,72 @@ async function dbInit() {
             console.error(`[DB-INIT] Error al verificar usuarios del sistema:`, e.message);
         }
 
+        // 19. Actualizar características avanzadas y descripciones de planes SaaS
+        console.log(`[DB-INIT] Verificando características completas de saas_plans...`);
+        try {
+            const [existingPlans] = await connection.query(`SELECT id, slug, features FROM saas_plans`);
+            for (const p of existingPlans) {
+                let feat = {};
+                try {
+                    feat = typeof p.features === 'string' ? JSON.parse(p.features) : (p.features || {});
+                } catch (e) {
+                    feat = {};
+                }
+                if (feat.pos_sales === undefined) {
+                    if (p.slug === 'basico') {
+                        feat = {
+                            description: feat.description || 'Para talleres individuales o negocios en crecimiento.',
+                            popular: false,
+                            pos_sales: true,
+                            inventory: true,
+                            public_tracking: true,
+                            transfers: false,
+                            whatsapp_notifications: false,
+                            ai_assistant: false,
+                            ecommerce: false,
+                            advanced_reports: false,
+                            support_tier: 'Soporte técnico por correo',
+                            custom_features: []
+                        };
+                    } else if (p.slug === 'pro') {
+                        feat = {
+                            description: feat.description || 'La opción recomendada para cadenas en expansión.',
+                            popular: true,
+                            pos_sales: true,
+                            inventory: true,
+                            public_tracking: true,
+                            transfers: true,
+                            whatsapp_notifications: true,
+                            ai_assistant: true,
+                            ecommerce: true,
+                            advanced_reports: false,
+                            support_tier: 'Soporte prioritario',
+                            custom_features: []
+                        };
+                    } else if (p.slug === 'enterprise') {
+                        feat = {
+                            description: feat.description || 'Para cadenas corporativas y redes a gran escala.',
+                            popular: false,
+                            pos_sales: true,
+                            inventory: true,
+                            public_tracking: true,
+                            transfers: true,
+                            whatsapp_notifications: true,
+                            ai_assistant: true,
+                            ecommerce: true,
+                            advanced_reports: true,
+                            support_tier: 'Soporte 24/7 y Onboarding dedicado',
+                            custom_features: ['Módulo POS & Traspasos avanzados', 'Reportes ejecutivos de red']
+                        };
+                    }
+                    await connection.query(`UPDATE saas_plans SET features = ? WHERE id = ?`, [JSON.stringify(feat), p.id]);
+                    console.log(`[DB-INIT] Plan ${p.slug} actualizado con características completas.`);
+                }
+            }
+        } catch (e) {
+            console.error(`[DB-INIT] Error al verificar características de planes:`, e.message);
+        }
+
         console.log(`[DB-INIT] Base de datos "${dbName}" inicializada correctamente.`);
 
     } catch (error) {

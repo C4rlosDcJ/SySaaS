@@ -621,27 +621,41 @@ export default function SubscriptionPage() {
                     {plans.map((p) => {
                         const isCurrentActive = p.id === tenant?.plan_id && tenant?.subscription_status === 'active';
                         const isCurrentPlan = p.id === tenant?.plan_id;
-                        const isPro = p.slug === 'pro';
+                        const isRecommended = p.popular || p.features?.popular || p.slug === 'pro';
                         const price = billingCycle === 'yearly'
                             ? (p.price_yearly || p.price_monthly * 10)
                             : p.price_monthly;
 
                         const planFeatures = [
-                            { label: p.max_branches === 99 ? 'Sucursales ilimitadas' : `${p.max_branches} sucursal${p.max_branches > 1 ? 'es' : ''}`, included: true },
-                            { label: p.max_users === 999 ? 'Usuarios staff ilimitados' : `Hasta ${p.max_users} usuarios`, included: true },
-                            { label: p.max_monthly_repairs ? `${p.max_monthly_repairs} ordenes de servicio/mes` : 'Ordenes ilimitadas', included: true },
-                            { label: 'Punto de Venta e Inventario', included: true },
+                            { label: p.max_branches >= 99 ? 'Sucursales ilimitadas' : `${p.max_branches} sucursal${p.max_branches > 1 ? 'es' : ''}`, included: true },
+                            { label: p.max_users >= 999 ? 'Usuarios staff ilimitados' : `Hasta ${p.max_users} usuarios staff`, included: true },
+                            { label: p.max_monthly_repairs ? `${p.max_monthly_repairs} ordenes de servicio/mes` : 'Ordenes de servicio ilimitadas', included: true },
+                            { label: 'Punto de Venta POS & Facturacion', included: p.features?.pos_sales !== false },
+                            { label: 'Control de Inventario y Stock', included: p.features?.inventory !== false },
+                            { label: 'Rastreo Publico para Clientes', included: p.features?.public_tracking !== false },
+                            { label: 'Traspasos entre Sucursales', included: !!p.features?.transfers },
+                            { label: 'Notificaciones por WhatsApp', included: !!p.features?.whatsapp_notifications },
                             { label: 'Asistente de Inteligencia Artificial', included: !!p.features?.ai_assistant },
-                            { label: 'Catalogo E-Commerce y Pedidos', included: !!p.features?.ecommerce },
-                            { label: 'Reportes y Analitica Machine Learning', included: !!p.features?.advanced_reports }
+                            { label: 'Catalogo E-Commerce y Pedidos Web', included: !!p.features?.ecommerce },
+                            { label: 'Reportes y Machine Learning', included: !!p.features?.advanced_reports }
                         ];
+
+                        if (p.features?.support_tier) {
+                            planFeatures.push({ label: p.features.support_tier, included: true });
+                        }
+
+                        if (Array.isArray(p.features?.custom_features)) {
+                            p.features.custom_features.forEach(cf => {
+                                planFeatures.push({ label: cf, included: true });
+                            });
+                        }
 
                         return (
                             <div
                                 key={p.id}
-                                className={`sub-plan-card ${isCurrentActive ? 'current' : ''} ${isPro ? 'featured' : ''}`}
+                                className={`sub-plan-card ${isCurrentActive ? 'current' : ''} ${isRecommended ? 'featured' : ''}`}
                             >
-                                {isPro && !isCurrentActive && (
+                                {isRecommended && !isCurrentActive && (
                                     <div className="sub-card-tag">
                                         RECOMENDADO
                                     </div>
@@ -659,6 +673,12 @@ export default function SubscriptionPage() {
                                             </span>
                                         )}
                                     </div>
+
+                                    {(p.description || p.features?.description) && (
+                                        <p style={{ fontSize: '0.78rem', color: 'var(--color-text-secondary)', margin: '4px 0 10px 0', lineHeight: 1.3 }}>
+                                            {p.description || p.features?.description}
+                                        </p>
+                                    )}
 
                                     <div className="sub-price-block">
                                         <div style={{ display: 'flex', alignItems: 'baseline' }}>
