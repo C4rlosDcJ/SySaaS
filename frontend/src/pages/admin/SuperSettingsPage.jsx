@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Settings, Save, Globe, Mail, Shield, Clock, ToggleLeft, ToggleRight, UploadCloud, Trash2, CheckCircle2, Lock, KeyRound, Eye, EyeOff, User, AlertCircle, Cpu, Sliders } from 'lucide-react';
-import { superAdminService, uploadService, getImageUrl } from '../../services/api';
-import { compressImage } from '../../utils/imageCompressor';
+import { superAdminService, getImageUrl } from '../../services/api';
+import { compressToBase64 } from '../../utils/imageCompressor';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -104,23 +104,23 @@ export default function SuperSettingsPage() {
             setError('');
             setLogoLoadError(false);
 
-            const compressed = await compressImage(file, { maxWidth: 500, maxHeight: 500, quality: 0.85 });
-            const formData = new FormData();
-            formData.append('image', compressed);
+            // Comprimir y convertir a base64 directamente en el navegador
+            // Se persiste en la BD para sobrevivir deploys en Render
+            const base64DataUrl = await compressToBase64(file, { maxWidth: 500, maxHeight: 500, quality: 0.85 });
 
-            const res = await uploadService.uploadSingle(formData);
-            if (res?.url) {
-                const persistentUrl = res.url;
-                await superAdminService.updateGlobalSettings({ platform_logo: persistentUrl });
-
-                setSettings(prev => ({ ...prev, platform_logo: persistentUrl }));
-                localStorage.setItem('platform_logo', persistentUrl);
-
-                setSaved(true);
-                setTimeout(() => setSaved(false), 3000);
+            if (!base64DataUrl || !base64DataUrl.startsWith('data:image')) {
+                throw new Error('No se pudo procesar la imagen.');
             }
+
+            await superAdminService.updateGlobalSettings({ platform_logo: base64DataUrl });
+
+            setSettings(prev => ({ ...prev, platform_logo: base64DataUrl }));
+            localStorage.setItem('platform_logo', base64DataUrl);
+
+            setSaved(true);
+            setTimeout(() => setSaved(false), 3000);
         } catch (err) {
-            setError('Error al subir el logo: ' + (err.message || 'Revisa el formato de imagen.'));
+            setError('Error al guardar el logo: ' + (err.message || 'Revisa el formato de imagen.'));
         } finally {
             setUploadingLogo(false);
             if (fileInputRef.current) fileInputRef.current.value = '';

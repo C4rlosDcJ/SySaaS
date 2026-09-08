@@ -328,22 +328,10 @@ export const posService = {
 
 // Upload Service
 export const uploadService = {
-    upload: (formData) => {
-        const token = localStorage.getItem('token');
-        const activeBranchId = localStorage.getItem('activeBranchId');
-        return fetch(`${API_URL}/uploads`, {
-            method: 'POST',
-            headers: {
-                ...(token && { Authorization: `Bearer ${token}` }),
-                ...(activeBranchId && { 'X-Branch-ID': activeBranchId })
-            },
-            body: formData
-        }).then(async res => {
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.message || 'Error al subir archivo');
-            return data;
-        });
-    },
+    /**
+     * Sube una imagen individual al backend y obtiene su URL base64 de vuelta.
+     * Acepta FormData (para compatibilidad) o un File/Blob directo.
+     */
     uploadSingle: (formData) => {
         const token = localStorage.getItem('token');
         const activeBranchId = localStorage.getItem('activeBranchId');
@@ -357,6 +345,78 @@ export const uploadService = {
         }).then(async res => {
             const data = await res.json();
             if (!res.ok) throw new Error(data.message || 'Error al subir archivo');
+            return data;
+        });
+    },
+
+    /**
+     * Sube una imagen individual enviando base64 como JSON (sin FormData).
+     * @param {string} base64DataUrl - Data URL base64 de la imagen comprimida.
+     * @returns {Promise<{url: string}>}
+     */
+    uploadBase64Single: (base64DataUrl) => {
+        const token = localStorage.getItem('token');
+        const activeBranchId = localStorage.getItem('activeBranchId');
+        return fetch(`${API_URL}/uploads/single-b64`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token && { Authorization: `Bearer ${token}` }),
+                ...(activeBranchId && { 'X-Branch-ID': activeBranchId })
+            },
+            body: JSON.stringify({ imageData: base64DataUrl })
+        }).then(async res => {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Error al subir imagen');
+            return data;
+        });
+    },
+
+    /**
+     * Sube multiples imagenes de reparacion al backend.
+     * Acepta un array de File objects; los convierte a base64 internamente usando FormData multipart.
+     * @param {string|number} repairId - ID de la reparacion.
+     * @param {File[]} files - Array de archivos de imagen.
+     * @param {string} imageType - Tipo: 'before', 'during', 'after'.
+     */
+    uploadImages: (repairId, files, imageType = 'during') => {
+        const token = localStorage.getItem('token');
+        const activeBranchId = localStorage.getItem('activeBranchId');
+        const formData = new FormData();
+        files.forEach(file => formData.append('images', file));
+        formData.append('image_type', imageType);
+
+        return fetch(`${API_URL}/uploads/repair/${repairId}`, {
+            method: 'POST',
+            headers: {
+                ...(token && { Authorization: `Bearer ${token}` }),
+                ...(activeBranchId && { 'X-Branch-ID': activeBranchId })
+            },
+            body: formData
+        }).then(async res => {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Error al subir imagenes');
+            return data;
+        });
+    },
+
+    /**
+     * Elimina una imagen de reparacion por su ID.
+     * @param {string|number} imageId - ID del registro en repair_images.
+     */
+    deleteImage: (imageId) => {
+        const token = localStorage.getItem('token');
+        const activeBranchId = localStorage.getItem('activeBranchId');
+        return fetch(`${API_URL}/uploads/${imageId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token && { Authorization: `Bearer ${token}` }),
+                ...(activeBranchId && { 'X-Branch-ID': activeBranchId })
+            }
+        }).then(async res => {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Error al eliminar imagen');
             return data;
         });
     }

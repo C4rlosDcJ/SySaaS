@@ -7,12 +7,12 @@ import {
     FileSpreadsheet, Image as ImageIcon, UploadCloud, Eye, CheckSquare,
     Square, Building2, Globe, Sparkles, FileText, Camera
 } from 'lucide-react';
-import { inventoryService, transferService, branchService, uploadService, getImageUrl } from '../../services/api';
+import { inventoryService, transferService, branchService, getImageUrl } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useTenant } from '../../context/TenantContext';
 import { formatCurrency } from '../../utils/constants';
 import { showAlert, showConfirm } from '../../utils/swal';
-import { compressImage } from '../../utils/imageCompressor';
+import { compressToBase64 } from '../../utils/imageCompressor';
 import CameraCaptureModal from '../../components/CameraCaptureModal';
 import './InventoryPage.css';
 
@@ -182,24 +182,22 @@ export default function InventoryPage() {
         try {
             setUploadingImage(true);
             showToast('Comprimiendo y optimizando imagen...', 'info');
-            
-            // Comprimir imagen usando Canvas en el navegador
-            const compressed = await compressImage(file, { maxWidth: 800, maxHeight: 800, quality: 0.82 });
-            
-            const formData = new FormData();
-            formData.append('image', compressed);
 
-            const res = await uploadService.uploadSingle(formData);
-            if (res && res.url) {
-                setForm(prev => ({ ...prev, image_url: res.url }));
-                showToast('Imagen guardada exitosamente', 'success');
+            // Comprimir imagen en el navegador y obtener base64 directamente
+            // La imagen queda almacenada en la BD como string, persistiendo entre deploys
+            const base64DataUrl = await compressToBase64(file, { maxWidth: 800, maxHeight: 800, quality: 0.82 });
+
+            if (base64DataUrl && base64DataUrl.startsWith('data:image')) {
+                setForm(prev => ({ ...prev, image_url: base64DataUrl }));
+                showToast('Imagen lista. Se guardara al confirmar el producto.', 'success');
             } else {
                 setForm(prev => ({ ...prev, image_url: '' }));
+                showAlert({ title: 'Error', text: 'No se pudo procesar la imagen.', icon: 'error' });
             }
         } catch (err) {
-            console.error('Error subiendo imagen:', err);
+            console.error('Error procesando imagen:', err);
             setForm(prev => ({ ...prev, image_url: editingProduct?.image_url || '' }));
-            showAlert({ title: 'Error', text: err.message || 'No se pudo subir la imagen.', icon: 'error' });
+            showAlert({ title: 'Error', text: err.message || 'No se pudo procesar la imagen.', icon: 'error' });
         } finally {
             setUploadingImage(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
