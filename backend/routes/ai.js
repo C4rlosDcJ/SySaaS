@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const aiService = require('../services/aiService');
-const { auth, isTechnicianOrAdmin } = require('../middleware/auth');
+const { auth, optionalAuth, isTechnicianOrAdmin } = require('../middleware/auth');
 const tenantContext = require('../middleware/tenantContext');
 const { subscriptionGuard, featureGuard } = require('../middleware/subscriptionGuard');
 
@@ -56,15 +56,19 @@ router.post('/improve-note', requireAI, isTechnicianOrAdmin, async (req, res) =>
     }
 });
 
-// 3. Chat de soporte virtual (Publico - sin restriccion de plan)
-router.post('/chat', async (req, res) => {
+// 3. Chat de soporte virtual adaptado por rol y empresa (o público en Landing)
+router.post('/chat', optionalAuth, async (req, res) => {
     try {
-        const { message, history } = req.body;
+        const { message, history, context } = req.body;
         if (!message) {
             return res.status(400).json({ message: 'Se requiere un mensaje.' });
         }
 
-        const reply = await aiService.chatSupport(message, history || []);
+        const reply = await aiService.chatSupport(message, history || [], {
+            user: req.user || null,
+            context: context || {},
+            branchId: req.header('X-Branch-ID') || null
+        });
         res.json({ reply });
     } catch (error) {
         console.error('[AI ROUTE] Error en chat de soporte:', error);

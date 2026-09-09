@@ -499,7 +499,21 @@ exports.getSuperAdminStats = async (req, res) => {
             ? parseFloat(((conversionData[0]?.active_count / conversionData[0]?.total_count) * 100).toFixed(1))
             : 0;
 
+        // Calcular facturación acumulada global
+        const totalRevenue = globalMonthlyRevenue.reduce((acc, curr) => acc + parseFloat(curr.revenue || 0), 0);
+
+        const totals = {
+            total_tenants: parseInt(infrastructure[0]?.total_tenants || 0, 10),
+            active_tenants: parseInt(statusDistribution.find(s => s.subscription_status === 'active')?.count || 0, 10),
+            trial_tenants: parseInt(statusDistribution.find(s => s.subscription_status === 'trial')?.count || 0, 10),
+            total_users: parseInt(infrastructure[0]?.total_users || 0, 10),
+            total_repairs: parseInt(infrastructure[0]?.total_repairs || 0, 10),
+            total_branches: parseInt(infrastructure[0]?.total_branches || 0, 10),
+            total_revenue: totalRevenue
+        };
+
         res.json({
+            totals,
             status_distribution: statusDistribution,
             plan_distribution: planDistribution,
             mrr: parseFloat(revenueMetrics[0]?.mrr || 0),

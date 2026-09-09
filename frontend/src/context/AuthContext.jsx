@@ -36,6 +36,8 @@ export function AuthProvider({ children }) {
             });
             if (userData.tenant) {
                 setTenantData(userData.tenant, userData.branches, userData.default_branch_id);
+            } else {
+                clearTenantData();
             }
         } catch {
             localStorage.removeItem('token');

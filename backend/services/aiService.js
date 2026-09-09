@@ -20,11 +20,13 @@ async function callGemini(prompt, systemInstruction = '', jsonMode = false) {
         throw new Error('API Key de Gemini no configurada. Por favor ve a Ajustes o configura GEMINI_API_KEY en el archivo .env del backend.');
     }
 
-    // Lista de modelos ordenados por preferencia
+    // Lista de modelos ordenados por preferencia y velocidad
     const modelsToTry = [
-        'gemini-2.5-flash',
-        'gemini-1.5-flash',
-        'gemini-pro'
+        'gemini-3.6-flash',
+        'gemini-3.7-flash',
+        'gemini-flash-latest',
+        'gemini-3.5-flash',
+        'gemini-3.1-flash-lite'
     ];
 
     let lastError = null;
@@ -65,10 +67,11 @@ async function callGemini(prompt, systemInstruction = '', jsonMode = false) {
                 const errData = await response.json().catch(() => ({}));
                 const errMessage = errData?.error?.message || 'Error desconocido';
                 
-                // Si es un error de modelo no encontrado o cuota excedida (429), intentamos con el siguiente modelo
-                const isRetryable = response.status === 404 || response.status === 429 || 
+                // Si es un error de modelo no encontrado, cuota excedida (429) o alta demanda temporal (503), intentamos con el siguiente modelo
+                const isRetryable = response.status === 404 || response.status === 429 || response.status === 503 ||
                                     errMessage.includes('not found') || errMessage.includes('not supported') || 
-                                    errMessage.includes('quota') || errMessage.includes('rate limit') || errMessage.includes('limit:');
+                                    errMessage.includes('quota') || errMessage.includes('rate limit') || errMessage.includes('limit:') ||
+                                    errMessage.includes('demand') || errMessage.includes('temporary') || errMessage.includes('try again later');
                                     
                 if (isRetryable) {
                     console.warn(`[AI SERVICE] El modelo ${modelName} falló con error (${response.status}): ${errMessage}. Intentando con el siguiente...`);
@@ -92,7 +95,9 @@ async function callGemini(prompt, systemInstruction = '', jsonMode = false) {
             const errStr = error.message || '';
             const isRetryable = errStr.includes('not found') || errStr.includes('not supported') || 
                                 errStr.includes('404') || errStr.includes('quota') || 
-                                errStr.includes('rate limit') || errStr.includes('429');
+                                errStr.includes('rate limit') || errStr.includes('429') ||
+                                errStr.includes('503') || errStr.includes('demand') ||
+                                errStr.includes('temporary') || errStr.includes('try again later');
                                 
             if (!isRetryable) {
                 throw error;
@@ -267,102 +272,51 @@ Mantén los detalles técnicos importantes pero exprésalos de forma educada y e
     return await callGemini(prompt, systemInstruction, false);
 };
 
-// 3. Chat de Soporte Virtual con contexto completo de la base de datos
-exports.chatSupport = async (message, history = []) => {
-    // ─── 1. Cargar configuraciones del negocio ───
-    let shopInfo = {};
-    try {
-        const [settings] = await db.query(
-            `SELECT setting_key, setting_value FROM settings 
-             WHERE setting_key IN ('company_name','company_phone','company_email','company_address',
-                                   'business_hours','shop_logo','default_warranty_days')`
-        );
-        for (const s of settings) {
-            shopInfo[s.setting_key] = s.setting_value;
-        }
-    } catch (e) {
-        console.error('[CHAT] Error al cargar settings:', e);
-    }
+// 3. Chat de Soporte y Asistente Virtual Multi-Rol y Multi-Empresa
+exports.chatSupport = async (message, history = [], sessionInfo = {}) => {
+    const user = sessionInfo.user || null;
+    const context = sessionInfo.context || {};
+    const branchId = sessionInfo.branchId || (user ? user.branch_id : null);
+    const role = user ? user.role : 'public_visitor';
+    const userTenantId = user ? user.tenant_id : null;
 
-    const companyName = shopInfo.company_name || 'SySaaS';
-    const companyPhone = shopInfo.company_phone || 'No registrado';
-    const companyEmail = shopInfo.company_email || 'No registrado';
-    const companyAddress = shopInfo.company_address || 'No registrada';
-    const businessHours = shopInfo.business_hours || 'No registrado';
-    const warrantyDays = shopInfo.default_warranty_days || '30';
-
-    // ─── 2. Cargar catálogo de servicios activos ───
-    let servicesText = 'No hay servicios registrados.';
-    try {
-        const [services] = await db.query(
-            `SELECT sc.name, sc.base_price, sc.estimated_time, sc.description,
-                    dt.name as device_type
-             FROM services_catalog sc
-             LEFT JOIN device_types dt ON sc.device_type_id = dt.id
-             WHERE sc.is_active = TRUE
-             ORDER BY sc.name`
-        );
-        if (services.length > 0) {
-            servicesText = services.map(s => {
-                let line = `• ${s.name}`;
-                if (s.device_type) line += ` (${s.device_type})`;
-                line += ` — Precio base: $${s.base_price} MXN`;
-                if (s.estimated_time) line += `, Tiempo estimado: ${s.estimated_time}`;
-                if (s.description) line += `. ${s.description}`;
-                return line;
-            }).join('\n');
-        }
-    } catch (e) {
-        console.error('[CHAT] Error al cargar servicios:', e);
-    }
-
-    // ─── 3. Cargar inventario de productos con stock ───
-    let productsText = 'No hay productos registrados.';
-    try {
-        const [products] = await db.query(
-            `SELECT p.name, p.sale_price, p.stock, p.description, p.sku,
-                    pc.name as category
-             FROM products p
-             LEFT JOIN product_categories pc ON p.category_id = pc.id
-             WHERE p.is_active = TRUE AND p.stock > 0
-             ORDER BY pc.name, p.name`
-        );
-        if (products.length > 0) {
-            productsText = products.map(p => {
-                let line = `• ${p.name}`;
-                if (p.category) line += ` [${p.category}]`;
-                line += ` — $${p.sale_price} MXN (Stock: ${p.stock})`;
-                if (p.description) line += `. ${p.description}`;
-                return line;
-            }).join('\n');
-        }
-    } catch (e) {
-        console.error('[CHAT] Error al cargar productos:', e);
-    }
-
-    // ─── 4. Detectar números de ticket (REP-...) o pedido (VTA-...) ───
+    let systemInstruction = '';
     let ticketContext = '';
+
+    // Detección de números de ticket (REP-...) o pedidos (VTA-...)
     const repairMatch = message.match(/REP-\d{6}-\d{4}/i);
     const orderMatch = message.match(/VTA-\d{6}-\d{4}/i);
 
     if (repairMatch) {
         try {
             const ticketNum = repairMatch[0].toUpperCase();
-            const [repairs] = await db.query(
-                `SELECT r.ticket_number, r.status, r.problem_description, r.technical_observations,
-                        r.total_cost, r.estimated_delivery, r.warranty_days, r.warranty_expires,
-                        r.priority, r.advance_payment, r.created_at,
-                        dt.name as device_type, b.name as brand, r.model, r.color,
-                        sc.name as service_name,
-                        u_tech.first_name as tech_name
-                 FROM repairs r
-                 LEFT JOIN device_types dt ON r.device_type_id = dt.id
-                 LEFT JOIN brands b ON r.brand_id = b.id
-                 LEFT JOIN services_catalog sc ON r.service_id = sc.id
-                 LEFT JOIN users u_tech ON r.technician_id = u_tech.id
-                 WHERE r.ticket_number = ?`,
-                [ticketNum]
-            );
+            let query = `
+                SELECT r.ticket_number, r.status, r.problem_description, r.technical_observations,
+                       r.total_cost, r.estimated_delivery, r.warranty_days, r.warranty_expires,
+                       r.priority, r.advance_payment, r.created_at, r.tenant_id, r.customer_id,
+                       dt.name as device_type, b.name as brand, r.model, r.color,
+                       sc.name as service_name,
+                       u_tech.first_name as tech_name,
+                       t.company_name
+                FROM repairs r
+                LEFT JOIN device_types dt ON r.device_type_id = dt.id
+                LEFT JOIN brands b ON r.brand_id = b.id
+                LEFT JOIN services_catalog sc ON r.service_id = sc.id
+                LEFT JOIN users u_tech ON r.technician_id = u_tech.id
+                LEFT JOIN tenants t ON r.tenant_id = t.id
+                WHERE r.ticket_number = ?
+            `;
+            const params = [ticketNum];
+
+            if (role === 'client') {
+                query += ' AND r.customer_id = ? AND r.tenant_id = ?';
+                params.push(user.id, userTenantId);
+            } else if (userTenantId && role !== 'superadmin') {
+                query += ' AND r.tenant_id = ?';
+                params.push(userTenantId);
+            }
+
+            const [repairs] = await db.query(query, params);
             if (repairs.length > 0) {
                 const rep = repairs[0];
                 const statusLabels = {
@@ -370,99 +324,385 @@ exports.chatSupport = async (message, history = []) => {
                     waiting_parts: 'Esperando refacciones', repairing: 'En reparación', quality_check: 'Control de calidad',
                     ready: 'Listo para entrega', delivered: 'Entregado', cancelled: 'Cancelado'
                 };
-                ticketContext = `\n\nINFORMACION DEL TICKET ${ticketNum}:\n` +
-                    `- Estado: ${statusLabels[rep.status] || rep.status}\n` +
-                    `- Equipo: ${rep.device_type || ''} ${rep.brand || ''} ${rep.model || ''} ${rep.color || ''}\n` +
-                    `- Servicio: ${rep.service_name || 'No asignado'}\n` +
-                    `- Problema reportado: ${rep.problem_description || 'No especificado'}\n` +
-                    `- Observaciones tecnicas: ${rep.technical_observations || 'Sin observaciones aun'}\n` +
-                    `- Costo total estimado: $${rep.total_cost || 0} MXN\n` +
-                    `- Anticipo recibido: $${rep.advance_payment || 0} MXN\n` +
-                    `- Prioridad: ${rep.priority === 'urgent' ? 'Urgente' : 'Normal'}\n` +
-                    `- Fecha de ingreso: ${rep.created_at ? new Date(rep.created_at).toLocaleDateString('es-MX') : 'N/A'}\n` +
-                    `- Entrega estimada: ${rep.estimated_delivery ? new Date(rep.estimated_delivery).toLocaleDateString('es-MX') : 'Pendiente'}\n` +
-                    `- Garantía: ${rep.warranty_days || warrantyDays} días\n` +
-                    `- Técnico asignado: ${rep.tech_name || 'Pendiente de asignación'}`;
+                if (!user) {
+                    // Consulta pública en Landing Page
+                    ticketContext = `\n\nCONSULTA DE TICKET ${ticketNum} (PÚBLICO):\n` +
+                        `- Estado: ${statusLabels[rep.status] || rep.status}\n` +
+                        `- Equipo: ${rep.device_type || ''} ${rep.brand || ''} ${rep.model || ''}\n` +
+                        `- Taller / Negocio: ${rep.company_name || 'Taller afiliado'}\n` +
+                        `- Fecha de ingreso: ${rep.created_at ? new Date(rep.created_at).toLocaleDateString('es-MX') : 'N/A'}\n` +
+                        `- Entrega estimada: ${rep.estimated_delivery ? new Date(rep.estimated_delivery).toLocaleDateString('es-MX') : 'Pendiente'}\n` +
+                        `Nota: Para consultar detalles de costos o recoger tu equipo, visita directamente la tienda o inicia sesión en tu cuenta.`;
+                } else {
+                    ticketContext = `\n\nINFORMACION DEL TICKET ${ticketNum}:\n` +
+                        `- Estado: ${statusLabels[rep.status] || rep.status}\n` +
+                        `- Equipo: ${rep.device_type || ''} ${rep.brand || ''} ${rep.model || ''} ${rep.color || ''}\n` +
+                        `- Servicio: ${rep.service_name || 'No asignado'}\n` +
+                        `- Problema reportado: ${rep.problem_description || 'No especificado'}\n` +
+                        `- Observaciones técnicas: ${rep.technical_observations || 'Sin observaciones aún'}\n` +
+                        `- Costo total: $${rep.total_cost || 0} MXN\n` +
+                        `- Anticipo recibido: $${rep.advance_payment || 0} MXN\n` +
+                        `- Prioridad: ${rep.priority === 'urgent' ? 'Urgente' : 'Normal'}\n` +
+                        `- Fecha de ingreso: ${rep.created_at ? new Date(rep.created_at).toLocaleDateString('es-MX') : 'N/A'}\n` +
+                        `- Entrega estimada: ${rep.estimated_delivery ? new Date(rep.estimated_delivery).toLocaleDateString('es-MX') : 'Pendiente'}\n` +
+                        `- Garantía: ${rep.warranty_days || 30} días\n` +
+                        `- Técnico asignado: ${rep.tech_name || 'Pendiente de asignación'}`;
+                }
             } else {
-                ticketContext = `\n\nNo se encontro ningun ticket con el numero ${ticketNum}. Verifica que sea correcto.`;
+                ticketContext = `\n\nNo se encontró ningún ticket con el número ${ticketNum}${role === 'client' ? ' asociado a tu cuenta' : ''}.`;
             }
         } catch (e) {
             console.error('[CHAT] Error al buscar ticket:', e);
-            ticketContext = '\n\nError al consultar el ticket en la base de datos.';
         }
     }
 
     if (orderMatch) {
         try {
             const orderNum = orderMatch[0].toUpperCase();
-            const [orders] = await db.query(
-                `SELECT s.sale_number, s.status, s.subtotal, s.total, s.notes, s.created_at,
-                        u.first_name as customer_name
-                 FROM sales s
-                 LEFT JOIN users u ON s.customer_id = u.id
-                 WHERE s.sale_number = ?`,
-                [orderNum]
-            );
+            let query = `
+                SELECT s.sale_number, s.status, s.subtotal, s.total, s.notes, s.created_at
+                FROM sales s
+                WHERE s.sale_number = ?
+            `;
+            const params = [orderNum];
+
+            if (role === 'client') {
+                query += ' AND s.customer_id = ? AND s.tenant_id = ?';
+                params.push(user.id, userTenantId);
+            } else if (userTenantId && role !== 'superadmin') {
+                query += ' AND s.tenant_id = ?';
+                params.push(userTenantId);
+            }
+
+            const [orders] = await db.query(query, params);
             if (orders.length > 0) {
                 const ord = orders[0];
-                // Buscar ítems del pedido
                 const [items] = await db.query(
                     `SELECT si.description, si.quantity, si.unit_price, si.total
-                     FROM sale_items si
-                     JOIN sales s ON si.sale_id = s.id
+                     FROM sale_items si JOIN sales s ON si.sale_id = s.id
                      WHERE s.sale_number = ?`,
                     [orderNum]
                 );
-                const statusLabels = {
-                    pending: 'Pendiente', completed: 'Completado', cancelled: 'Cancelado', refunded: 'Reembolsado'
-                };
+                const statusLabels = { pending: 'Pendiente', completed: 'Completado', cancelled: 'Cancelado', refunded: 'Reembolsado' };
                 let itemsList = items.map(i => `  - ${i.description} x${i.quantity} — $${i.total} MXN`).join('\n');
                 ticketContext += `\n\nINFORMACION DEL PEDIDO ${orderNum}:\n` +
                     `- Estado: ${statusLabels[ord.status] || ord.status}\n` +
-                    `- Cliente: ${ord.customer_name || 'N/A'}\n` +
                     `- Total: $${ord.total} MXN\n` +
                     `- Fecha: ${ord.created_at ? new Date(ord.created_at).toLocaleDateString('es-MX') : 'N/A'}\n` +
-                    `- Notas: ${ord.notes || 'Sin notas'}\n` +
-                    `- Productos/Servicios:\n${itemsList || '  (sin ítems)'}`;
+                    `- Ítems:\n${itemsList || '  (sin ítems)'}`;
             } else {
-                ticketContext += `\n\nNo se encontro ningun pedido con el numero ${orderNum}.`;
+                ticketContext += `\n\nNo se encontró ningún pedido con el número ${orderNum}.`;
             }
         } catch (e) {
             console.error('[CHAT] Error al buscar pedido:', e);
-            ticketContext += '\n\nError al consultar el pedido en la base de datos.';
         }
     }
 
-    // ─── 5. Construir system instruction con TODO el contexto ───
-    const systemInstruction = `Eres el asistente virtual oficial de "${companyName}", un taller profesional de servicio técnico y reparación de dispositivos electrónicos. Tu nombre es "${companyName} AI".
+    // ─── CONSTRUCCIÓN DEL CONTEXTO SEGÚN EL ROL ───
 
-INFORMACIÓN DEL NEGOCIO (datos REALES, usa SOLO estos):
-- Nombre: ${companyName}
-- Teléfono: ${companyPhone}
-- Correo electrónico: ${companyEmail}
-- Dirección: ${companyAddress}
-- Horario de atención: ${businessHours}
-- Garantía estándar en reparaciones: ${warrantyDays} días
+    // MODO 1: PÚBLICO EN LANDING PAGE / NO AUTENTICADO
+    if (!user) {
+        let plansSummary = '';
+        try {
+            const [plans] = await db.query(
+                'SELECT name, price_monthly, price_yearly, max_branches, max_users, max_monthly_repairs, features FROM saas_plans WHERE is_active = 1 ORDER BY price_monthly ASC'
+            );
+            plansSummary = plans.map(p => {
+                let f = {};
+                try { f = typeof p.features === 'string' ? JSON.parse(p.features) : (p.features || {}); } catch (e) {}
+                const branchDesc = p.max_branches >= 99 ? 'Sucursales ilimitadas' : `Hasta ${p.max_branches} sucursal(es)`;
+                const userDesc = p.max_users >= 999 ? 'Usuarios ilimitados' : `Hasta ${p.max_users} usuarios`;
+                const repairDesc = p.max_monthly_repairs ? `${p.max_monthly_repairs} tickets/mes` : 'Tickets ilimitados';
+                return `- ${p.name}: $${p.price_monthly} MXN/mes ($${p.price_yearly} MXN/año). ${branchDesc}, ${userDesc}, ${repairDesc}. Incluye: ${f.ecommerce ? 'Tienda web y pedidos, ' : ''}${f.ai_assistant ? 'Diagnósticos con IA, ' : ''}${f.transfers ? 'Traspasos entre sucursales, ' : ''}${f.whatsapp_notifications ? 'Avisos automáticos por WhatsApp, ' : ''}${f.advanced_reports ? 'Reportes con Machine Learning, ' : ''}${f.support_tier || 'Soporte estándar'}.`;
+            }).join('\n');
+        } catch (e) {
+            console.error('[CHAT-PUBLIC] Error al cargar planes:', e);
+        }
 
-CATÁLOGO DE SERVICIOS DE REPARACIÓN DISPONIBLES:
+        systemInstruction = `Eres el Asistente Oficial de SySaaS (Plataforma SaaS para Talleres de Soporte Técnico y Reparaciones).
+Tu misión es atender a prospectos y visitantes en la página principal, explicar los beneficios de SySaaS, asesorar sobre planes comerciales y resolver dudas sobre la prueba gratuita o rastreo de tickets.
+
+INFORMACIÓN COMERCIAL DE SYSAAS:
+- Qué es SySaaS: Software SaaS multi-empresa todo-en-uno para administrar talleres de reparación, soporte técnico, telefonía y cómputo. Permite controlar múltiples sucursales, punto de venta (POS), inventario descentralizado, avisos por WhatsApp y diagnósticos asistidos por IA.
+- Periodo de prueba gratuito: 30 días de acceso completo sin requerir tarjeta de crédito en cualquiera de los planes (Básico, Pro o Enterprise). Periodo de prueba único por empresa.
+- Enlace para registrar empresa: /register
+- Enlace para iniciar sesión: /login
+- Enlace para rastreo de tickets: /rastrear
+
+PLANES Y PRECIOS COMERCIALES:
+${plansSummary}
+
+REGLAS ESTRICTAS:
+1. Responde de forma cálida, profesional y orientada a mostrar el valor de SySaaS para negocios de soporte técnico.
+2. Si preguntan por precios, planes o cuotas, básate exclusivamente en la información oficial provista arriba.
+3. Si el usuario proporciona un ticket de reparación (formato REP-AAMMDD-XXXX), responde con la información del ticket consultada si está disponible.
+4. NO USES EMOJIS bajo ninguna circunstancia.
+5. NO uses formato markdown complejo (nada de **, *, #). Usa guiones simples (-) para viñetas. Responde en texto plano limpio.
+6. Responde siempre en español.${ticketContext}`;
+    }
+
+    // MODO 2: SUPERADMIN DE PLATAFORMA SAAS
+    else if (role === 'superadmin') {
+        let globalStats = '';
+        try {
+            const [[tCount]] = await db.query('SELECT COUNT(*) as total FROM tenants');
+            const [statusRows] = await db.query('SELECT subscription_status, COUNT(*) as count FROM tenants GROUP BY subscription_status');
+            const [planRows] = await db.query('SELECT sp.name, COUNT(*) as count FROM tenants t JOIN saas_plans sp ON t.plan_id = sp.id GROUP BY sp.name');
+            const [recentTenants] = await db.query('SELECT company_name, slug, subscription_status, created_at FROM tenants ORDER BY id DESC LIMIT 5');
+
+            const statusText = statusRows.map(r => `${r.subscription_status}: ${r.count}`).join(', ');
+            const planText = planRows.map(r => `${r.name}: ${r.count}`).join(', ');
+            const recentText = recentTenants.map(r => `- ${r.company_name} (${r.subscription_status})`).join('\n');
+
+            globalStats = `ESTADÍSTICAS GLOBALES DE LA PLATAFORMA:
+- Total empresas registradas: ${tCount.total}
+- Empresas por estado de suscripción: ${statusText}
+- Empresas por plan contratado: ${planText}
+- Empresas registradas recientemente:\n${recentText}`;
+        } catch (e) {
+            console.error('[CHAT-SUPERADMIN] Error al cargar stats:', e);
+        }
+
+        systemInstruction = `Eres el Copiloto Ejecutivo SuperAdmin de SySaaS.
+Tu rol es asistir al superadministrador en la supervisión global de la plataforma, análisis de métricas, suscripciones, empresas y configuración.
+
+${globalStats}
+
+RUTAS DEL PANEL SUPERADMIN:
+- Gestión de planes y precios: /admin/super-planes
+- Gestión de empresas SaaS: /admin/super-empresas
+- Usuarios globales de plataforma: /admin/super-usuarios
+- Comunicados del sistema: /admin/super-comunicados
+- Registro de auditoría global: /admin/super-auditoria
+- Configuración global de plataforma: /admin/super-configuracion
+
+REGLAS ESTRICTAS:
+1. Responde de manera profesional, directa, precisa y ejecutiva.
+2. Ayuda al SuperAdmin a resolver consultas sobre métricas globales, administración y configuración de la infraestructura.
+3. NO USES EMOJIS bajo ninguna circunstancia.
+4. NO uses markdown complejo. Usa guiones simples (-) para viñetas. Responde en texto plano limpio.${ticketContext}`;
+    }
+
+    // MODO 3: ADMINISTRADOR DE EMPRESA / DUEÑO DE TALLER
+    else if (role === 'admin' || role === 'tenant_admin') {
+        let tenantInfo = { company_name: 'Mi Empresa', plan_name: 'Pro', subscription_status: 'active' };
+        let repairsSummary = '';
+        let urgentText = '';
+        let lowStockText = '';
+        let salesText = '';
+
+        try {
+            const [[tData]] = await db.query(
+                'SELECT t.company_name, t.slug, t.subscription_status, sp.name as plan_name FROM tenants t JOIN saas_plans sp ON t.plan_id = sp.id WHERE t.id = ?',
+                [userTenantId]
+            );
+            if (tData) tenantInfo = tData;
+
+            const [statusCounts] = await db.query(
+                `SELECT status, COUNT(*) as count FROM repairs 
+                 WHERE tenant_id = ? AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE()) 
+                 GROUP BY status`,
+                [userTenantId]
+            );
+            repairsSummary = statusCounts.map(s => `${s.status}: ${s.count}`).join(', ') || 'Sin órdenes este mes.';
+
+            const [urgentRepairs] = await db.query(
+                `SELECT ticket_number, model, problem_description, status FROM repairs 
+                 WHERE tenant_id = ? AND priority = 'urgent' AND status NOT IN ('delivered', 'cancelled') 
+                 LIMIT 5`,
+                [userTenantId]
+            );
+            urgentText = urgentRepairs.length > 0
+                ? urgentRepairs.map(u => `- Ticket ${u.ticket_number} (${u.model || 'Equipo'}): ${u.problem_description || 'Sin descripción'} [Estado: ${u.status}]`).join('\n')
+                : 'No hay reparaciones urgentes pendientes en este momento.';
+
+            const [lowStock] = await db.query(
+                `SELECT name, stock, min_stock, sale_price FROM products 
+                 WHERE tenant_id = ? AND is_active = 1 AND stock <= min_stock 
+                 LIMIT 6`,
+                [userTenantId]
+            );
+            lowStockText = lowStock.length > 0
+                ? lowStock.map(p => `- ${p.name}: ${p.stock} unidades restantes (mínimo: ${p.min_stock})`).join('\n')
+                : 'Inventario en niveles adecuados.';
+
+            const [[salesMonth]] = await db.query(
+                `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total FROM sales 
+                 WHERE tenant_id = ? AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())`,
+                [userTenantId]
+            );
+            salesText = `${salesMonth.count} ventas registradas con un monto acumulado de $${salesMonth.total} MXN.`;
+        } catch (e) {
+            console.error('[CHAT-ADMIN] Error al cargar contexto de empresa:', e);
+        }
+
+        systemInstruction = `Eres el Copiloto Gerencial de "${tenantInfo.company_name}".
+Tu misión es asistir al administrador y dueño del negocio en la supervisión de operaciones, control de reparaciones, inventario, ventas y equipo de trabajo.
+
+RESUMEN OPERATIVO DE TU EMPRESA (${tenantInfo.company_name}):
+- Plan contratado: ${tenantInfo.plan_name} (Estado: ${tenantInfo.subscription_status})
+- Reparaciones del mes en curso: ${repairsSummary}
+- Reparaciones urgentes activas:\n${urgentText}
+- Alertas de inventario con stock bajo:\n${lowStockText}
+- Ventas del mes en curso: ${salesText}
+
+REGLAS ESTRICTAS:
+1. Responde de forma ejecutiva, ágil y constructiva.
+2. Tienes acceso exclusivo a los datos de "${tenantInfo.company_name}". No mezcles ni menciones datos de otras empresas.
+3. Si el usuario pregunta por un ticket o pedido específico, utiliza la información consultada arriba.
+4. NO USES EMOJIS bajo ninguna circunstancia.
+5. NO uses formato markdown (nada de **, *, #). Usa guiones simples (-) para viñetas. Responde en texto plano limpio.${ticketContext}`;
+    }
+
+    // MODO 4: TÉCNICO DE TALLER
+    else if (role === 'technician') {
+        let techRepairs = '';
+        let catalogSummary = '';
+        let companyName = 'Taller';
+
+        try {
+            const [[tData]] = await db.query('SELECT company_name FROM tenants WHERE id = ?', [userTenantId]);
+            if (tData) companyName = tData.company_name;
+
+            const [assigned] = await db.query(`
+                SELECT r.ticket_number, r.status, r.model, r.problem_description, r.priority, r.estimated_delivery
+                FROM repairs r
+                WHERE r.tenant_id = ? AND r.technician_id = ? AND r.status NOT IN ('delivered', 'cancelled')
+                ORDER BY (r.priority = 'urgent') DESC, r.created_at ASC
+                LIMIT 8
+            `, [userTenantId, user.id]);
+
+            techRepairs = assigned.length > 0
+                ? assigned.map(a => `- Ticket ${a.ticket_number} (${a.model || 'Equipo'}): ${a.status} [${a.priority === 'urgent' ? 'URGENTE' : 'Normal'}]. Falla: ${a.problem_description || 'No especificada'}. Entrega: ${a.estimated_delivery ? new Date(a.estimated_delivery).toLocaleDateString('es-MX') : 'Pendiente'}`).join('\n')
+                : 'No tienes equipos pendientes asignados a ti en este momento.';
+
+            const [services] = await db.query(
+                'SELECT name, base_price, estimated_time FROM services_catalog WHERE tenant_id = ? AND is_active = 1 ORDER BY name LIMIT 10',
+                [userTenantId]
+            );
+            catalogSummary = services.map(s => `- ${s.name}: $${s.base_price} MXN (${s.estimated_time || '1-2h'})`).join('\n') || 'Catálogo estándar';
+        } catch (e) {
+            console.error('[CHAT-TECH] Error al cargar contexto de técnico:', e);
+        }
+
+        systemInstruction = `Eres el Asistente Técnico de Banco de "${companyName}".
+Tu misión es apoyar a los técnicos en banco de trabajo con diagnósticos electrónicos, sugerencias técnicas de solución, verificación de refacciones y profesionalización de notas para clientes.
+
+DATOS DE BANCO DE TRABAJO:
+- Técnico: ${user.first_name || ''} ${user.last_name || ''}
+- Taller: ${companyName}
+- Equipos asignados a ti actualmente:\n${techRepairs}
+- Servicios frecuentes del catálogo:\n${catalogSummary}
+
+REGLAS ESTRICTAS:
+1. Brinda explicaciones técnicas precisas, prácticas y pasos ordenados de solución para fallas de hardware y software.
+2. Si te piden redactar una nota técnica para el cliente, conviértela en un mensaje claro, formal, educado y sin tecnicismos confusos.
+3. Si el técnico consulta sus asignaciones, indícale sus equipos asignados listados arriba.
+4. NO USES EMOJIS bajo ninguna circunstancia.
+5. NO uses markdown complejo. Responde en texto plano limpio con guiones simples (-).${ticketContext}`;
+    }
+
+    // MODO 5: CAJERO / VENTAS / RECEPCIÓN
+    else if (role === 'cashier' || role === 'salesperson') {
+        let servicesText = '';
+        let productsText = '';
+        let companyName = 'Taller';
+
+        try {
+            const [[tData]] = await db.query('SELECT company_name FROM tenants WHERE id = ?', [userTenantId]);
+            if (tData) companyName = tData.company_name;
+
+            const [services] = await db.query(
+                'SELECT name, base_price, estimated_time, description FROM services_catalog WHERE tenant_id = ? AND is_active = 1 ORDER BY name LIMIT 12',
+                [userTenantId]
+            );
+            servicesText = services.map(s => `- ${s.name}: $${s.base_price} MXN (${s.estimated_time || '1-2h'})`).join('\n') || 'Sin servicios registrados.';
+
+            const [products] = await db.query(
+                'SELECT name, sale_price, stock FROM products WHERE tenant_id = ? AND is_active = 1 AND stock > 0 ORDER BY name LIMIT 12',
+                [userTenantId]
+            );
+            productsText = products.map(p => `- ${p.name}: $${p.sale_price} MXN (Stock disponible: ${p.stock})`).join('\n') || 'Sin productos con stock.';
+        } catch (e) {
+            console.error('[CHAT-CASHIER] Error al cargar contexto de mostrador:', e);
+        }
+
+        systemInstruction = `Eres el Asistente de Mostrador y POS de "${companyName}".
+Tu misión es asistir al personal de recepción y caja en cotizaciones rápidas, consulta de servicios, existencias y estado de órdenes para clientes en sucursal.
+
+CATÁLOGO DE SERVICIOS DISPONIBLES:
 ${servicesText}
 
-PRODUCTOS EN VENTA (INVENTARIO ACTUAL CON STOCK DISPONIBLE):
+PRODUCTOS EN VENTA CON STOCK:
 ${productsText}
 
 REGLAS ESTRICTAS:
-1. SOLO responde con informacion que este en los datos proporcionados arriba. NUNCA inventes servicios, productos, precios, horarios o datos de contacto que NO esten en la lista anterior.
-2. Si un cliente pregunta por un servicio o producto que NO existe en la lista, dile amablemente que no lo tienes disponible actualmente y sugiere contactar a la tienda para mas informacion.
-3. Cuando menciones precios, siempre aclara que son precios base/de referencia y que el costo final puede variar segun el diagnostico.
-4. Si el cliente proporciona un numero de ticket (formato REP-YYMMDD-XXXX) o de pedido (formato VTA-YYMMDD-XXXX), usa EXCLUSIVAMENTE la informacion del ticket/pedido consultada de la base de datos para responder. No inventes estados ni datos.
-5. Responde SIEMPRE en espanol, con un tono calido, profesional y empatico.
-6. Si el cliente necesita una cotizacion o quiere solicitar una reparacion, guiale a la seccion de "Cotizar" en la pagina web o sugiere que registre una cuenta.
-7. Se breve y conciso en tus respuestas. NO uses emojis bajo ninguna circunstancia. NO uses formato markdown (nada de **, *, #, ni viñetas con asterisco). Responde en texto plano limpio.
-8. Si no tienes la informacion para responder algo, dilo honestamente y sugiere contactar directamente a la tienda.
-9. Nunca compartas contrasenas, datos bancarios o informacion sensible de ningun tipo.
-10. Cuando listes servicios o productos, usa guiones simples (-) para cada item, uno por linea. No uses asteriscos ni negritas.${ticketContext}`;
+1. Facilita cotizaciones rápidas y confirma existencias basándote en la información oficial anterior.
+2. Si el cliente pregunta por el estado de una reparación, consulta el ticket indicado arriba.
+3. Responde siempre con amabilidad y precisión en montos monetarios (pesos mexicanos MXN).
+4. NO USES EMOJIS bajo ninguna circunstancia.
+5. NO uses formato markdown. Usa guiones simples (-) para viñetas. Responde en texto plano limpio.${ticketContext}`;
+    }
 
-    // ─── 6. Construir historial de conversación para multi-turn ───
+    // MODO 6: CLIENTE FINAL AUTENTICADO
+    else if (role === 'client') {
+        let myRepairsText = '';
+        let myOrdersText = '';
+        let companyName = 'Taller';
+
+        try {
+            const [[tData]] = await db.query('SELECT company_name FROM tenants WHERE id = ?', [userTenantId]);
+            if (tData) companyName = tData.company_name;
+
+            const [repairs] = await db.query(`
+                SELECT r.ticket_number, r.status, r.model, r.total_cost, r.advance_payment, r.created_at, r.estimated_delivery, r.warranty_days
+                FROM repairs r
+                WHERE r.customer_id = ? AND r.tenant_id = ?
+                ORDER BY r.created_at DESC LIMIT 5
+            `, [user.id, userTenantId]);
+
+            const statusLabels = {
+                received: 'Recibido', diagnosing: 'En diagnóstico', waiting_approval: 'Esperando tu aprobación',
+                waiting_parts: 'Esperando refacciones', repairing: 'En reparación', quality_check: 'Control de calidad',
+                ready: 'Listo para recoger', delivered: 'Entregado', cancelled: 'Cancelado'
+            };
+
+            myRepairsText = repairs.length > 0
+                ? repairs.map(r => `- Ticket ${r.ticket_number} (${r.model || 'Equipo'}): Estado "${statusLabels[r.status] || r.status}". Costo: $${r.total_cost || 0} MXN (Anticipo: $${r.advance_payment || 0} MXN). Entrega estimada: ${r.estimated_delivery ? new Date(r.estimated_delivery).toLocaleDateString('es-MX') : 'Por definir'}. Garantía: ${r.warranty_days || 30} días`).join('\n')
+                : 'No tienes reparaciones registradas actualmente.';
+
+            const [orders] = await db.query(`
+                SELECT sale_number, status, total, created_at FROM sales 
+                WHERE customer_id = ? AND tenant_id = ? 
+                ORDER BY created_at DESC LIMIT 4
+            `, [user.id, userTenantId]);
+
+            myOrdersText = orders.length > 0
+                ? orders.map(o => `- Pedido ${o.sale_number}: $${o.total} MXN (Estado: ${o.status})`).join('\n')
+                : 'Sin pedidos de compra recientes.';
+        } catch (e) {
+            console.error('[CHAT-CLIENT] Error al cargar contexto de cliente:', e);
+        }
+
+        systemInstruction = `Eres el Asistente Virtual de Atención al Cliente de "${companyName}".
+Tu misión es atender amablemente a ${user.first_name || 'nuestro cliente'}, informarle sobre el estado de sus equipos en reparación, sus pedidos y resolver dudas sobre garantías y servicios.
+
+TUS EQUIPOS EN REPARACIÓN:
+${myRepairsText}
+
+TUS PEDIDOS RECIENTES:
+${myOrdersText}
+
+REGLAS ESTRICTAS:
+1. Responde de forma muy amable, clara y en lenguaje comprensible sin tecnicismos complejos.
+2. Si el cliente pregunta por su equipo, utiliza exclusivamente la información de sus tickets listada arriba.
+3. Si el estado es "Listo para recoger", indícale con alegría que su equipo ya está listo en sucursal.
+4. Si el estado es "Esperando tu aprobación", explícale que puede revisar la cotización en su portal para autorizar el inicio de la reparación.
+5. NO USES EMOJIS bajo ninguna circunstancia.
+6. NO uses formato markdown (nada de **, *, #). Usa guiones simples (-) para viñetas. Responde en texto plano limpio.${ticketContext}`;
+    }
+
+    // ─── CONSTRUCCIÓN DEL HISTORIAL Y LLAMADA A GEMINI ───
     const contents = [];
     for (const msg of history) {
         contents.push({
@@ -470,19 +710,23 @@ REGLAS ESTRICTAS:
             parts: [{ text: msg.text }]
         });
     }
-    // Agregar el mensaje actual del usuario
     contents.push({
         role: 'user',
         parts: [{ text: message }]
     });
 
-    // ─── 7. Llamar a Gemini con historial completo ───
     const apiKey = await getApiKey();
     if (!apiKey) {
         throw new Error('API Key de Gemini no configurada.');
     }
 
-    const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-pro'];
+    const modelsToTry = [
+        'gemini-3.6-flash',
+        'gemini-3.7-flash',
+        'gemini-flash-latest',
+        'gemini-3.5-flash',
+        'gemini-3.1-flash-lite'
+    ];
     let lastError = null;
 
     for (const modelName of modelsToTry) {
@@ -506,9 +750,10 @@ REGLAS ESTRICTAS:
             if (!response.ok) {
                 const errData = await response.json().catch(() => ({}));
                 const errMessage = errData?.error?.message || 'Error desconocido';
-                const isRetryable = response.status === 404 || response.status === 429 ||
+                const isRetryable = response.status === 404 || response.status === 429 || response.status === 503 ||
                     errMessage.includes('not found') || errMessage.includes('not supported') ||
-                    errMessage.includes('quota') || errMessage.includes('rate limit');
+                    errMessage.includes('quota') || errMessage.includes('rate limit') ||
+                    errMessage.includes('demand') || errMessage.includes('temporary') || errMessage.includes('try again later');
 
                 if (isRetryable) {
                     console.warn(`[CHAT] Modelo ${modelName} falló (${response.status}): ${errMessage}. Probando siguiente...`);
@@ -519,16 +764,22 @@ REGLAS ESTRICTAS:
             }
 
             const data = await response.json();
-            const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            let textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (!textResult) {
                 throw new Error('No se recibió respuesta válida del modelo.');
             }
-            return textResult;
+
+            // Filtrar emojis residuales de forma estricta
+            textResult = textResult.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{200D}\u{20E3}]/gu, '');
+
+            return textResult.trim();
         } catch (error) {
             lastError = error;
             const errStr = error.message || '';
             const isRetryable = errStr.includes('not found') || errStr.includes('not supported') ||
-                errStr.includes('404') || errStr.includes('quota') || errStr.includes('429');
+                errStr.includes('404') || errStr.includes('quota') || errStr.includes('429') ||
+                errStr.includes('503') || errStr.includes('demand') ||
+                errStr.includes('temporary') || errStr.includes('try again later');
             if (!isRetryable) throw error;
         }
     }
