@@ -1,5 +1,33 @@
 const db = require('../config/database');
 
+// Helper para obtener informacion de contacto del negocio / tenant
+const getTenantContactInfo = async (tenantId) => {
+    let businessName = 'SySaaS';
+    let contactPhone = '';
+    try {
+        if (tenantId) {
+            const [tenantRows] = await db.query('SELECT company_name FROM tenants WHERE id = ?', [tenantId]);
+            if (tenantRows.length > 0 && tenantRows[0].company_name) {
+                businessName = tenantRows[0].company_name;
+            }
+            const [settingRows] = await db.query('SELECT setting_key, setting_value FROM settings WHERE tenant_id = ? AND setting_key IN ("business_name", "contact_phone")', [tenantId]);
+            settingRows.forEach(s => {
+                if (s.setting_key === 'business_name' && s.setting_value) businessName = s.setting_value;
+                if (s.setting_key === 'contact_phone' && s.setting_value) contactPhone = s.setting_value;
+            });
+        } else {
+            const [globalSettings] = await db.query('SELECT setting_key, setting_value FROM settings WHERE tenant_id IS NULL AND setting_key IN ("business_name", "contact_phone")');
+            globalSettings.forEach(s => {
+                if (s.setting_key === 'business_name' && s.setting_value) businessName = s.setting_value;
+                if (s.setting_key === 'contact_phone' && s.setting_value) contactPhone = s.setting_value;
+            });
+        }
+    } catch (e) {
+        console.warn('[PUBLIC] Error al obtener datos de contacto:', e.message);
+    }
+    return { businessName, contactPhone };
+};
+
 // Rastrear reparación o venta/compra por número de ticket (público, sin auth)
 exports.trackRepair = async (req, res) => {
     try {
@@ -13,7 +41,7 @@ exports.trackRepair = async (req, res) => {
         if (ticketCode.includes('-VTA-') || ticketCode.startsWith('VTA-')) {
             const [sales] = await db.query(`
                 SELECT 
-                    s.id, s.sale_number, s.subtotal, s.discount, s.tax, s.total,
+                    s.id, s.tenant_id, s.branch_id, s.sale_number, s.subtotal, s.discount, s.tax, s.total,
                     s.payment_method, s.amount_received, s.change_amount, s.status,
                     s.notes, s.created_at, s.repair_id,
                     u.first_name as customer_first_name, u.last_name as customer_last_name,
@@ -47,7 +75,7 @@ exports.trackRepair = async (req, res) => {
             if (sale.repair_id) {
                 const [repairs] = await db.query(`
                     SELECT 
-                        r.id, r.ticket_number, r.model, r.status, r.payment_status,
+                        r.id, r.tenant_id, r.branch_id, r.ticket_number, r.model, r.status, r.payment_status,
                         r.priority, r.estimated_delivery, r.warranty_days, r.warranty_expires,
                         r.physical_condition, r.existing_damage, r.function_checklist,
                         r.problem_description, r.service_requested, r.technical_observations,
@@ -83,10 +111,14 @@ exports.trackRepair = async (req, res) => {
                 }
             }
 
+            const contactInfo = await getTenantContactInfo(sale.tenant_id);
+
             return res.json({
                 is_sale: true,
                 is_repair: !!repairData,
                 repair: repairData,
+                business_name: contactInfo.businessName,
+                contact_phone: contactInfo.contactPhone,
                 ...sale,
                 items
             });
@@ -95,7 +127,7 @@ exports.trackRepair = async (req, res) => {
         // De lo contrario, buscamos en la tabla de reparaciones
         const [repairs] = await db.query(`
             SELECT 
-                r.id, r.ticket_number, r.model, r.status, r.payment_status,
+                r.id, r.tenant_id, r.branch_id, r.ticket_number, r.model, r.status, r.payment_status,
                 r.priority, r.estimated_delivery, r.warranty_days, r.warranty_expires,
                 r.physical_condition, r.existing_damage, r.function_checklist,
                 r.problem_description, r.service_requested, r.technical_observations,
@@ -133,9 +165,13 @@ exports.trackRepair = async (req, res) => {
             ORDER BY rn.created_at DESC
         `, [repair.id]);
 
+        const contactInfo = await getTenantContactInfo(repair.tenant_id);
+
         res.json({
             is_sale: false,
             is_repair: true,
+            business_name: contactInfo.businessName,
+            contact_phone: contactInfo.contactPhone,
             ...repair,
             history,
             notes

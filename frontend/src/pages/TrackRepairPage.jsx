@@ -5,12 +5,13 @@ import { publicService } from '../services/api';
 import Navbar from '../components/Navbar';
 import Tilt3DCard from '../components/Tilt3DCard';
 import { useTheme } from '../context/ThemeContext';
+import { buildWhatsAppUrl } from '../utils/whatsappUtils';
 import './TrackRepairPage.css';
 
 function TrackRepairPage() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { businessName } = useTheme();
+    const { businessName, contactPhone: themeContactPhone } = useTheme();
     
     const [ticketId, setTicketId] = useState(new URLSearchParams(location.search).get('ticketId') || '');
     const [result, setResult] = useState(null);
@@ -694,11 +695,23 @@ function TrackRepairPage() {
                         )}
 
                         {/* WhatsApp Support Contact Action */}
-                        <div className="flex items-center justify-center gap-md flex-col-mobile">
-                            <a href="https://wa.me/521234567890" target="_blank" rel="noreferrer" className="btn btn-primary w-full-mobile">
-                                <Phone size={16} /> Contactar Soporte por WhatsApp
-                            </a>
-                        </div>
+                        {(() => {
+                            const effectivePhone = result?.contact_phone || themeContactPhone;
+                            if (!effectivePhone) return null;
+
+                            const orderCode = isRepair ? (repair?.ticket_number || ticketId) : (sale?.sale_number || ticketId);
+                            const text = `Hola, tengo una consulta sobre mi orden #${orderCode}`;
+                            const waUrl = buildWhatsAppUrl(effectivePhone, text);
+                            if (!waUrl) return null;
+
+                            return (
+                                <div className="flex items-center justify-center gap-md flex-col-mobile">
+                                    <a href={waUrl} target="_blank" rel="noreferrer" className="btn btn-primary w-full-mobile">
+                                        <Phone size={16} /> Contactar Soporte por WhatsApp
+                                    </a>
+                                </div>
+                            );
+                        })()}
                     </div>
                 )}
             </main>
