@@ -13,6 +13,7 @@ import SignatureModal from '../../components/common/SignatureModal';
 import CameraCaptureModal from '../../components/CameraCaptureModal';
 import { generateServiceTicket } from '../../utils/pdfGenerator';
 import PrintReceipt from '../../components/common/PrintReceipt';
+import WhatsAppNotifyModal from '../../components/WhatsAppNotifyModal';
 import './RepairDetailPage.css';
 
 export default function RepairDetailPage() {
@@ -26,7 +27,11 @@ export default function RepairDetailPage() {
     const [technicians, setTechnicians] = useState([]);
     const [settings, setSettings] = useState({});
 
+    const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+    const [whatsAppTemplateType, setWhatsAppTemplateType] = useState('ready');
+
     const [newStatus, setNewStatus] = useState('');
+
     const [statusNote, setStatusNote] = useState('');
     const [warrantyDays, setWarrantyDays] = useState(30);
 
@@ -288,6 +293,11 @@ export default function RepairDetailPage() {
                 }
                 await repairService.updateStatus(id, newStatus, statusNote);
                 setStatusNote('');
+
+                if (newStatus === 'ready' && repair.customer_phone) {
+                    setWhatsAppTemplateType('ready');
+                    setShowWhatsAppModal(true);
+                }
             }
 
             setIsEditingCosts(false); setIsEditingTechnical(false);
@@ -990,7 +1000,21 @@ export default function RepairDetailPage() {
                             <div className="mt-sm text-sm flex flex-col gap-xs">
                                 <strong>{repair.customer_first_name} {repair.customer_last_name}</strong>
                                 <span className="text-muted">{repair.customer_email}</span>
-                                <span className="text-muted">{repair.customer_phone}</span>
+                                <span className="text-muted">{repair.customer_phone || 'Sin teléfono'}</span>
+                                {repair.customer_phone && (
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-secondary btn-sm"
+                                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: '8px', width: '100%', justifyContent: 'center' }}
+                                        onClick={() => {
+                                            setWhatsAppTemplateType(repair.status === 'ready' ? 'ready' : 'status');
+                                            setShowWhatsAppModal(true);
+                                        }}
+                                    >
+                                        <MessageSquare size={14} className="text-primary" />
+                                        <span>Notificar por WhatsApp</span>
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}
@@ -1016,6 +1040,15 @@ export default function RepairDetailPage() {
 
             <SignatureModal isOpen={showSigModal} onClose={() => setShowSigModal(false)} onSave={handleSignatureSave} title={sigType === 'approval' ? 'Aprobar Cotización' : 'Confirmar Entrega'} description="..." />
             <PrintReceipt isOpen={showPrintReceipt} onClose={() => setShowPrintReceipt(false)} data={receiptData || repair} type={receiptType} settings={settings} />
+            <WhatsAppNotifyModal
+                isOpen={showWhatsAppModal}
+                onClose={() => setShowWhatsAppModal(false)}
+                customerPhone={repair?.customer_phone}
+                customerName={`${repair?.customer_first_name || ''} ${repair?.customer_last_name || ''}`.trim()}
+                repair={repair}
+                settings={settings}
+                initialTemplateType={whatsAppTemplateType}
+            />
 
             {showWarrantyModal && (
                 <div style={{

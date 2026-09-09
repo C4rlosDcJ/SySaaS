@@ -1,6 +1,7 @@
 const db = require('../config/database');
 const { createNotification } = require('./notificationsController');
 const { sendEmail } = require('../services/emailService');
+const { sendWhatsAppNotification } = require('../services/whatsappService');
 
 // Generar número de ticket único con prefijo de sucursal si está disponible
 const generateTicketNumber = (branchCode = 'REP') => {
@@ -497,9 +498,13 @@ exports.updateStatus = async (req, res) => {
 
         // Verificar que existe y pertenece al tenant
         const [existing] = await db.query(`
-      SELECT r.*, u.first_name, u.last_name, u.email 
+      SELECT r.*, u.first_name, u.last_name, u.email, u.phone,
+             dt.name as device_type_name,
+             b.name as brand_name
       FROM repairs r 
       LEFT JOIN users u ON r.customer_id = u.id 
+      LEFT JOIN device_types dt ON r.device_type_id = dt.id
+      LEFT JOIN brands b ON r.brand_id = b.id
       WHERE r.id = ? AND r.tenant_id = ?
     `, [id, tenantId]);
 
@@ -590,6 +595,26 @@ exports.updateStatus = async (req, res) => {
                     customer: { first_name: repair.first_name },
                     newStatus: status
                 });
+            }
+        }
+
+        // Intento de notificación automatizada de WhatsApp (Enfoque 2 para futuras implementaciones)
+        if (repair.phone && status !== repair.status && status === 'ready') {
+            try {
+                await sendWhatsAppNotification({
+                    to: repair.phone,
+                    templateKey: 'whatsapp_ready_template',
+                    templateData: {
+                        customerName: repair.first_name,
+                        deviceType: repair.device_type_name,
+                        brand: repair.brand_name || repair.brand_other,
+                        model: repair.model,
+                        ticketNumber: repair.ticket_number
+                    },
+                    tenantId
+                });
+            } catch (waErr) {
+                console.warn('[REPAIRS] Intento de envio automatico de WhatsApp omitido:', waErr.message);
             }
         }
 

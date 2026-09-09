@@ -561,13 +561,17 @@ export default function SettingsPage() {
                                 onChange={handleChange}
                                 className="input"
                                 style={{ width: '100%', fontSize: '12px', resize: 'vertical' }}
-                                placeholder="Hola {cliente}, tu equipo {modelo} (Folio: {folio}) está listo para entrega..."
+                                placeholder="Hola {cliente}, tu equipo {equipo} (Folio: {folio}) está listo para entrega..."
                             />
                             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
                                 <span className="badge-neutral" style={{ fontSize: '10px' }}>{'{cliente}'} = Nombre del Cliente</span>
-                                <span className="badge-neutral" style={{ fontSize: '10px' }}>{'{modelo}'} = Modelo del Dispositivo</span>
+                                <span className="badge-neutral" style={{ fontSize: '10px' }}>{'{equipo}'} = Tipo + Marca + Modelo</span>
+                                <span className="badge-neutral" style={{ fontSize: '10px' }}>{'{tipo}'} = Tipo de Equipo</span>
+                                <span className="badge-neutral" style={{ fontSize: '10px' }}>{'{marca}'} = Marca</span>
+                                <span className="badge-neutral" style={{ fontSize: '10px' }}>{'{modelo}'} = Modelo</span>
                                 <span className="badge-neutral" style={{ fontSize: '10px' }}>{'{folio}'} = Folio del Ticket</span>
-                                <span className="badge-neutral" style={{ fontSize: '10px' }}>{'{empresa}'} = Nombre de la Empresa</span>
+                                <span className="badge-neutral" style={{ fontSize: '10px' }}>{'{empresa}'} = Empresa</span>
+                                <span className="badge-neutral" style={{ fontSize: '10px' }}>{'{enlace}'} = Enlace de Rastreo</span>
                             </div>
                         </div>
                     </div>
