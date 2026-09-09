@@ -89,8 +89,37 @@ const isTechnicianOrAdmin = (req, res, next) => {
     next();
 };
 
+// Middleware de autenticación opcional (no falla si no hay token)
+const optionalAuth = async (req, res, next) => {
+    try {
+        const token = req.header('Authorization')?.replace('Bearer ', '');
+        if (!token) {
+            req.user = null;
+            return next();
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const [users] = await db.query(
+            `SELECT id, email, first_name, last_name, phone, role, is_active, tenant_id, branch_id 
+             FROM users WHERE id = ?`,
+            [decoded.id]
+        );
+
+        if (users.length > 0 && users[0].is_active) {
+            req.user = users[0];
+        } else {
+            req.user = null;
+        }
+        next();
+    } catch (error) {
+        req.user = null;
+        next();
+    }
+};
+
 module.exports = { 
     auth, 
+    optionalAuth,
     isAdmin, 
     isSuperAdmin, 
     isTenantAdmin, 

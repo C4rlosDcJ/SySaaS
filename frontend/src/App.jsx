@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import './utils/swal';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import MobileHeader from './components/MobileHeader';
@@ -68,6 +68,7 @@ function DashboardLayout({ children, adminOnly = false, superAdminOnly = false, 
   const { tenant } = useTenant();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
@@ -128,7 +129,14 @@ function DashboardLayout({ children, adminOnly = false, superAdminOnly = false, 
               <span>Modo Soporte Asistido: Visualizando empresa <strong style={{ color: 'var(--cool-cyan)' }}>{tenant?.company_name || 'Empresa Cliente'}</strong></span>
             </div>
             <button 
-              onClick={exitImpersonation}
+              onClick={async () => {
+                try {
+                  await exitImpersonation();
+                  navigate('/superadmin');
+                } catch (e) {
+                  console.error('Error al salir de soporte asistido:', e);
+                }
+              }}
               style={{
                 background: 'var(--color-bg-card)',
                 color: 'var(--color-text)',

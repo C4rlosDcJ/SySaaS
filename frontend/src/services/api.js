@@ -514,9 +514,9 @@ export const aiService = {
         method: 'POST',
         body: JSON.stringify({ note })
     }),
-    chat: (message, history) => fetchAPI('/ai/chat', {
+    chat: (message, history, context = {}) => fetchAPI('/ai/chat', {
         method: 'POST',
-        body: JSON.stringify({ message, history })
+        body: JSON.stringify({ message, history, context })
     })
 };
 

@@ -425,8 +425,8 @@ export default function SuperDashboard() {
                     ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                             {topTenants.map((t, idx) => {
-                                const maxRev = parseFloat(topTenants[0]?.monthly_revenue || 1);
-                                const currentRev = parseFloat(t.monthly_revenue || 0);
+                                const maxRev = parseFloat(topTenants[0]?.total_revenue || topTenants[0]?.monthly_revenue || 1);
+                                const currentRev = parseFloat(t.total_revenue || t.monthly_revenue || 0);
                                 const pct = Math.min(100, Math.round((currentRev / maxRev) * 100));
 
                                 return (
