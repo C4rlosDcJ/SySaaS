@@ -7,7 +7,7 @@ import {
     Wrench, Clock, User, MessageSquare, AlertCircle, CheckCircle2,
     ChevronLeft, Smartphone, CreditCard, ShieldCheck, Send, Plus, X,
     Image as ImageIcon, DollarSign, Save as SaveIcon, ClipboardCheck,
-    Printer, PenTool, Edit3, ShoppingCart, Star, Camera
+    Printer, PenTool, Edit3, ShoppingCart, Star, Camera, Trash2
 } from 'lucide-react';
 import SignatureModal from '../../components/common/SignatureModal';
 import CameraCaptureModal from '../../components/CameraCaptureModal';
@@ -31,7 +31,7 @@ export default function RepairDetailPage() {
     const [whatsAppTemplateType, setWhatsAppTemplateType] = useState('ready');
 
     const [newStatus, setNewStatus] = useState('');
-
+    const [statusEstimatedDelivery, setStatusEstimatedDelivery] = useState('');
     const [statusNote, setStatusNote] = useState('');
     const [warrantyDays, setWarrantyDays] = useState(30);
 
@@ -136,6 +136,7 @@ export default function RepairDetailPage() {
             setRepair(data);
             setNewStatus(data.status);
             setWarrantyDays(data.warranty_days);
+            setStatusEstimatedDelivery(data.estimated_delivery ? data.estimated_delivery.split('T')[0] : '');
             setCosts({
                 diagnosis_cost: data.diagnosis_cost || 0,
                 labor_cost: data.labor_cost || 0,
@@ -259,6 +260,11 @@ export default function RepairDetailPage() {
             const updates = {};
             if (parseInt(warrantyDays) !== parseInt(repair.warranty_days)) updates.warranty_days = warrantyDays;
 
+            const currentDelivery = repair.estimated_delivery ? repair.estimated_delivery.split('T')[0] : '';
+            if (statusEstimatedDelivery !== currentDelivery) {
+                updates.estimated_delivery = statusEstimatedDelivery || null;
+            }
+
             if (isEditingCosts) {
                 updates.diagnosis_cost = Number(costs.diagnosis_cost) || 0;
                 updates.labor_cost = Number(costs.labor_cost) || 0;
@@ -291,7 +297,7 @@ export default function RepairDetailPage() {
                     await fetchRepairData();
                     return;
                 }
-                await repairService.updateStatus(id, newStatus, statusNote);
+                await repairService.updateStatus(id, newStatus, statusNote, statusEstimatedDelivery || null);
                 setStatusNote('');
 
                 if (newStatus === 'ready' && repair.customer_phone) {
@@ -300,10 +306,26 @@ export default function RepairDetailPage() {
                 }
             }
 
-            setIsEditingCosts(false); setIsEditingTechnical(false);
+            setIsEditingCosts(false);
+            setIsEditingTechnical(false);
+            setReceiptData(null);
             await fetchRepairData();
         } catch (err) { alert('Error al actualizar: ' + err.message); } 
         finally { setUpdatingStatus(false); }
+    };
+
+    const handleDeleteOrder = async () => {
+        if (window.confirm(`¿Estás seguro de eliminar la reparación #${repair.ticket_number}? Esta acción no se puede deshacer.`)) {
+            try {
+                setUpdatingStatus(true);
+                await repairService.delete(id);
+                alert('Reparación eliminada exitosamente.');
+                navigate(isAdmin ? '/admin/reparaciones' : '/dashboard/reparaciones');
+            } catch (err) {
+                alert('Error al eliminar la reparación: ' + err.message);
+                setUpdatingStatus(false);
+            }
+        }
     };
 
     const handleFileUpload = async (e) => {
@@ -432,6 +454,11 @@ export default function RepairDetailPage() {
                                 </button>
                             </>
                         )}
+                        {isAdmin && (
+                            <button onClick={handleDeleteOrder} className="btn btn-ghost btn-sm text-error" title="Eliminar orden">
+                                <Trash2 size={16} /> <span className="hide-on-mobile">Eliminar</span>
+                            </button>
+                        )}
                         <span className={`badge big-badge status-${repair.status}`}>
                             {STATUS_LABELS[repair.status]}
                         </span>
@@ -458,11 +485,22 @@ export default function RepairDetailPage() {
                                 ))}
                             </select>
                             <input type="text" placeholder="Nota opcional..." value={statusNote} onChange={e => setStatusNote(e.target.value)} className="input flex-1" />
-                            <div className="warranty-input">
+                            <div className="delivery-input" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                <span className="text-sm text-muted">Entrega:</span>
+                                <input
+                                    type="date"
+                                    value={statusEstimatedDelivery}
+                                    onChange={e => setStatusEstimatedDelivery(e.target.value)}
+                                    className="input input-sm"
+                                    style={{ width: '135px' }}
+                                    title="Fecha estimada de entrega"
+                                />
+                            </div>
+                            <div className="warranty-input" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span className="text-sm text-muted">Garantía (días):</span>
                                 <input type="number" value={warrantyDays} onChange={e => setWarrantyDays(e.target.value)} className="input input-sm w-16 text-center" />
                             </div>
-                            <button className="btn btn-primary" onClick={handleUpdateStatus} disabled={updatingStatus || (newStatus === repair.status && parseInt(warrantyDays) === parseInt(repair.warranty_days) && !isEditingCosts && !isEditingTechnical)}>
+                            <button className="btn btn-primary" onClick={handleUpdateStatus} disabled={updatingStatus || (newStatus === repair.status && parseInt(warrantyDays) === parseInt(repair.warranty_days) && statusEstimatedDelivery === (repair.estimated_delivery ? repair.estimated_delivery.split('T')[0] : '') && !statusNote && !isEditingCosts && !isEditingTechnical)}>
                                 <SaveIcon size={16} /> {updatingStatus ? 'Guardando...' : 'Guardar'}
                             </button>
                         </div>

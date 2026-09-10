@@ -1,28 +1,33 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { formatCurrency, formatDate } from './constants';
+import { formatCurrency, formatDate, STATUS_LABELS } from './constants';
 
 export const generateServiceTicket = async (repair, settings = {}) => {
     // A4 Format: 210mm x 297mm
     const doc = new jsPDF();
     
-    // Fetch QR code image and convert to Base64
+    // Fetch QR code image and convert to Base64 (con timeout defensivo)
     let qrBase64 = null;
     try {
         const trackingCode = repair.ticket_number;
-        // Fix: Use ticketId to match TrackRepairPage URL search parameter
         const trackingUrl = `${window.location.origin}/rastrear?ticketId=${encodeURIComponent(trackingCode)}`;
         const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(trackingUrl)}&margin=0`;
         
-        const response = await fetch(qrUrl);
-        const blob = await response.blob();
-        qrBase64 = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+        const response = await fetch(qrUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+            const blob = await response.blob();
+            qrBase64 = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.readAsDataURL(blob);
+            });
+        }
     } catch (e) {
-        console.error('Error fetching QR code for PDF:', e);
+        console.warn('No se pudo descargar QR para PDF (se continuara sin QR):', e.message);
     }
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
@@ -61,23 +66,29 @@ export const generateServiceTicket = async (repair, settings = {}) => {
     if (contactAddress) contactInfo.push(contactAddress);
     doc.text(contactInfo.join('  |  '), 15, currentY + 13);
 
-    // Ticket Number & Date (Top Right)
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
-    const ticketText = `ORDEN DE SERVICIO: #${repair.ticket_number}`;
+    // Ticket Number, Status & Date (Top Right)
+    const statusLabel = (STATUS_LABELS[repair.status] || repair.status || 'Recibido').toUpperCase();
+    const isDelivered = repair.status === 'delivered';
+    const ticketText = isDelivered ? `ORDEN ENTREGADA: #${repair.ticket_number}` : `ORDEN DE SERVICIO: #${repair.ticket_number}`;
     const ticketWidth = doc.getTextWidth(ticketText);
-    doc.text(ticketText, pageWidth - 15 - ticketWidth, currentY + 8);
+    doc.text(ticketText, pageWidth - 15 - ticketWidth, currentY + 7);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(accentColor[0], accentColor[1], accentColor[2]);
+    const statusHeader = `ESTADO: ${statusLabel}`;
+    const statusWidth = doc.getTextWidth(statusHeader);
+    doc.text(statusHeader, pageWidth - 15 - statusWidth, currentY + 12);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
+    doc.setFontSize(8);
     doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
     const dateText = `Fecha: ${formatDate(new Date())}`;
     const dateWidth = doc.getTextWidth(dateText);
-    doc.text(dateText, pageWidth - 15 - dateWidth, currentY + 13);
+    doc.text(dateText, pageWidth - 15 - dateWidth, currentY + 16);
 
     // Separator line
-    currentY += 18;
+    currentY += 19;
     doc.setDrawColor(226, 232, 240); // Slate 200
     doc.setLineWidth(0.5);
     doc.line(15, currentY, pageWidth - 15, currentY);
@@ -142,12 +153,22 @@ export const generateServiceTicket = async (repair, settings = {}) => {
     }
 
     const receptionDetails = [
+        ['Estado del Servicio:', statusLabel],
         ['Servicio Solicitado:', repair.service_name || repair.service_requested || 'General'],
         ['Falla Reportada:', repair.problem_description || 'N/A'],
         ['Garantía Pactada:', `${repair.warranty_days || settings.default_warranty_days || 30} días`],
     ];
+    if (repair.estimated_delivery) {
+        receptionDetails.push(['Entrega Estimada:', formatDate(repair.estimated_delivery, { day: '2-digit', month: 'long', year: 'numeric' })]);
+    }
+    if (repair.delivered_at) {
+        receptionDetails.push(['Fecha de Entrega:', formatDate(repair.delivered_at, { day: '2-digit', month: 'long', year: 'numeric' })]);
+    }
     if (repair.warranty_expires) {
-        receptionDetails.push(['Vencimiento de Garantía:', new Date(repair.warranty_expires).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })]);
+        receptionDetails.push(['Vencimiento de Garantía:', formatDate(repair.warranty_expires, { day: '2-digit', month: 'long', year: 'numeric' })]);
+    }
+    if (repair.technical_observations) {
+        receptionDetails.push(['Observaciones Técnicas:', repair.technical_observations]);
     }
     if (repair.parent_repair_id) {
         receptionDetails.push(['INGRESO POR GARANTÍA:', `Ticket Original: ${repair.parent_ticket || '#' + repair.parent_repair_id}`]);

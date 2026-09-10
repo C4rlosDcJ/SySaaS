@@ -35,7 +35,10 @@ exports.getAll = async (req, res) => {
 
         let query = `
       SELECT r.*, 
-        u.first_name as customer_first_name, u.last_name as customer_last_name, u.email as customer_email, u.phone as customer_phone,
+        u.first_name, u.first_name as customer_first_name,
+        u.last_name, u.last_name as customer_last_name,
+        u.email, u.email as customer_email,
+        u.phone, u.phone as customer_phone,
         t.first_name as technician_first_name, t.last_name as technician_last_name,
         dt.name as device_type_name,
         b.name as brand_name
@@ -337,17 +340,18 @@ exports.create = async (req, res) => {
             [finalCustomerId, tenantId]
         );
 
-        // Enviar email de confirmación
+        // Enviar email de confirmación en segundo plano
         if (customers.length > 0 && customers[0].email) {
-            await sendEmail(customers[0].email, 'repairCreated', {
-                repair: { ticket_number: ticketNumber, model, problem_description },
-                customer: customers[0]
-            });
+            sendEmail(customers[0].email, 'repairCreated', {
+                repair: { ticket_number: ticketNumber, model, problem_description, tenant_id: tenantId },
+                customer: customers[0],
+                tenantId
+            }).catch(err => console.error('[REPAIRS] Error enviando email de confirmación en segundo plano:', err.message));
         }
 
-        // Notificacion interna para el equipo del tenant
+        // Notificacion interna para el equipo del tenant en segundo plano
         const isClientRequest = req.user.role === 'client';
-        await createNotification(tenantId, {
+        createNotification(tenantId, {
             title: isClientRequest ? 'Nueva solicitud de reparacion' : 'Reparacion creada',
             message: isClientRequest
                 ? `${customers[0]?.first_name || 'Un cliente'} solicito reparacion para ${model || 'dispositivo'}. Ticket: ${ticketNumber}`
@@ -355,7 +359,7 @@ exports.create = async (req, res) => {
             type: 'new_repair',
             link: `/admin/reparaciones/${result.insertId}`,
             entity_id: result.insertId
-        });
+        }).catch(err => console.error('[REPAIRS] Error creando notificacion en segundo plano:', err.message));
 
         res.status(201).json({
             message: 'Reparación creada exitosamente.',
@@ -440,37 +444,40 @@ exports.update = async (req, res) => {
                 [id, existing[0].status, `Garantía marcada como: ${statusText}. Nota: ${updates.warranty_tech_notes || 'Sin observaciones'}`, req.user.id]
             );
 
-            // 2. Enviar correo al cliente
+            // 2. Enviar correo al cliente en segundo plano
             if (customer.length > 0 && customer[0].email) {
-                try {
-                    await sendEmail(customer[0].email, 'warrantyResolved', {
-                        repair: {
-                            ticket_number: existing[0].ticket_number,
-                            model: existing[0].model,
-                            warranty_tech_notes: updates.warranty_tech_notes || updates.warranty_tech_notes === '' ? updates.warranty_tech_notes : existing[0].warranty_tech_notes
-                        },
-                        customer: customer[0],
-                        newStatus: updates.warranty_approved
-                    });
-                } catch (emailErr) {
-                    console.error('[REPAIRS] Error al enviar email de resolución de garantía:', emailErr.message);
-                }
-            }
-        }
-
-        // Notificar cambio de fecha de entrega si cambió
-        if (updates.estimated_delivery && updates.estimated_delivery !== existing[0].estimated_delivery) {
-            const [customer] = await db.query('SELECT email, first_name FROM users WHERE id = ? AND tenant_id = ?', [existing[0].customer_id, tenantId]);
-            if (customer.length > 0 && customer[0].email) {
-                await sendEmail(customer[0].email, 'deliveryRescheduled', {
+                sendEmail(customer[0].email, 'warrantyResolved', {
                     repair: {
                         ticket_number: existing[0].ticket_number,
                         model: existing[0].model,
-                        estimated_delivery: updates.estimated_delivery
+                        warranty_tech_notes: updates.warranty_tech_notes || updates.warranty_tech_notes === '' ? updates.warranty_tech_notes : existing[0].warranty_tech_notes,
+                        tenant_id: tenantId
                     },
-                    customer: customer[0]
-                });
+                    customer: customer[0],
+                    newStatus: updates.warranty_approved,
+                    tenantId
+                }).catch(emailErr => console.error('[REPAIRS] Error al enviar email de resolución de garantía en segundo plano:', emailErr.message));
             }
+        }
+
+        // Notificar cambio de fecha de entrega si cambió en segundo plano
+        if (updates.estimated_delivery && updates.estimated_delivery !== existing[0].estimated_delivery) {
+            db.query('SELECT email, first_name FROM users WHERE id = ? AND tenant_id = ?', [existing[0].customer_id, tenantId])
+                .then(([customer]) => {
+                    if (customer.length > 0 && customer[0].email) {
+                        sendEmail(customer[0].email, 'deliveryRescheduled', {
+                            repair: {
+                                ticket_number: existing[0].ticket_number,
+                                model: existing[0].model,
+                                estimated_delivery: updates.estimated_delivery,
+                                tenant_id: tenantId
+                            },
+                            customer: customer[0],
+                            tenantId
+                        }).catch(e => console.error('[REPAIRS] Error email reprogramacion:', e.message));
+                    }
+                })
+                .catch(err => console.error('[REPAIRS] Error buscando cliente para reprogramacion:', err.message));
         }
 
         res.json({ message: 'Reparación actualizada exitosamente.' });
@@ -577,45 +584,41 @@ exports.updateStatus = async (req, res) => {
             );
         }
 
-        // Enviar email de notificación
-        if (repair.email) {
-            if (status !== repair.status) {
-                let template = 'statusChanged';
-                if (status === 'ready') template = 'repairReady';
-                if (status === 'delivered') template = 'repairDelivered';
+        // Enviar email de notificación en segundo plano
+        if (repair.email && status !== repair.status) {
+            let template = 'statusChanged';
+            if (status === 'ready') template = 'repairReady';
+            if (status === 'delivered') template = 'repairDelivered';
 
-                await sendEmail(repair.email, template, {
-                    repair: {
-                        ticket_number: repair.ticket_number,
-                        model: repair.model,
-                        total_cost: repair.total_cost,
-                        estimated_delivery: estimated_delivery || repair.estimated_delivery,
-                        warranty_days: repair.warranty_days
-                    },
-                    customer: { first_name: repair.first_name },
-                    newStatus: status
-                });
-            }
+            sendEmail(repair.email, template, {
+                repair: {
+                    ticket_number: repair.ticket_number,
+                    model: repair.model,
+                    total_cost: repair.total_cost,
+                    estimated_delivery: estimated_delivery || repair.estimated_delivery,
+                    warranty_days: repair.warranty_days,
+                    tenant_id: tenantId
+                },
+                customer: { first_name: repair.first_name },
+                newStatus: status,
+                tenantId
+            }).catch(e => console.error('[REPAIRS] Error enviando email de estado en segundo plano:', e.message));
         }
 
-        // Intento de notificación automatizada de WhatsApp (Enfoque 2 para futuras implementaciones)
+        // Intento de notificación automatizada de WhatsApp en segundo plano
         if (repair.phone && status !== repair.status && status === 'ready') {
-            try {
-                await sendWhatsAppNotification({
-                    to: repair.phone,
-                    templateKey: 'whatsapp_ready_template',
-                    templateData: {
-                        customerName: repair.first_name,
-                        deviceType: repair.device_type_name,
-                        brand: repair.brand_name || repair.brand_other,
-                        model: repair.model,
-                        ticketNumber: repair.ticket_number
-                    },
-                    tenantId
-                });
-            } catch (waErr) {
-                console.warn('[REPAIRS] Intento de envio automatico de WhatsApp omitido:', waErr.message);
-            }
+            sendWhatsAppNotification({
+                to: repair.phone,
+                templateKey: 'whatsapp_ready_template',
+                templateData: {
+                    customerName: repair.first_name,
+                    deviceType: repair.device_type_name,
+                    brand: repair.brand_name || repair.brand_other,
+                    model: repair.model,
+                    ticketNumber: repair.ticket_number
+                },
+                tenantId
+            }).catch(waErr => console.warn('[REPAIRS] Intento de envio automatico de WhatsApp omitido:', waErr.message));
         }
 
         res.json({ message: 'Estado actualizado exitosamente.' });
@@ -657,11 +660,18 @@ exports.addNote = async (req, res) => {
     }
 };
 
-// Eliminar reparación (solo tenant_admin)
+// Eliminar reparación (solo admin/tenant_admin)
 exports.delete = async (req, res) => {
     try {
         const { id } = req.params;
         const tenantId = req.tenantCtx.tenantId;
+
+        // Limpiar notificaciones asociadas a esta reparacion
+        try {
+            await db.query('DELETE FROM notifications WHERE entity_id = ? AND tenant_id = ?', [id, tenantId]);
+        } catch (notifErr) {
+            console.warn('[REPAIRS] Aviso al limpiar notificaciones de reparacion:', notifErr.message);
+        }
 
         const [result] = await db.query('DELETE FROM repairs WHERE id = ? AND tenant_id = ?', [id, tenantId]);
 
@@ -805,52 +815,49 @@ exports.claimWarranty = async (req, res) => {
             [original.id, req.user.id, `Se registró un ingreso por garantía con el ticket ${ticketNumber}`, true]
         );
 
-        // Enviar email de notificación al cliente
-        try {
-            const [customers] = await db.query('SELECT first_name, email FROM users WHERE id = ? AND tenant_id = ?', [original.customer_id, tenantId]);
-            if (customers.length > 0 && customers[0].email) {
-                await sendEmail(customers[0].email, 'repairCreated', {
-                    repair: { ticket_number: ticketNumber, model: original.model, problem_description: `[GARANTÍA] ${problem_description}` },
-                    customer: customers[0]
-                });
-            }
-        } catch (emailErr) {
-            console.error('[REPAIRS] Error al enviar email de garantía al cliente (no crítico):', emailErr.message);
-        }
-
-        // Notificar al técnico original y a los administradores de la empresa (tenant)
-        try {
-            const emailsToNotify = [];
-
-            // 1. Obtener email del técnico original
-            if (original.technician_id) {
-                const [techs] = await db.query('SELECT email FROM users WHERE id = ? AND tenant_id = ? AND role = "technician"', [original.technician_id, tenantId]);
-                if (techs.length > 0 && techs[0].email) {
-                    emailsToNotify.push(techs[0].email);
+        // Enviar emails de notificación en segundo plano
+        (async () => {
+            try {
+                const [customers] = await db.query('SELECT first_name, email FROM users WHERE id = ? AND tenant_id = ?', [original.customer_id, tenantId]);
+                if (customers.length > 0 && customers[0].email) {
+                    sendEmail(customers[0].email, 'repairCreated', {
+                        repair: { ticket_number: ticketNumber, model: original.model, problem_description: `[GARANTÍA] ${problem_description}`, tenant_id: tenantId },
+                        customer: customers[0],
+                        tenantId
+                    }).catch(e => console.error('[REPAIRS] Error email cliente garantia:', e.message));
                 }
-            }
 
-            // 2. Obtener emails de los administradores del tenant
-            const [admins] = await db.query('SELECT email FROM users WHERE tenant_id = ? AND role IN ("tenant_admin", "branch_manager")', [tenantId]);
-            admins.forEach(admin => {
-                if (admin.email && !emailsToNotify.includes(admin.email)) {
-                    emailsToNotify.push(admin.email);
+                const emailsToNotify = [];
+                if (original.technician_id) {
+                    const [techs] = await db.query('SELECT email FROM users WHERE id = ? AND tenant_id = ? AND role = "technician"', [original.technician_id, tenantId]);
+                    if (techs.length > 0 && techs[0].email) {
+                        emailsToNotify.push(techs[0].email);
+                    }
                 }
-            });
 
-            for (const email of emailsToNotify) {
-                await sendEmail(email, 'repairCreated', {
-                    repair: {
-                        ticket_number: ticketNumber,
-                        model: `${original.model} (RECLAMO DE GARANTÍA PENDIENTE)`,
-                        problem_description: `Se ha reportado un reclamo de garantía para el ticket original ${original.ticket_number}. Falla reportada: ${problem_description}`
-                    },
-                    customer: { first_name: 'Equipo de Soporte' }
+                const [admins] = await db.query('SELECT email FROM users WHERE tenant_id = ? AND role IN ("tenant_admin", "branch_manager")', [tenantId]);
+                admins.forEach(admin => {
+                    if (admin.email && !emailsToNotify.includes(admin.email)) {
+                        emailsToNotify.push(admin.email);
+                    }
                 });
+
+                for (const email of emailsToNotify) {
+                    sendEmail(email, 'repairCreated', {
+                        repair: {
+                            ticket_number: ticketNumber,
+                            model: `${original.model} (RECLAMO DE GARANTÍA PENDIENTE)`,
+                            problem_description: `Se ha reportado un reclamo de garantía para el ticket original ${original.ticket_number}. Falla reportada: ${problem_description}`,
+                            tenant_id: tenantId
+                        },
+                        customer: { first_name: 'Equipo de Soporte' },
+                        tenantId
+                    }).catch(e => console.error('[REPAIRS] Error email admin garantia:', e.message));
+                }
+            } catch (notifErr) {
+                console.error('[REPAIRS] Error en notificaciones de garantia en segundo plano:', notifErr.message);
             }
-        } catch (notifErr) {
-            console.error('[REPAIRS] Error al enviar email de notificación a técnicos/admins:', notifErr.message);
-        }
+        })();
 
         res.status(201).json({
             message: 'Ingreso por garantía registrado exitosamente.',
