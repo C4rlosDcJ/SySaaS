@@ -413,7 +413,7 @@ function TrackRepairPage() {
                                             {repair.warranty_expires && (
                                                 <div className="info-item">
                                                     <span className="info-label text-muted">Vence el</span>
-                                                    <span className="info-value font-bold">{new Date(repair.warranty_expires).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                                                    <span className="info-value font-bold">{formatDate(repair.warranty_expires, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                                 </div>
                                             )}
                                             {remainingWarranty !== null && (

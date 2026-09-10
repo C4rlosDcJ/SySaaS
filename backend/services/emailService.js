@@ -1,24 +1,43 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
+function isEmailConfigured() {
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
+  if (!user || !pass) return false;
+  if (user === 'tu_correo@gmail.com' || pass === 'tu_password_de_aplicacion') return false;
+  return true;
+}
+
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: process.env.EMAIL_PORT || 587,
-  secure: false,
+  port: parseInt(process.env.EMAIL_PORT, 10) || 587,
+  secure: process.env.EMAIL_SECURE === 'true',
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS
   },
   tls: {
     rejectUnauthorized: false // Permitir en desarrollo
-  }
+  },
+  connectionTimeout: 4000,
+  greetingTimeout: 4000,
+  socketTimeout: 5000
 });
 
 const settingsController = require('../controllers/settingsController');
 
 // Helper para obtener nombre del negocio
-async function getBusinessName() {
-  return await settingsController.getSettingValue('business_name', 'SySaaS');
+async function getBusinessName(tenantId = null) {
+  if (tenantId) {
+    try {
+      const val = await settingsController.getSettingValue(tenantId, 'business_name');
+      if (val) return val;
+    } catch {
+      // Ignorar error de lectura de configuracion
+    }
+  }
+  return 'SySaaS';
 }
 
 // Templates de email (ahora son funciones async o reciben businessName)
@@ -180,9 +199,14 @@ function getStatusLabel(status) {
 }
 
 // Enviar email
-async function sendEmail(to, template, data) {
+async function sendEmail(to, template, data = {}) {
+  if (!isEmailConfigured()) {
+    console.warn('[EMAIL] Servicio de correo no configurado o con credenciales por defecto. Omitiendo envio a:', to);
+    return { success: false, error: 'Email service unconfigured' };
+  }
   try {
-    const businessName = await getBusinessName();
+    const tenantId = data.tenantId || data.repair?.tenant_id || null;
+    const businessName = await getBusinessName(tenantId);
     const emailContent = emailTemplates[template](data.repair, data.customer, data.newStatus || null, businessName);
 
     const info = await transporter.sendMail({
@@ -195,7 +219,7 @@ async function sendEmail(to, template, data) {
     console.log('[EMAIL] Email enviado:', info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('[EMAIL] Error al enviar email:', error);
+    console.error('[EMAIL] Error al enviar email:', error.message);
     return { success: false, error: error.message };
   }
 }

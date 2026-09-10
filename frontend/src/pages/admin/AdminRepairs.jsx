@@ -4,7 +4,7 @@ import { repairService } from '../../services/api';
 import { STATUS_LABELS, formatCurrency, formatDate } from '../../utils/constants';
 import {
     Search, Filter, RefreshCw, Wrench, Eye,
-    ChevronLeft, ChevronRight, ShoppingCart
+    ChevronLeft, ChevronRight, ShoppingCart, Trash2
 } from 'lucide-react';
 import './AdminRepairs.css';
 
@@ -67,6 +67,19 @@ export default function AdminRepairs() {
     const handleStatusFilter = (s) => {
         setStatusFilter(s);
         setPage(1);
+    };
+
+    const handleDeleteRepair = async (repair) => {
+        const clientName = `${repair.customer_first_name || repair.first_name || ''} ${repair.customer_last_name || repair.last_name || ''}`.trim();
+        const msg = `¿Estás seguro de eliminar la orden #${repair.ticket_number}${clientName ? ` (${clientName})` : ''}? Esta acción no se puede deshacer.`;
+        if (window.confirm(msg)) {
+            try {
+                await repairService.delete(repair.id);
+                fetchRepairs();
+            } catch (err) {
+                alert('Error al eliminar la reparación: ' + err.message);
+            }
+        }
     };
 
     return (
@@ -178,11 +191,17 @@ export default function AdminRepairs() {
                                         <td data-label="Cliente">
                                             <div className="repairs-client">
                                                 <div className="repairs-client-avatar">
-                                                    {repair.first_name?.charAt(0)}{repair.last_name?.charAt(0)}
+                                                    {((repair.customer_first_name || repair.first_name)?.[0] || 'C')}
+                                                    {((repair.customer_last_name || repair.last_name)?.[0] || '')}
                                                 </div>
                                                 <div>
-                                                    <div className="repairs-client-name">{repair.first_name} {repair.last_name}</div>
-                                                    <div className="repairs-client-email">{repair.email}</div>
+                                                    <div className="repairs-client-name">
+                                                        {repair.customer_first_name || repair.first_name || 'Sin Cliente'}{' '}
+                                                        {repair.customer_last_name || repair.last_name || ''}
+                                                    </div>
+                                                    <div className="repairs-client-email">
+                                                        {repair.customer_email || repair.email || repair.customer_phone || '—'}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </td>
@@ -215,13 +234,24 @@ export default function AdminRepairs() {
                                             {formatDate(repair.created_at)}
                                         </td>
                                         <td data-label="Acciones">
-                                            <Link
-                                                to={`/admin/reparaciones/${repair.id}`}
-                                                className="btn btn-ghost btn-icon"
-                                                title="Ver detalle"
-                                            >
-                                                <Eye size={16} />
-                                            </Link>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                <Link
+                                                    to={`/admin/reparaciones/${repair.id}`}
+                                                    className="btn btn-ghost btn-icon"
+                                                    title="Ver detalle"
+                                                >
+                                                    <Eye size={16} />
+                                                </Link>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-ghost btn-icon"
+                                                    style={{ color: 'var(--color-error)' }}
+                                                    title="Eliminar orden de reparación"
+                                                    onClick={() => handleDeleteRepair(repair)}
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

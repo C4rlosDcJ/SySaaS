@@ -1,5 +1,5 @@
 import { Printer, X } from 'lucide-react';
-import { formatCurrency, formatDateTime } from '../../utils/constants';
+import { STATUS_LABELS, formatCurrency, formatDate, formatDateTime } from '../../utils/constants';
 import { useTenant } from '../../context/TenantContext';
 import './PrintReceipt.css';
 
@@ -90,16 +90,23 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                                 {contactPhone && <p>Teléfono: {contactPhone}</p>}
                                 {contactEmail && <p>{contactEmail}</p>}
                                 
-                                <h3>ORDEN DE SERVICIO</h3>
+                                <h3>{data.status === 'delivered' ? 'COMPROBANTE DE ENTREGA Y GARANTÍA' : 'ORDEN DE SERVICIO'}</h3>
                                 
                                 <p className="bold uppercase" style={{ fontSize: '13px', marginTop: '6px' }}>TICKET: {data.ticket_number}</p>
                                 <p>Ingreso: {formatDateTime(data.created_at)}</p>
+                                {data.completed_at && (
+                                    <p className="bold">Finalizado: {formatDateTime(data.completed_at)}</p>
+                                )}
+                                {data.delivered_at && (
+                                    <p className="bold">Entregado: {formatDateTime(data.delivered_at)}</p>
+                                )}
                                 {data.estimated_delivery && (
-                                    <p className="bold">Entrega Estimada: {formatDateTime(data.estimated_delivery)}</p>
+                                    <p className="bold">Entrega Estimada: {formatDate(data.estimated_delivery, { day: '2-digit', month: 'long', year: 'numeric' })}</p>
                                 )}
                                 
-                                <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '8px' }}>
-                                    <span className="bold-badge">ESTADO: {paymentStatusText}</span>
+                                <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+                                    <span className="bold-badge">SERVICIO: {(STATUS_LABELS[data.status] || data.status || 'RECIBIDO').toUpperCase()}</span>
+                                    <span className="bold-badge">PAGO: {paymentStatusText}</span>
                                     {data.priority && (
                                         <span className="bold-badge priority-badge">PRIORIDAD: {translatePriority(data.priority)}</span>
                                     )}
@@ -143,7 +150,7 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                                 {data.physical_condition && <p><span>Estado Estético:</span> <span>{data.physical_condition}/5</span></p>}
                                 <p><span>Garantía Aplicable:</span> <span className="bold">{data.warranty_days || settings.default_warranty_days || 30} días</span></p>
                                 {data.warranty_expires && (
-                                    <p><span>Vence el:</span> <span className="bold">{new Date(data.warranty_expires).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}</span></p>
+                                    <p><span>Vence el:</span> <span className="bold">{formatDate(data.warranty_expires, { year: 'numeric', month: 'long', day: 'numeric' })}</span></p>
                                 )}
                                 {data.accessories_received && <p><span>Accesorios:</span> <span className="bold">{data.accessories_received}</span></p>}
                             </div>
