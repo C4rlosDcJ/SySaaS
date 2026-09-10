@@ -34,11 +34,14 @@
 .filters-search-row .search-icon {
     position: absolute;
     left: var(--sp-3);
+    top: 50%;
+    transform: translateY(-50%);
     color: var(--color-text-muted);
+    pointer-events: none;
 }
 
 .filters-search-row .input {
-    padding-left: var(--sp-9);
+    padding-left: 2.5rem;
     width: 100%;
 }
 

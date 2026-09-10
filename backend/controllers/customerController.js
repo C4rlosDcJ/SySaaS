@@ -6,27 +6,71 @@ exports.getAll = async (req, res) => {
     try {
         const { search, page = 1, limit = 10, branch_id } = req.query;
         const offset = (page - 1) * limit;
-        const tenantId = req.tenantCtx.tenantId;
+        let tenantId = req.tenantCtx?.tenantId;
         const userRole = req.user?.role || '';
         const isGlobalAdmin = ['tenant_admin', 'admin', 'superadmin'].includes(userRole);
 
+        // Si es SuperAdmin y no hay tenantId en el contexto, permitir tomarlo de query o header
+        if (!tenantId && req.user?.role === 'superadmin') {
+            if (req.query.tenant_id) {
+                tenantId = parseInt(req.query.tenant_id, 10);
+            } else if (req.headers['x-tenant-id']) {
+                tenantId = parseInt(req.headers['x-tenant-id'], 10);
+            }
+        }
+
+        let repairStatsJoin = '';
+        const params = [];
+        if (tenantId) {
+            repairStatsJoin = `
+              LEFT JOIN (
+                SELECT 
+                  customer_id,
+                  COUNT(id) as total_repairs,
+                  SUM(CASE WHEN status NOT IN ('delivered', 'cancelled') THEN 1 ELSE 0 END) as active_repairs
+                FROM repairs
+                WHERE tenant_id = ?
+                GROUP BY customer_id
+              ) rep_stats ON u.id = rep_stats.customer_id
+            `;
+            params.push(tenantId);
+        } else {
+            repairStatsJoin = `
+              LEFT JOIN (
+                SELECT 
+                  customer_id,
+                  COUNT(id) as total_repairs,
+                  SUM(CASE WHEN status NOT IN ('delivered', 'cancelled') THEN 1 ELSE 0 END) as active_repairs
+                FROM repairs
+                GROUP BY customer_id
+              ) rep_stats ON u.id = rep_stats.customer_id
+            `;
+        }
+
         let query = `
-      SELECT u.id, u.email, u.first_name, u.last_name, u.phone, u.address, u.created_at, u.branch_id,
+      SELECT u.id, u.email, u.first_name, u.last_name, u.phone, u.address, u.created_at, u.branch_id, u.tenant_id,
         b.name as branch_name, b.code as branch_code,
-        COUNT(r.id) as total_repairs,
-        SUM(CASE WHEN r.status NOT IN ('delivered', 'cancelled') THEN 1 ELSE 0 END) as active_repairs
+        t.company_name as tenant_company_name,
+        COALESCE(rep_stats.total_repairs, 0) as total_repairs,
+        COALESCE(rep_stats.active_repairs, 0) as active_repairs
       FROM users u
-      LEFT JOIN repairs r ON u.id = r.customer_id AND r.tenant_id = ?
+      ${repairStatsJoin}
       LEFT JOIN branches b ON u.branch_id = b.id
-      WHERE u.role = 'client' AND u.tenant_id = ? AND u.is_active = TRUE
+      LEFT JOIN tenants t ON u.tenant_id = t.id
+      WHERE u.role = 'client' AND (u.is_active = TRUE OR u.is_active = 1)
     `;
-        const params = [tenantId, tenantId];
+
+        if (tenantId) {
+            query += ' AND u.tenant_id = ?';
+            params.push(tenantId);
+        }
 
         // Filtro opcional por sucursal
-        if (branch_id) {
+        const hasSpecificBranch = branch_id && branch_id !== 'all' && branch_id !== '';
+        if (hasSpecificBranch) {
             query += ' AND (u.branch_id = ? OR u.branch_id IS NULL)';
             params.push(parseInt(branch_id, 10));
-        } else if (!isGlobalAdmin && req.tenantCtx.branchId) {
+        } else if (!isGlobalAdmin && req.tenantCtx?.branchId) {
             // Staff restringido a sede específica
             query += ' AND (u.branch_id = ? OR u.branch_id IS NULL)';
             params.push(req.tenantCtx.branchId);
@@ -38,19 +82,24 @@ exports.getAll = async (req, res) => {
             params.push(searchTerm, searchTerm, searchTerm, searchTerm);
         }
 
-        query += ' GROUP BY u.id ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
+        query += ' ORDER BY u.created_at DESC LIMIT ? OFFSET ?';
         params.push(parseInt(limit, 10), parseInt(offset, 10));
 
         const [customers] = await db.query(query, params);
 
         // Contar total
-        let countQuery = 'SELECT COUNT(*) as total FROM users WHERE role = "client" AND tenant_id = ? AND is_active = TRUE';
-        const countParams = [tenantId];
+        let countQuery = 'SELECT COUNT(*) as total FROM users WHERE role = "client" AND (is_active = TRUE OR is_active = 1)';
+        const countParams = [];
 
-        if (branch_id) {
+        if (tenantId) {
+            countQuery += ' AND tenant_id = ?';
+            countParams.push(tenantId);
+        }
+
+        if (hasSpecificBranch) {
             countQuery += ' AND (branch_id = ? OR branch_id IS NULL)';
             countParams.push(parseInt(branch_id, 10));
-        } else if (!isGlobalAdmin && req.tenantCtx.branchId) {
+        } else if (!isGlobalAdmin && req.tenantCtx?.branchId) {
             countQuery += ' AND (branch_id = ? OR branch_id IS NULL)';
             countParams.push(req.tenantCtx.branchId);
         }
@@ -67,8 +116,8 @@ exports.getAll = async (req, res) => {
             pagination: {
                 page: parseInt(page, 10),
                 limit: parseInt(limit, 10),
-                total: countResult[0].total,
-                totalPages: Math.ceil(countResult[0].total / limit)
+                total: countResult[0]?.total || 0,
+                totalPages: Math.ceil((countResult[0]?.total || 0) / limit)
             }
         });
     } catch (error) {
@@ -81,19 +130,34 @@ exports.getAll = async (req, res) => {
 exports.getById = async (req, res) => {
     try {
         const { id } = req.params;
-        const tenantId = req.tenantCtx.tenantId;
+        let tenantId = req.tenantCtx?.tenantId;
 
-        const [customers] = await db.query(`
-      SELECT u.id, u.email, u.first_name, u.last_name, u.phone, u.address, u.created_at, u.branch_id,
+        if (!tenantId && req.user?.role === 'superadmin') {
+            if (req.query.tenant_id) tenantId = parseInt(req.query.tenant_id, 10);
+            else if (req.headers['x-tenant-id']) tenantId = parseInt(req.headers['x-tenant-id'], 10);
+        }
+
+        let query = `
+      SELECT u.id, u.email, u.first_name, u.last_name, u.phone, u.address, u.created_at, u.branch_id, u.tenant_id,
              b.name as branch_name, b.code as branch_code
       FROM users u
       LEFT JOIN branches b ON u.branch_id = b.id
-      WHERE u.id = ? AND u.role = 'client' AND u.tenant_id = ? AND u.is_active = TRUE
-    `, [id, tenantId]);
+      WHERE u.id = ? AND u.role = 'client' AND (u.is_active = TRUE OR u.is_active = 1)
+    `;
+        const params = [id];
+
+        if (tenantId) {
+            query += ' AND u.tenant_id = ?';
+            params.push(tenantId);
+        }
+
+        const [customers] = await db.query(query, params);
 
         if (customers.length === 0) {
             return res.status(404).json({ message: 'Cliente no encontrado.' });
         }
+
+        const targetTenantId = tenantId || customers[0].tenant_id;
 
         // Obtener estadísticas en toda la empresa
         const [stats] = await db.query(`
@@ -103,7 +167,7 @@ exports.getById = async (req, res) => {
         SUM(CASE WHEN status NOT IN ('delivered', 'cancelled') THEN 1 ELSE 0 END) as active,
         COALESCE(SUM(total_cost), 0) as total_spent
       FROM repairs WHERE customer_id = ? AND tenant_id = ?
-    `, [id, tenantId]);
+    `, [id, targetTenantId]);
 
         res.json({
             ...customers[0],

@@ -48,6 +48,8 @@ export default function AdminCustomers() {
     // Advanced Filtering and Sorting States
     const [sortBy, setSortBy] = useState('recent'); // 'recent', 'repairs_desc', 'name_asc'
     const [filterActive, setFilterActive] = useState('all'); // 'all', 'active', 'inactive'
+    const [selectedBranch, setSelectedBranch] = useState('all');
+    const [fetchError, setFetchError] = useState('');
 
     // Modal States
     const [showAddModal, setShowAddModal] = useState(false);
@@ -90,9 +92,13 @@ export default function AdminCustomers() {
 
     useEffect(() => {
         fetchCustomers();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [page, activeBranchId, selectedBranch]);
+
+    useEffect(() => {
         fetchBranches();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page]);
+    }, [tenantBranches]);
 
     const fetchBranches = async () => {
         try {
@@ -108,15 +114,21 @@ export default function AdminCustomers() {
 
     const fetchCustomers = async () => {
         setLoading(true);
+        setFetchError('');
         try {
-            const params = { limit: 100, page }; // Load a larger limit to sort and filter easily
-            if (searchTerm) params.search = searchTerm;
+            const params = { limit: 100, page };
+            if (searchTerm && searchTerm.trim()) params.search = searchTerm.trim();
+            if (selectedBranch && selectedBranch !== 'all') {
+                params.branch_id = selectedBranch;
+            }
 
             const data = await customerService.getAll(params);
             setCustomers(data.customers || []);
             setTotalPages(data.pagination?.totalPages || 1);
         } catch (error) {
             console.error('Error al cargar clientes:', error);
+            setFetchError(error.message || 'Error al conectar con el servidor o cargar clientes.');
+            setCustomers([]);
         } finally {
             setLoading(false);
         }
@@ -271,6 +283,18 @@ export default function AdminCustomers() {
             const hasActive = parseInt(customer.active_repairs || 0) > 0;
             if (filterActive === 'active') return hasActive;
             if (filterActive === 'inactive') return !hasActive;
+
+            // Filtro local instantaneo por busqueda al teclear
+            if (searchTerm && searchTerm.trim()) {
+                const term = searchTerm.trim().toLowerCase();
+                const fullName = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
+                const email = (customer.email || '').toLowerCase();
+                const phone = (customer.phone || '').toLowerCase();
+                if (!fullName.includes(term) && !email.includes(term) && !phone.includes(term)) {
+                    return false;
+                }
+            }
+
             return true;
         })
         .sort((a, b) => {
@@ -292,7 +316,7 @@ export default function AdminCustomers() {
     // Reset local page on search/filter
     useEffect(() => {
         setCurrentPage(1);
-    }, [searchTerm, filterActive, sortBy]);
+    }, [searchTerm, filterActive, sortBy, selectedBranch]);
 
     return (
         <div className="admin-customers-container">
@@ -332,6 +356,24 @@ export default function AdminCustomers() {
                 </form>
 
                 <div className="filters-select-row">
+                    {branchesList.length > 1 && (
+                        <div className="filter-item">
+                            <Filter size={14} className="filter-icon" />
+                            <select
+                                value={selectedBranch}
+                                onChange={(e) => setSelectedBranch(e.target.value)}
+                                className="select select-sm"
+                            >
+                                <option value="all">Todas las sucursales</option>
+                                {branchesList.map(b => (
+                                    <option key={b.id} value={b.id}>
+                                        {b.name} {b.is_main ? '(Matriz)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
                     <div className="filter-item">
                         <Filter size={14} className="filter-icon" />
                         <select
@@ -366,6 +408,18 @@ export default function AdminCustomers() {
                     <div className="loading-state">
                         <div className="spinner"></div>
                         <p>Cargando clientes...</p>
+                    </div>
+                ) : fetchError ? (
+                    <div className="empty-state error-state">
+                        <div className="empty-icon" style={{ color: '#ef4444', opacity: 0.9 }}>
+                            <AlertCircle size={48} />
+                        </div>
+                        <h3>Error al cargar clientes</h3>
+                        <p>{fetchError}</p>
+                        <button onClick={fetchCustomers} className="btn btn-secondary" style={{ marginTop: '16px' }}>
+                            <RefreshCw size={16} />
+                            <span>Reintentar</span>
+                        </button>
                     </div>
                 ) : filteredCustomers.length === 0 ? (
                     <div className="empty-state">
