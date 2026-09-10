@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTenant } from '../../context/TenantContext';
+import { draftStorage } from '../../utils/draftStorage';
 import {
     customerService,
     repairService,
@@ -11,13 +13,19 @@ import { formatCurrency } from '../../utils/constants';
 import {
     Save, X, User, Smartphone, Wrench, ClipboardCheck,
     DollarSign, Search, ChevronRight, CheckCircle2,
-    Image as ImageIcon, Plus, Trash2, Camera, UploadCloud
+    Image as ImageIcon, Plus, Trash2, Camera, UploadCloud, RotateCcw
 } from 'lucide-react';
 import CameraCaptureModal from '../../components/CameraCaptureModal';
 import './NewRepairPage.css';
 
 export default function NewRepairPage() {
     const navigate = useNavigate();
+    const { tenant, activeBranchId } = useTenant();
+    const tenantId = tenant?.id;
+
+    const isRestoringRef = useRef(true);
+    const [hasDraft, setHasDraft] = useState(false);
+
     const [loading, setLoading] = useState(false);
     const [customers, setCustomers] = useState([]);
     const [deviceTypes, setDeviceTypes] = useState([]);
@@ -108,13 +116,121 @@ export default function NewRepairPage() {
             setBrands(brandsData || []);
             setTechnicians(staff || []);
             setSettings(settingsData || {});
-
             const defWarranty = settingsData?.default_warranty_days;
             if (defWarranty) {
-                setFormData(prev => ({ ...prev, warranty_days: parseInt(defWarranty) }));
+                setFormData(prev => ({
+                    ...prev,
+                    warranty_days: prev.warranty_days || parseInt(defWarranty)
+                }));
             }
         } catch (error) {
             console.error('Error fetching initial data:', error);
+        }
+    };
+
+    useEffect(() => {
+        // Cargar borrador persistido para el tenant y sucursal activa
+        const draft = draftStorage.loadDraft('new_repair', tenantId, activeBranchId);
+        if (draft) {
+            if (draft.formData) {
+                setFormData(prev => ({
+                    ...prev,
+                    ...draft.formData
+                }));
+            }
+            if (draft.selectedCustomer) {
+                setSelectedCustomer(draft.selectedCustomer);
+            }
+            if (draft._selectedService) {
+                setSelectedService(draft._selectedService);
+            }
+            if (draft.acceptedTerms !== undefined) {
+                setAcceptedTerms(draft.acceptedTerms);
+            }
+            setHasDraft(true);
+        }
+        setTimeout(() => {
+            isRestoringRef.current = false;
+        }, 150);
+    }, [tenantId, activeBranchId]);
+
+    // Guardado automatico de borrador cuando cambian los datos
+    useEffect(() => {
+        if (isRestoringRef.current) return;
+
+        const hasContent = Boolean(
+            formData.customer_id ||
+            formData.model ||
+            formData.problem_description ||
+            formData.brand_id ||
+            formData.device_type_id ||
+            selectedCustomer ||
+            formData.labor_cost > 0 ||
+            formData.parts_cost > 0
+        );
+
+        if (hasContent) {
+            draftStorage.saveDraft('new_repair', {
+                formData,
+                selectedCustomer,
+                _selectedService,
+                acceptedTerms
+            }, tenantId, activeBranchId);
+            setHasDraft(true);
+        }
+    }, [formData, selectedCustomer, _selectedService, acceptedTerms, tenantId, activeBranchId]);
+
+    const handleClearDraft = () => {
+        if (window.confirm('¿Deseas descartar los datos capturados y limpiar el formulario?')) {
+            draftStorage.clearDraft('new_repair', tenantId, activeBranchId);
+            setHasDraft(false);
+            setSelectedCustomer(null);
+            setSelectedService(null);
+            setAcceptedTerms(false);
+            setSelectedImages([]);
+            imagePreviews.forEach(url => URL.revokeObjectURL(url));
+            setImagePreviews([]);
+            setFormData({
+                customer_id: '',
+                device_type_id: '',
+                brand_id: '',
+                brand_other: '',
+                model: '',
+                color: '',
+                storage_capacity: '',
+                serial_number: '',
+                imei: '',
+                device_password: '',
+                accessories_received: '',
+                physical_condition: 5,
+                existing_damage: '',
+                problem_description: '',
+                service_id: '',
+                service_requested: '',
+                priority: 'normal',
+                estimated_delivery: '',
+                diagnosis_cost: 0,
+                labor_cost: 0,
+                parts_cost: 0,
+                discount: 0,
+                advance_payment: 0,
+                warranty_days: settings?.default_warranty_days ? parseInt(settings.default_warranty_days) : 30,
+                technician_id: '',
+                battery_health: '',
+                screen_status: '',
+                account_status: '',
+                technical_observations: '',
+                function_checklist: {
+                    power: true,
+                    display: true,
+                    touch: true,
+                    cameras: true,
+                    audio: true,
+                    wifi: true,
+                    charging: true,
+                    buttons: true
+                }
+            });
         }
     };
 
@@ -305,6 +421,10 @@ export default function NewRepairPage() {
                 }
             }
 
+            // Limpiar borrador persistido al completar la orden
+            draftStorage.clearDraft('new_repair', tenantId, activeBranchId);
+            setHasDraft(false);
+
             navigate(`/admin/reparaciones/${newRepairId}`);
         } catch (error) {
             console.error('Error creating repair:', error);
@@ -329,6 +449,23 @@ export default function NewRepairPage() {
                     <h1>Nueva Reparación</h1>
                     <p>Ingresa los detalles para la nueva orden de servicio</p>
                 </div>
+                {hasDraft && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '12px', color: 'var(--color-primary)', background: 'var(--color-bg-elevated)', padding: '4px 10px', borderRadius: '12px', border: '1px solid var(--color-border)' }}>
+                            Borrador guardado
+                        </span>
+                        <button
+                            type="button"
+                            onClick={handleClearDraft}
+                            className="btn btn-ghost btn-sm"
+                            style={{ color: 'var(--color-text-muted)' }}
+                            title="Descartar borrador y limpiar formulario"
+                        >
+                            <Trash2 size={15} />
+                            <span>Limpiar Formulario</span>
+                        </button>
+                    </div>
+                )}
             </header>
 
             <form onSubmit={(e) => handleSubmit(e, false)} className="repair-form-layout">

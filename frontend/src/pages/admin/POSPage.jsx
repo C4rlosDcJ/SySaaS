@@ -14,11 +14,15 @@ import { showAlert, showConfirm } from '../../utils/swal';
 import './POSPage.css';
 import { useTenant } from '../../context/TenantContext';
 import { useAuth } from '../../context/AuthContext';
+import { draftStorage } from '../../utils/draftStorage';
 
 export default function POSPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const { activeBranchId, tenant } = useTenant();
     const { user, isSuperAdmin } = useAuth();
+    const tenantId = tenant?.id;
+
+    const isRestoringRef = useRef(true);
 
     // ─── State ───
     const [mode, setMode] = useState('products'); // 'products' | 'services' | 'repairs' | 'pending_sales'
@@ -82,6 +86,63 @@ export default function POSPage() {
     const searchRef = useRef(null);
     const customerSearchTimeout = useRef(null);
     const loadedRepairIdRef = useRef(null);
+
+    // ─── Restaurar borrador de POS ───
+    useEffect(() => {
+        // Si viene con deep-link de reparacion, priorizar la orden y no restaurar borrador
+        if (searchParams.get('repair_id')) {
+            isRestoringRef.current = false;
+            return;
+        }
+
+        const draft = draftStorage.loadDraft('pos', tenantId, activeBranchId);
+        if (draft) {
+            if (Array.isArray(draft.cart) && draft.cart.length > 0) {
+                setCart(draft.cart);
+            }
+            if (draft.selectedCustomer) {
+                setSelectedCustomer(draft.selectedCustomer);
+            }
+            if (draft.discount !== undefined) {
+                setDiscount(draft.discount);
+            }
+            if (draft.paymentMethod) {
+                setPaymentMethod(draft.paymentMethod);
+            }
+            if (draft.amountReceived !== undefined) {
+                setAmountReceived(draft.amountReceived);
+            }
+            if (draft.linkedRepair) {
+                setLinkedRepair(draft.linkedRepair);
+            }
+            if (draft.loadedPendingSaleId) {
+                setLoadedPendingSaleId(draft.loadedPendingSaleId);
+            }
+        }
+
+        setTimeout(() => {
+            isRestoringRef.current = false;
+        }, 150);
+    }, [tenantId, activeBranchId]);
+
+    // ─── Guardado automatico de borrador de POS ───
+    useEffect(() => {
+        if (isRestoringRef.current) return;
+
+        if (cart.length > 0 || selectedCustomer || (discount && discount > 0)) {
+            draftStorage.saveDraft('pos', {
+                cart,
+                selectedCustomer,
+                discount,
+                paymentMethod,
+                amountReceived,
+                linkedRepair,
+                loadedPendingSaleId
+            }, tenantId, activeBranchId);
+        } else {
+            draftStorage.clearDraft('pos', tenantId, activeBranchId);
+        }
+    }, [cart, selectedCustomer, discount, paymentMethod, amountReceived, linkedRepair, loadedPendingSaleId, tenantId, activeBranchId]);
 
     // ─── Load data ───
     useEffect(() => {
@@ -375,6 +436,7 @@ export default function POSPage() {
         setSelectedCustomer(null);
         setLinkedRepair(null);
         setLoadedPendingSaleId(null);
+        draftStorage.clearDraft('pos', tenantId, activeBranchId);
     };
 
     // ─── Calculations ───
