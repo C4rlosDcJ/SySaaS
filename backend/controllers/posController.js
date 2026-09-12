@@ -21,7 +21,7 @@ exports.createSale = async (req, res) => {
         const {
             customer_id, repair_id, repair_ids, items, discount = 0,
             payment_method, amount_received, change_amount: passedChange,
-            notes, pending_sale_id, pending_sale_ids, payment_breakdown
+            notes, pending_sale_id, pending_sale_ids, payment_breakdown, signature
         } = req.body;
 
         const tenantId = req.tenantCtx.tenantId;
@@ -282,15 +282,16 @@ exports.createSale = async (req, res) => {
                      SET payment_status = ?, 
                          status = ?, 
                          advance_payment = ?,
+                         signature_delivery = CASE WHEN ? IS NOT NULL THEN ? ELSE signature_delivery END,
                          delivered_at = CASE WHEN ? = 'delivered' AND delivered_at IS NULL THEN NOW() ELSE delivered_at END,
                          warranty_expires = CASE WHEN ? = 'delivered' AND warranty_expires IS NULL THEN DATE_ADD(NOW(), INTERVAL COALESCE(warranty_days, 30) DAY) ELSE warranty_expires END
                      WHERE id = ? AND tenant_id = ?`,
-                    [paymentStatus, newStatus, totalPaid, newStatus, newStatus, rId, tenantId]
+                    [paymentStatus, newStatus, totalPaid, signature || null, signature || null, newStatus, newStatus, rId, tenantId]
                 );
 
                 await connection.query(
                     'INSERT INTO repair_status_history (repair_id, status, notes, changed_by) VALUES (?, ?, ?, ?)',
-                    [rId, newStatus, `Cobrado y entregado en POS (Venta ${saleNumber})`, req.user.id]
+                    [rId, newStatus, `Cobrado y entregado en POS${signature ? ' con firma de entrega' : ''} (Venta ${saleNumber})`, req.user.id]
                 );
             }
         }
@@ -516,6 +517,7 @@ exports.cancelSale = async (req, res) => {
             if (repairRows.length > 0) {
                 const rep = repairRows[0];
                 const revertStatus = (rep.status === 'delivered') ? 'ready' : rep.status;
+                const advance = parseFloat(rep.advance_payment) || 0;
                 const itemForRepair = items.find(i => i.repair_id === rId);
                 const paidInSale = itemForRepair ? (parseFloat(itemForRepair.total) || 0) : 0;
                 const newAdvance = Math.max(0, advance - paidInSale);
