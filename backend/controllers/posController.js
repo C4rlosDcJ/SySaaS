@@ -19,8 +19,9 @@ exports.createSale = async (req, res) => {
         await connection.beginTransaction();
 
         const {
-            customer_id, repair_id, items, discount = 0,
-            payment_method, amount_received, notes, pending_sale_id
+            customer_id, repair_id, repair_ids, items, discount = 0,
+            payment_method, amount_received, change_amount: passedChange,
+            notes, pending_sale_id, pending_sale_ids, payment_breakdown
         } = req.body;
 
         const tenantId = req.tenantCtx.tenantId;
@@ -38,9 +39,12 @@ exports.createSale = async (req, res) => {
         }
 
         const total = subtotal - (parseFloat(discount) || 0);
-        const changeAmount = payment_method === 'cash'
-            ? Math.max(0, (parseFloat(amount_received) || 0) - total)
-            : 0;
+        let changeAmount = 0;
+        if (payment_method === 'cash') {
+            changeAmount = Math.max(0, (parseFloat(amount_received) || 0) - total);
+        } else if (payment_method === 'mixed') {
+            changeAmount = parseFloat(passedChange) || 0;
+        }
 
         let activeRepairId = repair_id || null;
         let generatedRepairTicket = null;
@@ -135,30 +139,59 @@ exports.createSale = async (req, res) => {
             }
         }
 
-        let saleId = pending_sale_id;
+        const allPendingSaleIds = Array.isArray(pending_sale_ids) && pending_sale_ids.length > 0
+            ? pending_sale_ids
+            : (pending_sale_id ? [pending_sale_id] : []);
+
+        let saleId = allPendingSaleIds[0] || null;
         let saleNumber;
 
-        if (pending_sale_id) {
-            // Obtener número de venta existente
-            const [existing] = await connection.query('SELECT sale_number FROM sales WHERE id = ? AND tenant_id = ? AND branch_id = ?', [pending_sale_id, tenantId, branchId]);
+        if (allPendingSaleIds.length > 0) {
+            const primaryPendingId = allPendingSaleIds[0];
+            // Obtener número de venta existente de la venta principal
+            const [existing] = await connection.query('SELECT sale_number FROM sales WHERE id = ? AND tenant_id = ? AND branch_id = ?', [primaryPendingId, tenantId, branchId]);
             if (existing.length === 0) {
                 await connection.rollback();
                 return res.status(404).json({ message: 'Venta pendiente no encontrada.' });
             }
             saleNumber = existing[0].sale_number;
+            saleId = primaryPendingId;
 
-            // Eliminar ítems previos de esta venta pendiente
-            await connection.query('DELETE FROM sale_items WHERE sale_id = ?', [pending_sale_id]);
+            // Eliminar ítems previos de la venta pendiente principal
+            await connection.query('DELETE FROM sale_items WHERE sale_id = ?', [primaryPendingId]);
 
-            // Actualizar la cabecera del registro existente de venta
+            // Actualizar la cabecera del registro principal de venta a completada
             await connection.query(
                 `UPDATE sales SET customer_id = ?, repair_id = ?, cashier_id = ?, subtotal = ?, discount = ?, total = ?,
                   payment_method = ?, amount_received = ?, change_amount = ?, status = 'completed', notes = ?
                   WHERE id = ? AND tenant_id = ? AND branch_id = ?`,
                 [customer_id || null, activeRepairId, req.user.id,
                  subtotal, discount || 0, total, payment_method || 'cash',
-                 amount_received || total, changeAmount, notes || null, pending_sale_id, tenantId, branchId]
+                 amount_received || total, changeAmount, notes || null, primaryPendingId, tenantId, branchId]
             );
+
+            // Si se combinaron múltiples pedidos web, consolidar los adicionales
+            if (allPendingSaleIds.length > 1) {
+                for (let i = 1; i < allPendingSaleIds.length; i++) {
+                    const secondaryId = allPendingSaleIds[i];
+                    const [secExisting] = await connection.query(
+                        'SELECT sale_number FROM sales WHERE id = ? AND tenant_id = ? AND branch_id = ?',
+                        [secondaryId, tenantId, branchId]
+                    );
+                    const secSaleNum = secExisting.length > 0 ? secExisting[0].sale_number : `ID-${secondaryId}`;
+
+                    // Vaciar ítems de la secundaria para no duplicar en auditorías
+                    await connection.query('DELETE FROM sale_items WHERE sale_id = ?', [secondaryId]);
+
+                    // Marcar como completada consolidada
+                    await connection.query(
+                        `UPDATE sales SET status = 'completed', cashier_id = ?, subtotal = 0, discount = 0, total = 0,
+                          notes = CONCAT(COALESCE(notes, ''), ' [Consolidado y cobrado en venta principal ${saleNumber}]')
+                          WHERE id = ? AND tenant_id = ? AND branch_id = ?`,
+                        [req.user.id, secondaryId, tenantId, branchId]
+                    );
+                }
+            }
         } else {
             saleNumber = generateSaleNumber(branchPrefix);
 
@@ -179,9 +212,9 @@ exports.createSale = async (req, res) => {
             const itemTotal = (item.unit_price * item.quantity) - (item.discount || 0);
 
             await connection.query(
-                `INSERT INTO sale_items (sale_id, product_id, service_id, description, quantity, unit_price, discount, total)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [saleId, item.product_id || null, item.service_id || null,
+                `INSERT INTO sale_items (sale_id, product_id, service_id, repair_id, description, quantity, unit_price, discount, total)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [saleId, item.product_id || null, item.service_id || null, item.repair_id || null,
                  item.description, item.quantity, item.unit_price, item.discount || 0, itemTotal]
             );
 
@@ -209,26 +242,55 @@ exports.createSale = async (req, res) => {
             }
         }
 
-        // Si la venta está vinculada a una reparación, actualizar estado de pago
-        if (activeRepairId && repair_id) {
+        // Si la venta está vinculada a reparaciones, actualizar estado de pago para TODAS
+        // repair_ids es el array completo enviado por el frontend; repair_id es sólo la primera (para compatibilidad de header)
+        const allRepairIds = Array.isArray(repair_ids) && repair_ids.length > 0
+            ? repair_ids
+            : (repair_id ? [repair_id] : []);
+
+        for (const rId of allRepairIds) {
             const [repair] = await connection.query(
-                'SELECT total_cost, advance_payment FROM repairs WHERE id = ? AND tenant_id = ?',
-                [activeRepairId, tenantId]
+                'SELECT total_cost, advance_payment, status, warranty_days, delivered_at, warranty_expires FROM repairs WHERE id = ? AND tenant_id = ?',
+                [rId, tenantId]
             );
 
             if (repair.length > 0) {
                 const totalRepairCost = parseFloat(repair[0].total_cost) || 0;
                 const previousPayments = parseFloat(repair[0].advance_payment) || 0;
-                const totalPaid = previousPayments + total;
+
+                // Determinar el monto cobrado para esta reparacion especifica
+                const repairItem = (items || []).find(i => i.repair_id == rId);
+                const repairItemAmount = repairItem
+                    ? (parseFloat(repairItem.total) || (parseFloat(repairItem.quantity || 1) * parseFloat(repairItem.unit_price) - (parseFloat(repairItem.discount) || 0)))
+                    : 0;
+
+                const repairShare = repairItemAmount > 0
+                    ? repairItemAmount
+                    : Math.max(0, totalRepairCost - previousPayments);
+
+                const totalPaid = Math.min(totalRepairCost, previousPayments + repairShare);
 
                 let paymentStatus = 'partial';
+                let newStatus = repair[0].status;
                 if (totalPaid >= totalRepairCost) {
                     paymentStatus = 'paid';
+                    newStatus = 'delivered';
                 }
 
                 await connection.query(
-                    'UPDATE repairs SET payment_status = ?, advance_payment = ? WHERE id = ? AND tenant_id = ?',
-                    [paymentStatus, totalPaid, activeRepairId, tenantId]
+                    `UPDATE repairs 
+                     SET payment_status = ?, 
+                         status = ?, 
+                         advance_payment = ?,
+                         delivered_at = CASE WHEN ? = 'delivered' AND delivered_at IS NULL THEN NOW() ELSE delivered_at END,
+                         warranty_expires = CASE WHEN ? = 'delivered' AND warranty_expires IS NULL THEN DATE_ADD(NOW(), INTERVAL COALESCE(warranty_days, 30) DAY) ELSE warranty_expires END
+                     WHERE id = ? AND tenant_id = ?`,
+                    [paymentStatus, newStatus, totalPaid, newStatus, newStatus, rId, tenantId]
+                );
+
+                await connection.query(
+                    'INSERT INTO repair_status_history (repair_id, status, notes, changed_by) VALUES (?, ?, ?, ?)',
+                    [rId, newStatus, `Cobrado y entregado en POS (Venta ${saleNumber})`, req.user.id]
                 );
             }
         }
@@ -412,11 +474,11 @@ exports.cancelSale = async (req, res) => {
             return res.status(400).json({ message: 'La venta ya está cancelada.' });
         }
 
-        // Obtener items para devolver stock a la sucursal
-        const [items] = await connection.query('SELECT * FROM sale_items WHERE sale_id = ?', [id]);
+        // Obtener items para devolver stock a la sucursal (solo no devueltos previamente)
+        const [items] = await connection.query('SELECT si.*, si.repair_id FROM sale_items si WHERE si.sale_id = ?', [id]);
 
         for (const item of items) {
-            if (item.product_id) {
+            if (item.product_id && !item.is_returned) {
                 // Devolver stock a branch_inventory
                 await connection.query(
                     'UPDATE branch_inventory SET stock = stock + ? WHERE product_id = ? AND branch_id = ?',
@@ -431,6 +493,52 @@ exports.cancelSale = async (req, res) => {
             }
         }
 
+        // Revertir reparaciones vinculadas a la venta que no hayan sido devueltas individualmente
+        const linkedRepairIds = new Set();
+        for (const item of items) {
+            if (item.repair_id && !item.is_returned) {
+                linkedRepairIds.add(item.repair_id);
+            }
+        }
+        if (sales[0].repair_id && linkedRepairIds.size === 0) {
+            const hasReturnedGlobal = items.some(i => i.repair_id === sales[0].repair_id && i.is_returned);
+            if (!hasReturnedGlobal) {
+                linkedRepairIds.add(sales[0].repair_id);
+            }
+        }
+
+        for (const rId of linkedRepairIds) {
+            // Revertir estado a 'ready' y pago a 'partial' si tenía anticipo, o 'pending' si no
+            const [repairRows] = await connection.query(
+                'SELECT advance_payment, total_cost, status FROM repairs WHERE id = ? AND tenant_id = ?',
+                [rId, tenantId]
+            );
+            if (repairRows.length > 0) {
+                const rep = repairRows[0];
+                const revertStatus = (rep.status === 'delivered') ? 'ready' : rep.status;
+                const itemForRepair = items.find(i => i.repair_id === rId);
+                const paidInSale = itemForRepair ? (parseFloat(itemForRepair.total) || 0) : 0;
+                const newAdvance = Math.max(0, advance - paidInSale);
+                const revertPayment = newAdvance > 0 ? 'partial' : 'pending';
+
+                await connection.query(
+                    'UPDATE repairs SET status = ?, payment_status = ?, advance_payment = ? WHERE id = ? AND tenant_id = ?',
+                    [revertStatus, revertPayment, newAdvance, rId, tenantId]
+                );
+
+                await connection.query(
+                    'INSERT INTO repair_status_history (repair_id, status, notes, changed_by) VALUES (?, ?, ?, ?)',
+                    [rId, revertStatus, `Estado revertido por cancelación de venta ${sales[0].sale_number}`, req.user.id]
+                );
+            }
+        }
+
+        // Marcar todos los ítems como devueltos
+        await connection.query(
+            'UPDATE sale_items SET is_returned = 1, returned_at = COALESCE(returned_at, NOW()), return_reason = COALESCE(return_reason, \'Cancelación total de venta\') WHERE sale_id = ?',
+            [id]
+        );
+
         await connection.query('UPDATE sales SET status = ? WHERE id = ? AND tenant_id = ? AND branch_id = ?', ['cancelled', id, tenantId, branchId]);
 
         await connection.commit();
@@ -439,6 +547,143 @@ exports.cancelSale = async (req, res) => {
         await connection.rollback();
         console.error('[POS] Error al cancelar venta:', error);
         res.status(500).json({ message: 'Error al cancelar venta.' });
+    } finally {
+        connection.release();
+    }
+};
+
+// =====================================================
+// Devolución / Descarte de ítem individual (SaaS & Multi-Branch Scoped)
+// =====================================================
+exports.returnSaleItem = async (req, res) => {
+    const connection = await db.getConnection();
+    try {
+        await connection.beginTransaction();
+
+        const { id: saleId, itemId } = req.params;
+        const { reason } = req.body || {};
+        const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.tenantCtx.branchId;
+
+        // Verificar que la venta exista y pertenezca al tenant y sucursal
+        const [sales] = await connection.query(
+            'SELECT * FROM sales WHERE id = ? AND tenant_id = ? AND branch_id = ?',
+            [saleId, tenantId, branchId]
+        );
+
+        if (sales.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'Venta no encontrada.' });
+        }
+
+        const sale = sales[0];
+        if (sale.status === 'cancelled') {
+            await connection.rollback();
+            return res.status(400).json({ message: 'No se puede devolver un ítem de una venta ya cancelada.' });
+        }
+
+        // Obtener el ítem específico
+        const [items] = await connection.query(
+            'SELECT * FROM sale_items WHERE id = ? AND sale_id = ?',
+            [itemId, saleId]
+        );
+
+        if (items.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ message: 'Ítem no encontrado en esta venta.' });
+        }
+
+        const item = items[0];
+        if (item.is_returned) {
+            await connection.rollback();
+            return res.status(400).json({ message: 'Este ítem ya ha sido devuelto anteriormente.' });
+        }
+
+        // 1. Si es producto, reponer stock a branch_inventory y registrar movimiento
+        if (item.product_id) {
+            await connection.query(
+                'UPDATE branch_inventory SET stock = stock + ? WHERE product_id = ? AND branch_id = ?',
+                [item.quantity, item.product_id, branchId]
+            );
+
+            await connection.query(
+                `INSERT INTO stock_movements (tenant_id, branch_id, product_id, type, quantity, reference, notes, created_by)
+                 VALUES (?, ?, ?, 'in', ?, ?, ?, ?)`,
+                [tenantId, branchId, item.product_id, item.quantity, sale.sale_number, `Devolución de ítem: ${item.description}${reason ? ` (${reason})` : ''}`, req.user.id]
+            );
+        }
+
+        // 2. Si es reparación, revertir estado a ready y ajustar anticipo / estatus de pago
+        const targetRepairId = item.repair_id || (sale.repair_id ? sale.repair_id : null);
+        if (targetRepairId) {
+            const [repairRows] = await connection.query(
+                'SELECT advance_payment, total_cost, status FROM repairs WHERE id = ? AND tenant_id = ?',
+                [targetRepairId, tenantId]
+            );
+
+            if (repairRows.length > 0) {
+                const rep = repairRows[0];
+                const revertStatus = (rep.status === 'delivered') ? 'ready' : rep.status;
+                const currentAdvance = parseFloat(rep.advance_payment) || 0;
+                const itemTotal = parseFloat(item.total) || 0;
+                const newAdvance = Math.max(0, currentAdvance - itemTotal);
+                const newPayment = newAdvance > 0 ? 'partial' : 'pending';
+
+                await connection.query(
+                    'UPDATE repairs SET status = ?, payment_status = ?, advance_payment = ? WHERE id = ? AND tenant_id = ?',
+                    [revertStatus, newPayment, newAdvance, targetRepairId, tenantId]
+                );
+
+                await connection.query(
+                    'INSERT INTO repair_status_history (repair_id, status, notes, changed_by) VALUES (?, ?, ?, ?)',
+                    [targetRepairId, revertStatus, `Ítem retirado por devolución de venta ${sale.sale_number}${reason ? `: ${reason}` : ''}`, req.user.id]
+                );
+            }
+        }
+
+        // 3. Marcar el ítem como devuelto en sale_items
+        const returnReason = reason && reason.trim() ? reason.trim() : 'Devolución de cliente';
+        await connection.query(
+            'UPDATE sale_items SET is_returned = 1, returned_at = NOW(), return_reason = ? WHERE id = ?',
+            [returnReason, itemId]
+        );
+
+        // 4. Recalcular montos de la venta
+        const itemTotal = parseFloat(item.total) || 0;
+        const itemDiscount = parseFloat(item.discount) || 0;
+        const itemSubtotal = (parseFloat(item.unit_price) * parseInt(item.quantity)) || itemTotal;
+
+        const newTotal = Math.max(0, parseFloat(sale.total) - itemTotal);
+        const newSubtotal = Math.max(0, parseFloat(sale.subtotal) - itemSubtotal);
+        const newDiscount = Math.max(0, parseFloat(sale.discount) - itemDiscount);
+
+        // Verificar si quedan ítems activos no devueltos
+        const [remainingRows] = await connection.query(
+            'SELECT COUNT(*) as activeCount FROM sale_items WHERE sale_id = ? AND (is_returned = 0 OR is_returned IS NULL)',
+            [saleId]
+        );
+
+        const isFullyReturned = remainingRows[0].activeCount === 0;
+        const newStatus = isFullyReturned ? 'refunded' : sale.status;
+
+        await connection.query(
+            'UPDATE sales SET total = ?, subtotal = ?, discount = ?, status = ? WHERE id = ? AND tenant_id = ? AND branch_id = ?',
+            [newTotal, newSubtotal, newDiscount, newStatus, saleId, tenantId, branchId]
+        );
+
+        await connection.commit();
+
+        res.json({
+            message: 'Ítem devuelto exitosamente.',
+            isFullyReturned,
+            newStatus,
+            newTotal,
+            returnedItemId: itemId
+        });
+    } catch (error) {
+        await connection.rollback();
+        console.error('[POS] Error al devolver ítem de venta:', error);
+        res.status(500).json({ message: 'Error al procesar la devolución del ítem.' });
     } finally {
         connection.release();
     }

@@ -95,10 +95,9 @@ export const generateServiceTicket = async (repair, settings = {}) => {
     currentY += 8;
 
     // --- Client & Device details ---
+    // Client details — no contact info on the printed document
     const clientDetails = [
-        ['Nombre:', `${repair.customer_first_name || repair.first_name || 'Mostrador'} ${repair.customer_last_name || repair.last_name || ''}`.trim()],
-        ['Teléfono:', repair.customer_phone || 'No registrado'],
-        ['Email:', repair.customer_email || 'No registrado']
+        ['Nombre:', `${repair.customer_first_name || repair.first_name || 'Mostrador'} ${repair.customer_last_name || repair.last_name || ''}`.trim()]
     ];
 
     const deviceDetails = [
@@ -197,11 +196,17 @@ export const generateServiceTicket = async (repair, settings = {}) => {
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
     doc.text('PRESUPUESTO ESTIMADO Y COSTOS', 15, currentY);
     
+    // Show the selected service and its cost; keep diagnosis separately if applicable
+    const diagCostPDF = parseFloat(repair.diagnosis_cost) || 0;
+    const serviceCostPDF = Math.max(0, (parseFloat(repair.total_cost) || 0) - diagCostPDF);
+    const serviceLabel = repair.service_name || repair.service_requested || 'Servicio';
+
     const costs = [
-        ['Mano de Obra / Servicios', formatCurrency(repair.labor_cost)],
-        ['Refacciones y Partes', formatCurrency(repair.parts_cost)],
-        ['Diagnóstico Técnico', formatCurrency(repair.diagnosis_cost)]
+        [serviceLabel, formatCurrency(serviceCostPDF)]
     ];
+    if (diagCostPDF > 0) {
+        costs.push(['Diagnóstico Técnico', formatCurrency(repair.diagnosis_cost)]);
+    }
     if (repair.discount > 0) {
         costs.push(['Descuento Aplicado', `-${formatCurrency(repair.discount)}`]);
     }

@@ -229,6 +229,14 @@
     background-color: #ef4444;
 }
 
+.sale-status-indicator.status-refunded {
+    color: #d97706;
+}
+
+.sale-status-indicator.status-refunded .status-dot {
+    background-color: #f59e0b;
+}
+
 .sale-status-indicator.status-pending {
     color: var(--cool-amber);
 }

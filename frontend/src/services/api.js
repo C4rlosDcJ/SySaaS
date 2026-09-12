@@ -318,6 +318,10 @@ export const posService = {
     },
     getSaleById: (id) => fetchAPI(`/pos/sales/${id}`),
     cancelSale: (id) => fetchAPI(`/pos/sales/${id}/cancel`, { method: 'PUT' }),
+    returnSaleItem: (saleId, itemId, data = {}) => fetchAPI(`/pos/sales/${saleId}/items/${itemId}/return`, {
+        method: 'POST',
+        body: JSON.stringify(data)
+    }),
     getSalesStats: () => fetchAPI('/pos/sales/stats'),
     getBillableRepairs: (params = {}) => {
         const query = new URLSearchParams(params).toString();

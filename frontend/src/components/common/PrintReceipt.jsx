@@ -128,9 +128,6 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                                     <span>Nombre:</span> 
                                     <span className="bold">{data.customer_first_name || data.first_name} {data.customer_last_name || data.last_name}</span>
                                 </p>
-                                {data.customer_phone && (
-                                    <p><span>Contacto:</span> <span className="bold">{data.customer_phone}</span></p>
-                                )}
                             </div>
 
                             <div className="divider-dashed"></div>
@@ -184,18 +181,23 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                             <div className="divider-double"></div>
 
                             <div className="receipt-section costs-summary">
-                                <div className="cost-row">
-                                    <span>Mano de Obra</span>
-                                    <span>{formatCurrency(data.labor_cost)}</span>
-                                </div>
-                                <div className="cost-row">
-                                    <span>Refacciones</span>
-                                    <span>{formatCurrency(data.parts_cost)}</span>
-                                </div>
-                                <div className="cost-row">
-                                    <span>Diagnóstico</span>
-                                    <span>{formatCurrency(data.diagnosis_cost)}</span>
-                                </div>
+                                {parseFloat(data.total_cost) > 0 && (() => {
+                                    const diagCost = parseFloat(data.diagnosis_cost) || 0;
+                                    const serviceCost = parseFloat(data.total_cost) - diagCost;
+                                    const label = data.service_name || data.service_requested || 'Servicio';
+                                    return (
+                                        <div className="cost-row">
+                                            <span>{label}</span>
+                                            <span>{formatCurrency(serviceCost)}</span>
+                                        </div>
+                                    );
+                                })()}
+                                {parseFloat(data.diagnosis_cost) > 0 && (
+                                    <div className="cost-row">
+                                        <span>Diagnóstico</span>
+                                        <span>{formatCurrency(data.diagnosis_cost)}</span>
+                                    </div>
+                                )}
                                 {parseFloat(data.discount) > 0 && (
                                     <div className="cost-row discount">
                                         <span>Descuento</span>
@@ -294,17 +296,24 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
 
                             <p className="bold uppercase block-text" style={{ marginBottom: '8px', fontSize: '10px' }}>Lista de Artículos</p>
                             <div className="receipt-items-list">
-                                {data.items?.map((item, idx) => (
-                                    <div key={idx} className="receipt-item-row">
-                                        <div className="item-main-line">
-                                            <span className="item-desc">{item.description}</span>
-                                            <span className="item-price">{formatCurrency(item.total)}</span>
+                                {data.items?.map((item, idx) => {
+                                    const isRet = Boolean(item.is_returned);
+                                    return (
+                                        <div key={idx} className="receipt-item-row" style={isRet ? { opacity: 0.6 } : {}}>
+                                            <div className="item-main-line">
+                                                <span className="item-desc" style={isRet ? { textDecoration: 'line-through' } : {}}>
+                                                    {item.description} {isRet ? ' [DEVUELTO]' : ''}
+                                                </span>
+                                                <span className="item-price" style={isRet ? { textDecoration: 'line-through' } : {}}>
+                                                    {formatCurrency(item.total)}
+                                                </span>
+                                            </div>
+                                            <div className="item-meta">
+                                                {item.quantity} x {formatCurrency(item.price || item.unit_price)}
+                                            </div>
                                         </div>
-                                        <div className="item-meta">
-                                            {item.quantity} x {formatCurrency(item.price)}
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
 
                             <div className="divider-solid"></div>
@@ -328,19 +337,22 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                                     <span>Forma de Pago:</span>
                                     <span className="bold uppercase">
                                         {data.payment_method === 'cash' ? 'EFECTIVO' :
-                                         data.payment_method === 'card' ? 'TARJETA' : 'TRANSFERENCIA'}
+                                         data.payment_method === 'card' ? 'TARJETA' :
+                                         data.payment_method === 'transfer' ? 'TRANSFERENCIA' : 'MIXTO'}
                                     </span>
                                 </div>
-                                {data.payment_method === 'cash' && (
+                                {(data.payment_method === 'cash' || data.payment_method === 'mixed') && (
                                     <>
                                         <div className="cost-row">
-                                            <span>Efectivo Recibido</span>
+                                            <span>Monto Recibido</span>
                                             <span>{formatCurrency(data.amount_received)}</span>
                                         </div>
-                                        <div className="cost-row bold uppercase" style={{ marginTop: '4px' }}>
-                                            <span>CAMBIO ENTREGADO</span>
-                                            <span>{formatCurrency(data.change_amount)}</span>
-                                        </div>
+                                        {parseFloat(data.change_amount) > 0 && (
+                                            <div className="cost-row bold uppercase" style={{ marginTop: '4px' }}>
+                                                <span>CAMBIO ENTREGADO</span>
+                                                <span>{formatCurrency(data.change_amount)}</span>
+                                            </div>
+                                        )}
                                     </>
                                 )}
                             </div>

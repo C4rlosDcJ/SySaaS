@@ -17,6 +17,7 @@ router.get('/sales', posController.getSales);
 router.get('/sales/stats', posController.getSalesStats);
 router.get('/sales/:id', posController.getSaleById);
 router.put('/sales/:id/cancel', posController.cancelSale);
+router.post('/sales/:id/items/:itemId/return', posController.returnSaleItem);
 
 // Reparaciones cobrables
 router.get('/repairs/billable', posController.getBillableRepairs);

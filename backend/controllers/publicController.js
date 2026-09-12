@@ -61,7 +61,7 @@ exports.trackRepair = async (req, res) => {
             // Obtener ítems de la venta
             const [items] = await db.query(`
                 SELECT 
-                    si.id, si.description, si.quantity, si.unit_price, si.discount, si.total,
+                    si.id, si.description, si.quantity, si.unit_price, si.discount, si.total, si.is_returned,
                     p.name as product_name, p.sku,
                     sc.name as service_name
                 FROM sale_items si
