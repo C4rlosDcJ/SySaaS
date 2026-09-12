@@ -323,6 +323,7 @@ export const posService = {
         body: JSON.stringify(data)
     }),
     getSalesStats: () => fetchAPI('/pos/sales/stats'),
+    getStats: () => fetchAPI('/pos/sales/stats'),
     getBillableRepairs: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return fetchAPI(`/pos/repairs/billable${query ? `?${query}` : ''}`);
