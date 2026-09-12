@@ -28,7 +28,8 @@ exports.getSalesForecast = async (req, res) => {
     try {
         const tenantId = req.tenantCtx.tenantId;
 
-        // Extraer ventas y cobros de reparaciones por día históricas (últimos 365 días)
+        // Fuente única: tabla sales completadas (incluye tanto mostrador como taller cobrado en POS)
+        // No se suma repairs.total_cost porque cada reparación cobrada ya genera un registro en sales
         const [salesRows] = await db.query(`
             SELECT date, SUM(amount) as amount
             FROM (
@@ -36,17 +37,10 @@ exports.getSalesForecast = async (req, res) => {
                 FROM sales
                 WHERE tenant_id = ? AND status = 'completed' AND created_at >= DATE_SUB(CURDATE(), INTERVAL 365 DAY)
                 GROUP BY DATE(created_at)
-
-                UNION ALL
-
-                SELECT DATE(created_at) as date, SUM(total_cost) as amount
-                FROM repairs
-                WHERE tenant_id = ? AND created_at >= DATE_SUB(CURDATE(), INTERVAL 365 DAY)
-                GROUP BY DATE(created_at)
             ) combined
             GROUP BY date
             ORDER BY date ASC
-        `, [tenantId, tenantId]);
+        `, [tenantId]);
 
         if (salesRows.length === 0) {
             return res.json({

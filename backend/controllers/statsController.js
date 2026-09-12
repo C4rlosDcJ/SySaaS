@@ -32,23 +32,28 @@ exports.getDashboard = async (req, res) => {
           GROUP BY status
         `, params);
 
-        // Reparaciones e Ingresos este mes (reparaciones + ventas POS)
+        // Ingresos este mes:
+        // - Ingresos Taller: ventas POS vinculadas a reparaciones (repair_id NOT NULL)
+        // - Ingresos Mostrador: ventas POS sin reparación (repair_id IS NULL)
+        // Esto evita contar dos veces una reparación (una en repairs.total_cost y otra en sales.total)
         const [thisMonth] = await db.query(`
           SELECT 
-            (SELECT COUNT(*) FROM repairs ${baseWhere} AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) as count,
+            (SELECT COUNT(*) FROM repairs ${baseWhere} AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE()) AND status != 'cancelled') as count,
             (
-              (SELECT COALESCE(SUM(total_cost), 0) FROM repairs ${baseWhere} AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) +
-              (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND status = 'completed' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE()))
-            ) as revenue
-        `, [...params, ...params, ...params]);
+              (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NOT NULL AND status = 'completed' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) +
+              (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NULL AND status = 'completed' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE()))
+            ) as revenue,
+            (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NOT NULL AND status = 'completed' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) as taller_revenue,
+            (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NULL AND status = 'completed' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) as pos_revenue
+        `, [...params, ...params, ...params, ...params, ...params]);
 
-        // Reparaciones e Ingresos mes anterior
+        // Ingresos mes anterior (misma lógica, sin duplicar)
         const [lastMonth] = await db.query(`
           SELECT 
-            (SELECT COUNT(*) FROM repairs ${baseWhere} AND MONTH(created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))) as count,
+            (SELECT COUNT(*) FROM repairs ${baseWhere} AND MONTH(created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND status != 'cancelled') as count,
             (
-              (SELECT COALESCE(SUM(total_cost), 0) FROM repairs ${baseWhere} AND MONTH(created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))) +
-              (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND status = 'completed' AND MONTH(created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)))
+              (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NOT NULL AND status = 'completed' AND MONTH(created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))) +
+              (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NULL AND status = 'completed' AND MONTH(created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)))
             ) as revenue
         `, [...params, ...params, ...params]);
 
@@ -82,29 +87,35 @@ exports.getDashboard = async (req, res) => {
           LIMIT 10
         `, params);
 
-        // Ingresos por mes (últimos 12 meses consolidados: reparaciones + ventas POS)
+        // Ingresos por mes (últimos 12 meses)
+        // Fuente única: tabla sales completadas, separadas por tipo (taller vs mostrador)
+        // Esto evita la duplicidad de contar repairs.total_cost + sales.total para la misma operación
         const [monthlyRevenue] = await db.query(`
           SELECT 
             month,
-            SUM(revenue) as revenue,
-            SUM(repairs_count) as repairs_count
+            SUM(pos_revenue + taller_revenue) as revenue,
+            SUM(repairs_count) as repairs_count,
+            SUM(taller_revenue) as taller_revenue,
+            SUM(pos_revenue) as pos_revenue
           FROM (
             SELECT 
               DATE_FORMAT(created_at, '%Y-%m') as month,
-              COALESCE(SUM(total_cost), 0) as revenue,
-              COUNT(*) as repairs_count
-            FROM repairs
-            ${baseWhere} AND created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH)
+              COALESCE(SUM(CASE WHEN repair_id IS NOT NULL THEN total ELSE 0 END), 0) as taller_revenue,
+              COALESCE(SUM(CASE WHEN repair_id IS NULL THEN total ELSE 0 END), 0) as pos_revenue,
+              0 as repairs_count
+            FROM sales
+            ${baseWhere} AND status = 'completed' AND created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH)
             GROUP BY DATE_FORMAT(created_at, '%Y-%m')
 
             UNION ALL
 
             SELECT 
               DATE_FORMAT(created_at, '%Y-%m') as month,
-              COALESCE(SUM(total), 0) as revenue,
-              0 as repairs_count
-            FROM sales
-            ${baseWhere} AND status = 'completed' AND created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH)
+              0 as taller_revenue,
+              0 as pos_revenue,
+              COUNT(*) as repairs_count
+            FROM repairs
+            ${baseWhere} AND status != 'cancelled' AND created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH)
             GROUP BY DATE_FORMAT(created_at, '%Y-%m')
           ) combined
           GROUP BY month
@@ -142,7 +153,9 @@ exports.getDashboard = async (req, res) => {
         const thisMonthData = {
             count: parseInt(thisMonth[0]?.count || 0, 10),
             repairs: parseInt(thisMonth[0]?.count || 0, 10),
-            revenue: parseFloat(thisMonth[0]?.revenue || 0)
+            revenue: parseFloat(thisMonth[0]?.revenue || 0),
+            taller_revenue: parseFloat(thisMonth[0]?.taller_revenue || 0),
+            pos_revenue: parseFloat(thisMonth[0]?.pos_revenue || 0)
         };
 
         const lastMonthData = {
@@ -154,6 +167,8 @@ exports.getDashboard = async (req, res) => {
         const formattedMonthlyRevenue = monthlyRevenue.map(mr => ({
             month: mr.month,
             revenue: parseFloat(mr.revenue || 0),
+            taller_revenue: parseFloat(mr.taller_revenue || 0),
+            pos_revenue: parseFloat(mr.pos_revenue || 0),
             repairs_count: parseInt(mr.repairs_count || 0, 10)
         }));
 
@@ -738,7 +753,7 @@ exports.getEnterpriseAnalytics = async (req, res) => {
             baseParams.push(requestedBranchId);
         }
 
-        // 1. Métricas de Ventas POS en el período
+        // 1. Ventas Mostrador POS (solo sales sin reparación vinculada = repair_id IS NULL)
         const [posSales] = await db.query(`
             SELECT 
                 COUNT(*) as sales_count,
@@ -746,35 +761,50 @@ exports.getEnterpriseAnalytics = async (req, res) => {
                 COALESCE(AVG(s.total), 0) as avg_ticket,
                 COALESCE(SUM(s.discount), 0) as total_discounts
             FROM sales s
-            WHERE s.tenant_id = ? AND s.status = 'completed' ${branchFilterSales} ${dateConditionSales}
+            WHERE s.tenant_id = ? AND s.status = 'completed' AND s.repair_id IS NULL ${branchFilterSales} ${dateConditionSales}
         `, baseParams);
 
-        // 2. Métricas de Reparaciones / Taller en el período
+        // 1b. Ingresos Taller (sales vinculadas a reparaciones = repair_id IS NOT NULL)
+        const [tallerSales] = await db.query(`
+            SELECT 
+                COUNT(DISTINCT s.repair_id) as repairs_billed,
+                COALESCE(SUM(s.total), 0) as taller_revenue
+            FROM sales s
+            WHERE s.tenant_id = ? AND s.status = 'completed' AND s.repair_id IS NOT NULL ${branchFilterSales} ${dateConditionSales}
+        `, baseParams);
+
+        // 2. Métricas de Reparaciones / Taller en el período (conteo y estado, NO para sumar ingresos)
         const [repairsMetrics] = await db.query(`
             SELECT 
                 COUNT(*) as repairs_count,
                 COALESCE(SUM(r.total_cost), 0) as repairs_revenue,
                 COUNT(CASE WHEN r.status = 'delivered' THEN 1 END) as delivered_count
             FROM repairs r
-            WHERE r.tenant_id = ? ${branchFilterRepairs} ${dateConditionRepairs}
+            WHERE r.tenant_id = ? AND r.status != 'cancelled' ${branchFilterRepairs} ${dateConditionRepairs}
         `, baseParams);
 
-        // 3. Período anterior para comparación de ingresos
+        // 3. Órdenes de Compra a Proveedores (Egresos) - para balance financiero
+        let branchFilterPO = '';
+        if (requestedBranchId) { branchFilterPO = 'AND po.branch_id = ?'; }
+        const [purchaseEgress] = await db.query(`
+            SELECT COALESCE(SUM(po.total_amount), 0) as total_egress, COUNT(*) as po_count
+            FROM purchase_orders po
+            WHERE po.tenant_id = ? AND po.status = 'received' ${branchFilterPO}
+        `, baseParams);
+
+        // 4. Período anterior para comparación de ingresos
         const [prevPeriodSales] = await db.query(`
             SELECT COALESCE(SUM(s.total), 0) as revenue
             FROM sales s
             WHERE s.tenant_id = ? AND s.status = 'completed' ${branchFilterSales} ${prevDateConditionSales}
         `, baseParams);
 
-        const [prevPeriodRepairs] = await db.query(`
-            SELECT COALESCE(SUM(r.total_cost), 0) as revenue
-            FROM repairs r
-            WHERE r.tenant_id = ? ${branchFilterRepairs} ${prevDateConditionRepairs}
-        `, baseParams);
-
-        const currentTotalRevenue = parseFloat(posSales[0]?.sales_revenue || 0) + parseFloat(repairsMetrics[0]?.repairs_revenue || 0);
-        const prevTotalRevenue = parseFloat(prevPeriodSales[0]?.revenue || 0) + parseFloat(prevPeriodRepairs[0]?.revenue || 0);
+        const currentTallerRevenue = parseFloat(tallerSales[0]?.taller_revenue || 0);
+        const currentPosRevenue = parseFloat(posSales[0]?.sales_revenue || 0);
+        const currentTotalRevenue = currentPosRevenue + currentTallerRevenue;
+        const prevTotalRevenue = parseFloat(prevPeriodSales[0]?.revenue || 0);
         const revenueGrowth = prevTotalRevenue > 0 ? ((currentTotalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100 : null;
+        const totalEgress = parseFloat(purchaseEgress[0]?.total_egress || 0);
 
         // 4. Top 10 Productos Más Vendidos
         const [topProducts] = await db.query(`
@@ -808,35 +838,25 @@ exports.getEnterpriseAnalytics = async (req, res) => {
             ORDER BY total_amount DESC
         `, baseParams);
 
-        // 6. Evolución Temporal de Ingresos (Desglosado en Ventas POS + Reparaciones)
+        // 6. Evolución Temporal de Ingresos (Ventas Mostrador + Ingresos Taller via ventas, sin duplicar)
         const [temporalRevenue] = await db.query(`
             SELECT 
                 period_date,
                 SUM(pos_revenue) as pos_revenue,
-                SUM(repairs_revenue) as repairs_revenue,
-                SUM(pos_revenue + repairs_revenue) as total_revenue
+                SUM(taller_revenue) as taller_revenue,
+                SUM(pos_revenue + taller_revenue) as total_revenue
             FROM (
                 SELECT 
                     DATE_FORMAT(s.created_at, '%Y-%m-%d') as period_date,
-                    SUM(s.total) as pos_revenue,
-                    0 as repairs_revenue
+                    SUM(CASE WHEN s.repair_id IS NULL THEN s.total ELSE 0 END) as pos_revenue,
+                    SUM(CASE WHEN s.repair_id IS NOT NULL THEN s.total ELSE 0 END) as taller_revenue
                 FROM sales s
                 WHERE s.tenant_id = ? AND s.status = 'completed' ${branchFilterSales} ${dateConditionSales}
                 GROUP BY DATE_FORMAT(s.created_at, '%Y-%m-%d')
-
-                UNION ALL
-
-                SELECT 
-                    DATE_FORMAT(r.created_at, '%Y-%m-%d') as period_date,
-                    0 as pos_revenue,
-                    SUM(r.total_cost) as repairs_revenue
-                FROM repairs r
-                WHERE r.tenant_id = ? ${branchFilterRepairs} ${dateConditionRepairs}
-                GROUP BY DATE_FORMAT(r.created_at, '%Y-%m-%d')
             ) unified
             GROUP BY period_date
             ORDER BY period_date ASC
-        `, [...baseParams, ...baseParams]);
+        `, baseParams);
 
         // 7. Servicios Más Solicitados en Taller
         const [topServices] = await db.query(`
@@ -852,16 +872,16 @@ exports.getEnterpriseAnalytics = async (req, res) => {
             LIMIT 6
         `, baseParams);
 
-        // 8. Rendimiento por Sucursal (Multi-Branch Breakdown)
+        // 8. Rendimiento por Sucursal (Multi-Branch Breakdown, sin duplicar)
         const [branchBreakdown] = await db.query(`
             SELECT 
                 b.id,
                 b.name as branch_name,
                 b.code,
-                COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.branch_id = b.id AND s.status = 'completed' ${dateConditionSales}), 0) as pos_revenue,
-                COALESCE((SELECT COUNT(*) FROM sales s WHERE s.branch_id = b.id AND s.status = 'completed' ${dateConditionSales}), 0) as sales_count,
-                COALESCE((SELECT SUM(r.total_cost) FROM repairs r WHERE r.branch_id = b.id ${dateConditionRepairs}), 0) as repairs_revenue,
-                COALESCE((SELECT COUNT(*) FROM repairs r WHERE r.branch_id = b.id ${dateConditionRepairs}), 0) as repairs_count
+                COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.branch_id = b.id AND s.repair_id IS NULL AND s.status = 'completed' ${dateConditionSales}), 0) as pos_revenue,
+                COALESCE((SELECT COUNT(*) FROM sales s WHERE s.branch_id = b.id AND s.repair_id IS NULL AND s.status = 'completed' ${dateConditionSales}), 0) as sales_count,
+                COALESCE((SELECT SUM(s.total) FROM sales s WHERE s.branch_id = b.id AND s.repair_id IS NOT NULL AND s.status = 'completed' ${dateConditionSales}), 0) as repairs_revenue,
+                COALESCE((SELECT COUNT(*) FROM repairs r WHERE r.branch_id = b.id AND r.status != 'cancelled' ${dateConditionRepairs}), 0) as repairs_count
             FROM branches b
             WHERE b.tenant_id = ? AND b.is_active = 1
             ORDER BY b.name ASC
@@ -910,8 +930,12 @@ exports.getEnterpriseAnalytics = async (req, res) => {
             period,
             kpis: {
                 total_revenue: currentTotalRevenue,
-                pos_revenue: parseFloat(posSales[0]?.sales_revenue || 0),
-                repairs_revenue: parseFloat(repairsMetrics[0]?.repairs_revenue || 0),
+                pos_revenue: currentPosRevenue,
+                taller_revenue: currentTallerRevenue,
+                repairs_revenue: currentTallerRevenue,
+                total_egress: totalEgress,
+                operating_balance: currentTotalRevenue - totalEgress,
+                po_count: parseInt(purchaseEgress[0]?.po_count || 0, 10),
                 sales_count: parseInt(posSales[0]?.sales_count || 0, 10),
                 repairs_count: parseInt(repairsMetrics[0]?.repairs_count || 0, 10),
                 avg_ticket: parseFloat(posSales[0]?.avg_ticket || 0),
@@ -936,7 +960,7 @@ exports.getEnterpriseAnalytics = async (req, res) => {
             temporalRevenue: temporalRevenue.map(tr => ({
                 date: tr.period_date,
                 pos_revenue: parseFloat(tr.pos_revenue || 0),
-                repairs_revenue: parseFloat(tr.repairs_revenue || 0),
+                repairs_revenue: parseFloat(tr.taller_revenue || 0),
                 total_revenue: parseFloat(tr.total_revenue || 0)
             })),
             topServices: topServices.map(ts => ({

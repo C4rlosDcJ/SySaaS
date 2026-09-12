@@ -755,12 +755,13 @@ exports.getSalesStats = async (req, res) => {
             branchParams
         );
 
-        // Productos más vendidos (mes actual)
+        // Productos más vendidos (mes actual, excluyendo ítems devueltos)
         const [topProducts] = await db.query(
             `SELECT si.description, SUM(si.quantity) as total_qty, SUM(si.total) as total_revenue
              FROM sale_items si
              JOIN sales s ON si.sale_id = s.id
              WHERE YEAR(s.created_at) = YEAR(CURDATE()) AND MONTH(s.created_at) = MONTH(CURDATE()) AND s.status = 'completed' AND s.tenant_id = ? ${branchCondition.replace('branch_id', 's.branch_id')}
+             AND (si.is_returned = 0 OR si.is_returned IS NULL)
              GROUP BY si.description
              ORDER BY total_qty DESC LIMIT 10`,
             branchParams

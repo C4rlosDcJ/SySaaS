@@ -129,7 +129,7 @@ function DashboardSkeleton() {
 
 export default function AdminDashboard() {
     const { user } = useAuth();
-    const { activeBranch } = useTenant();
+    const { activeBranch, activeBranchId } = useTenant();
     const [stats, setStats] = useState(null);
     const [salesStats, setSalesStats] = useState(null);
     const [inventoryStats, setInventoryStats] = useState(null);
@@ -147,13 +147,13 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         fetchAllStats();
-    }, []);
+    }, [activeBranchId]);
 
     const fetchAllStats = async () => {
         try {
             const [dashData, salesData, invData, bcData] = await Promise.allSettled([
                 statsService.getDashboard(),
-                posService.getStats(),
+                posService.getSalesStats(),
                 inventoryService.getStats(),
                 broadcastService.getActive()
             ]);
