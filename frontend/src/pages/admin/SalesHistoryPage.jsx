@@ -3,7 +3,7 @@ import {
     Receipt, Search, Eye, XCircle, Printer, DollarSign,
     TrendingUp, ShoppingBag, CreditCard, Banknote, ArrowRightLeft,
     Calendar, Download, RefreshCw, Filter, Layers, User,
-    FileText, CheckCircle2, AlertCircle, Clock, X, ChevronLeft, ChevronRight
+    FileText, CheckCircle2, AlertCircle, Clock, X, ChevronLeft, ChevronRight, RotateCcw
 } from 'lucide-react';
 import { posService, settingsService } from '../../services/api';
 import { useTenant } from '../../context/TenantContext';
@@ -181,6 +181,46 @@ export default function SalesHistoryPage() {
         }
     };
 
+    const handleReturnItem = async (item) => {
+        const isRepair = !!(item.repair_id || selectedSale.repair_ticket);
+        const itemTypeDesc = item.product_id 
+            ? 'un producto y sus existencias volverán al inventario' 
+            : (isRepair ? 'una reparación y se revertirá a estado lista para entrega' : 'un servicio');
+
+        const confirmed = await showConfirm({
+            title: '¿Devolver este ítem?',
+            text: `Se retirará "${item.description}" de la venta. Corresponde a ${itemTypeDesc}. ¿Deseas continuar?`,
+            icon: 'warning',
+            confirmText: 'Sí, Devolver Ítem'
+        });
+        if (!confirmed) return;
+
+        try {
+            await posService.returnSaleItem(selectedSale.id, item.id, {
+                reason: 'Devolución de cliente'
+            });
+            showAlert({
+                title: 'Ítem Devuelto',
+                text: `Se ha procesado la devolución de "${item.description}" y se actualizaron los totales.`,
+                icon: 'success'
+            });
+
+            // Recargar detalle actual de la venta
+            const updated = await posService.getSaleById(selectedSale.id);
+            setSelectedSale(updated);
+
+            // Recargar lista y estadísticas
+            loadSales();
+            loadStats();
+        } catch (err) {
+            showAlert({
+                title: 'Error',
+                text: err.message || 'No se pudo procesar la devolución del ítem.',
+                icon: 'error'
+            });
+        }
+    };
+
     const handleExportCSV = () => {
         if (!sales || sales.length === 0) {
             showAlert({ title: 'Sin Datos', text: 'No hay ventas disponibles en este filtro para exportar.', icon: 'info' });
@@ -199,7 +239,7 @@ export default function SalesHistoryPage() {
             parseFloat(s.subtotal || 0).toFixed(2),
             parseFloat(s.discount || 0).toFixed(2),
             parseFloat(s.total || 0).toFixed(2),
-            s.status === 'completed' ? 'Completada' : (s.status === 'cancelled' ? 'Cancelada' : s.status),
+            s.status === 'completed' ? 'Completada' : (s.status === 'refunded' ? 'Devuelta' : (s.status === 'cancelled' ? 'Cancelada' : s.status)),
             `"${(s.repair_ticket || '').replace(/"/g, '""')}"`
         ]);
 
@@ -375,6 +415,7 @@ export default function SalesHistoryPage() {
                     >
                         <option value="">Todos los Estados</option>
                         <option value="completed">Completadas</option>
+                        <option value="refunded">Devueltas / Reembolsadas</option>
                         <option value="cancelled">Canceladas</option>
                         <option value="pending">Pendientes</option>
                     </select>
@@ -470,6 +511,7 @@ export default function SalesHistoryPage() {
                                                         <span className="status-dot"></span>
                                                         <span>
                                                             {sale.status === 'completed' ? 'Completada' :
+                                                             sale.status === 'refunded' ? 'Devuelta' :
                                                              sale.status === 'cancelled' ? 'Cancelada' : sale.status}
                                                         </span>
                                                     </div>
@@ -493,6 +535,16 @@ export default function SalesHistoryPage() {
                                                         >
                                                             <Eye size={15} />
                                                         </button>
+                                                        {sale.status === 'completed' && (
+                                                            <button
+                                                                className="btn btn-ghost btn-sm"
+                                                                onClick={() => handleCancelSale(sale.id)}
+                                                                title="Cancelar Venta"
+                                                                style={{ padding: '6px', color: 'var(--color-danger, #ef4444)' }}
+                                                            >
+                                                                <XCircle size={15} />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -596,8 +648,13 @@ export default function SalesHistoryPage() {
                                         </div>
                                         <div>
                                             <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>Estado</span>
-                                            <div style={{ fontSize: '13px', fontWeight: 700, marginTop: '2px', color: selectedSale.status === 'completed' ? '#10b981' : '#ef4444' }}>
-                                                {selectedSale.status === 'completed' ? 'Completada' : (selectedSale.status === 'cancelled' ? 'Cancelada' : selectedSale.status)}
+                                            <div style={{
+                                                fontSize: '13px',
+                                                fontWeight: 700,
+                                                marginTop: '2px',
+                                                color: selectedSale.status === 'completed' ? '#10b981' : (selectedSale.status === 'refunded' ? '#f59e0b' : '#ef4444')
+                                            }}>
+                                                {selectedSale.status === 'completed' ? 'Completada' : (selectedSale.status === 'refunded' ? 'Devuelta' : (selectedSale.status === 'cancelled' ? 'Cancelada' : selectedSale.status))}
                                             </div>
                                         </div>
                                     </div>
@@ -624,20 +681,79 @@ export default function SalesHistoryPage() {
                                                     <th style={{ textAlign: 'center' }}>Cant.</th>
                                                     <th style={{ textAlign: 'right' }}>P. Unit</th>
                                                     <th style={{ textAlign: 'right' }}>Importe</th>
+                                                    <th style={{ textAlign: 'center', width: '120px' }}>Acción</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {selectedSale.items?.map((item, i) => (
-                                                    <tr key={i}>
-                                                        <td>
-                                                            <div style={{ fontWeight: 600, fontSize: '13px' }}>{item.description}</div>
-                                                            {item.sku && <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>SKU: {item.sku}</div>}
-                                                        </td>
-                                                        <td style={{ textAlign: 'center', fontWeight: 600 }}>{item.quantity}</td>
-                                                        <td style={{ textAlign: 'right' }}>{formatCurrency(item.unit_price || item.price)}</td>
-                                                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatCurrency(item.total)}</td>
-                                                    </tr>
-                                                ))}
+                                                {selectedSale.items?.map((item, i) => {
+                                                    const isReturned = Boolean(item.is_returned);
+                                                    return (
+                                                        <tr key={i} style={isReturned ? { background: 'rgba(239, 68, 68, 0.04)' } : {}}>
+                                                            <td>
+                                                                <div style={{
+                                                                    fontWeight: 600,
+                                                                    fontSize: '13px',
+                                                                    textDecoration: isReturned ? 'line-through' : 'none',
+                                                                    color: isReturned ? 'var(--color-text-secondary)' : 'var(--color-text)'
+                                                                }}>
+                                                                    {item.description}
+                                                                </div>
+                                                                {item.sku && <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>SKU: {item.sku}</div>}
+                                                                {isReturned && (
+                                                                    <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '2px', fontWeight: 500 }}>
+                                                                        Devuelto: {item.return_reason || 'Devolución de cliente'}
+                                                                        {item.returned_at ? ` (${formatDateTime(item.returned_at)})` : ''}
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                            <td style={{ textAlign: 'center', fontWeight: 600, opacity: isReturned ? 0.5 : 1 }}>{item.quantity}</td>
+                                                            <td style={{ textAlign: 'right', opacity: isReturned ? 0.5 : 1 }}>{formatCurrency(item.unit_price || item.price)}</td>
+                                                            <td style={{
+                                                                textAlign: 'right',
+                                                                fontWeight: 700,
+                                                                textDecoration: isReturned ? 'line-through' : 'none',
+                                                                color: isReturned ? 'var(--color-text-secondary)' : 'var(--color-text)'
+                                                            }}>
+                                                                {formatCurrency(item.total)}
+                                                            </td>
+                                                            <td style={{ textAlign: 'center' }}>
+                                                                {isReturned ? (
+                                                                    <span style={{
+                                                                        display: 'inline-block',
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '12px',
+                                                                        fontSize: '11px',
+                                                                        fontWeight: 600,
+                                                                        background: 'rgba(239, 68, 68, 0.12)',
+                                                                        color: '#ef4444'
+                                                                    }}>
+                                                                        Devuelto
+                                                                    </span>
+                                                                ) : selectedSale.status === 'completed' ? (
+                                                                    <button
+                                                                        type="button"
+                                                                        className="btn btn-secondary btn-sm"
+                                                                        onClick={() => handleReturnItem(item)}
+                                                                        title="Quitar o devolver este ítem individual"
+                                                                        style={{
+                                                                            padding: '4px 8px',
+                                                                            fontSize: '11px',
+                                                                            display: 'inline-flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '4px',
+                                                                            color: '#ef4444',
+                                                                            borderColor: 'rgba(239, 68, 68, 0.3)'
+                                                                        }}
+                                                                    >
+                                                                        <RotateCcw size={12} /> Devolver
+                                                                    </button>
+                                                                ) : (
+                                                                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>-</span>
+                                                                )}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
                                             </tbody>
                                         </table>
                                     </div>

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
     ShoppingCart, Search, Package, Wrench, X, Plus, Minus, Trash2,
     CreditCard, Banknote, ArrowRightLeft, Printer, CheckCircle2,
-    User, ShoppingBag, ClipboardList, Hash, AlertCircle, Store, Camera
+    User, ShoppingBag, ClipboardList, Hash, AlertCircle, Store, Camera, Layers
 } from 'lucide-react';
 import { inventoryService, posService, customerService, servicesCatalog, settingsService, repairService, orderService, getImageUrl } from '../../services/api';
 import { formatCurrency, STATUS_LABELS } from '../../utils/constants';
@@ -35,12 +35,13 @@ export default function POSPage() {
     const [discount, setDiscount] = useState(0);
     const [paymentMethod, setPaymentMethod] = useState('cash');
     const [amountReceived, setAmountReceived] = useState('');
+    const [mixedPayments, setMixedPayments] = useState({ cash: '', card: '', transfer: '' });
     const [loading, setLoading] = useState(true);
 
-    // Pending web sales state
+    // Pending web sales state — supports combining multiple web orders for the same client
     const [pendingSales, setPendingSales] = useState([]);
     const [pendingSearch, setPendingSearch] = useState('');
-    const [loadedPendingSaleId, setLoadedPendingSaleId] = useState(null);
+    const [loadedPendingSales, setLoadedPendingSales] = useState([]);
 
     // Billable repairs
     const [billableRepairs, setBillableRepairs] = useState([]);
@@ -52,8 +53,8 @@ export default function POSPage() {
     const [selectedCustomer, setSelectedCustomer] = useState(null);
     const [showCustomerResults, setShowCustomerResults] = useState(false);
 
-    // Repair link
-    const [linkedRepair, setLinkedRepair] = useState(null);
+    // Repair links — now supports multiple repairs in the same cart
+    const [linkedRepairs, setLinkedRepairs] = useState([]);
 
     // Receipt modal
     const [showReceipt, setShowReceipt] = useState(false);
@@ -112,11 +113,18 @@ export default function POSPage() {
             if (draft.amountReceived !== undefined) {
                 setAmountReceived(draft.amountReceived);
             }
-            if (draft.linkedRepair) {
-                setLinkedRepair(draft.linkedRepair);
+            if (draft.linkedRepairs) {
+                setLinkedRepairs(draft.linkedRepairs);
+            } else if (draft.linkedRepair) {
+                setLinkedRepairs([draft.linkedRepair]);
             }
-            if (draft.loadedPendingSaleId) {
-                setLoadedPendingSaleId(draft.loadedPendingSaleId);
+            if (draft.loadedPendingSales) {
+                setLoadedPendingSales(draft.loadedPendingSales);
+            } else if (draft.loadedPendingSaleId) {
+                setLoadedPendingSales([{ id: draft.loadedPendingSaleId, order_number: 'Pedido Web' }]);
+            }
+            if (draft.mixedPayments) {
+                setMixedPayments(draft.mixedPayments);
             }
         }
 
@@ -136,13 +144,14 @@ export default function POSPage() {
                 discount,
                 paymentMethod,
                 amountReceived,
-                linkedRepair,
-                loadedPendingSaleId
+                mixedPayments,
+                linkedRepairs,
+                loadedPendingSales
             }, tenantId, activeBranchId);
         } else {
             draftStorage.clearDraft('pos', tenantId, activeBranchId);
         }
-    }, [cart, selectedCustomer, discount, paymentMethod, amountReceived, linkedRepair, loadedPendingSaleId, tenantId, activeBranchId]);
+    }, [cart, selectedCustomer, discount, paymentMethod, amountReceived, mixedPayments, linkedRepairs, loadedPendingSales, tenantId, activeBranchId]);
 
     // ─── Load data ───
     useEffect(() => {
@@ -286,7 +295,14 @@ export default function POSPage() {
     const addRepairToCart = (repair) => {
         const key = `r-${repair.id}`;
 
-        // Auto-set customer from repair
+        // Validate customer consistency: if a customer is already selected and this repair
+        // belongs to a different customer, warn and abort.
+        if (repair.customer_id && selectedCustomer && selectedCustomer.id !== repair.customer_id) {
+            showToast(`Esta reparación pertenece a otro cliente (${repair.customer_first_name} ${repair.customer_last_name}). Solo puedes cobrar reparaciones del mismo cliente en una venta.`, 'error');
+            return;
+        }
+
+        // Auto-set customer from repair if not already selected
         if (repair.customer_id && !selectedCustomer) {
             setSelectedCustomer({
                 id: repair.customer_id,
@@ -296,10 +312,10 @@ export default function POSPage() {
             });
         }
 
-        // Link the repair
-        setLinkedRepair({
-            id: repair.id,
-            ticket_number: repair.ticket_number
+        // Add this repair to the linked repairs list
+        setLinkedRepairs(prev => {
+            if (prev.find(r => r.id === repair.id)) return prev;
+            return [...prev, { id: repair.id, ticket_number: repair.ticket_number }];
         });
 
         // Build repair description
@@ -310,52 +326,62 @@ export default function POSPage() {
         // The amount to charge is the remaining balance
         const balance = repair.balance || (parseFloat(repair.total_cost) - parseFloat(repair.advance_payment || 0));
 
-        // Build itemized breakdown for the cart
-        const items = [];
-
-        // Add as a single "repair charge" line with the full balance
-        items.push({
-            key,
-            type: 'repair',
-            product_id: null,
-            service_id: null,
-            repair_id: repair.id,
-            description,
-            unit_price: Math.max(0, balance),
-            quantity: 1,
-            discount: 0,
-            maxStock: 1,
-            isRepair: true
-        });
-
         setCart(prev => {
             const existing = prev.find(i => i.key === key);
             if (existing) {
                 return prev;
             }
             showToast(`Reparación ${repair.ticket_number} agregada`);
-            return [...prev, ...items];
+            return [...prev, {
+                key,
+                type: 'repair',
+                product_id: null,
+                service_id: null,
+                repair_id: repair.id,
+                description,
+                unit_price: Math.max(0, balance),
+                quantity: 1,
+                discount: 0,
+                maxStock: 1,
+                isRepair: true
+            }];
         });
     };
 
     const loadPendingSaleToCart = async (sale) => {
         try {
-            const saleDetail = await orderService.getById(sale.id);
-            clearCart();
-            setLoadedPendingSaleId(saleDetail.id);
-
-            if (saleDetail.customer_id) {
-                setSelectedCustomer({
-                    id: saleDetail.customer_id,
-                    first_name: saleDetail.customer_first_name,
-                    last_name: saleDetail.customer_last_name,
-                    phone: saleDetail.customer_phone,
-                    email: saleDetail.customer_email
-                });
+            // Si ya está cargado, lo retiramos (toggle)
+            if (loadedPendingSales.some(s => s.id === sale.id)) {
+                removePendingSaleFromCart(sale.id);
+                return;
             }
 
-            const cartItems = saleDetail.items.map(item => {
-                const key = item.product_id ? `p-${item.product_id}` : `s-${item.service_id}`;
+            // Validar compatibilidad de cliente
+            if (sale.customer_id) {
+                if (selectedCustomer && selectedCustomer.id && selectedCustomer.id !== sale.customer_id) {
+                    showAlert({
+                        title: 'Cliente Diferente',
+                        text: `Este pedido pertenece a ${sale.customer_first_name || 'otro cliente'}. Para combinar pedidos en el carrito deben pertenecer al mismo cliente.`,
+                        icon: 'warning'
+                    });
+                    return;
+                }
+
+                if (!selectedCustomer) {
+                    setSelectedCustomer({
+                        id: sale.customer_id,
+                        first_name: sale.customer_first_name,
+                        last_name: sale.customer_last_name,
+                        phone: sale.customer_phone,
+                        email: sale.customer_email
+                    });
+                }
+            }
+
+            const saleDetail = await orderService.getById(sale.id);
+
+            const newCartItems = (saleDetail.items || []).map((item, idx) => {
+                const key = `order-${saleDetail.id}-${item.product_id ? 'p' + item.product_id : 's' + item.service_id}-${item.id || idx}`;
                 return {
                     key,
                     type: item.product_id ? 'product' : 'service',
@@ -365,15 +391,31 @@ export default function POSPage() {
                     unit_price: parseFloat(item.unit_price) || 0,
                     quantity: item.quantity,
                     discount: parseFloat(item.discount) || 0,
-                    maxStock: 999
+                    maxStock: 999,
+                    pending_sale_id: saleDetail.id,
+                    order_number: saleDetail.order_number || sale.order_number
                 };
             });
-            setCart(cartItems);
-            showToast(`Pedido ${saleDetail.order_number} cargado en el carrito`);
+
+            setCart(prev => [...prev, ...newCartItems]);
+            setLoadedPendingSales(prev => [...prev, {
+                id: saleDetail.id,
+                order_number: saleDetail.order_number || sale.order_number,
+                customer_id: saleDetail.customer_id,
+                customer_name: `${saleDetail.customer_first_name || ''} ${saleDetail.customer_last_name || ''}`.trim()
+            }]);
+
+            showToast(`Pedido ${saleDetail.order_number || sale.order_number} agregado al carrito`);
         } catch (err) {
             console.error(err);
             showToast('Error al cargar el pedido', 'error');
         }
+    };
+
+    const removePendingSaleFromCart = (saleId) => {
+        setLoadedPendingSales(prev => prev.filter(s => s.id !== saleId));
+        setCart(prev => prev.filter(item => item.pending_sale_id !== saleId));
+        showToast('Pedido retirado del carrito');
     };
 
     const handleCancelPendingSale = async (sale) => {
@@ -389,8 +431,8 @@ export default function POSPage() {
         try {
             await orderService.cancel(sale.id);
             showToast(`Pedido ${sale.order_number} cancelado`, 'success');
-            if (loadedPendingSaleId === sale.id) {
-                clearCart();
+            if (loadedPendingSales.some(s => s.id === sale.id)) {
+                removePendingSaleFromCart(sale.id);
             }
             // Refresh list
             const data = await orderService.getAll({ status: 'pending' });
@@ -422,11 +464,24 @@ export default function POSPage() {
 
     const removeFromCart = (key) => {
         const item = cart.find(i => i.key === key);
-        // If removing a repair, also unlink it
-        if (item?.type === 'repair') {
-            setLinkedRepair(null);
+        const newCart = cart.filter(i => i.key !== key);
+        setCart(newCart);
+
+        // If removing a repair item, also remove it from linkedRepairs
+        if (item?.type === 'repair' && item.repair_id) {
+            const hasOtherForRepair = newCart.some(i => i.repair_id === item.repair_id);
+            if (!hasOtherForRepair) {
+                setLinkedRepairs(prev => prev.filter(r => r.id !== item.repair_id));
+            }
         }
-        setCart(prev => prev.filter(i => i.key !== key));
+
+        // If removing an item from a pending web sale
+        if (item?.pending_sale_id) {
+            const hasOtherForOrder = newCart.some(i => i.pending_sale_id === item.pending_sale_id);
+            if (!hasOtherForOrder) {
+                setLoadedPendingSales(prev => prev.filter(s => s.id !== item.pending_sale_id));
+            }
+        }
     };
 
     const clearCart = () => {
@@ -434,8 +489,9 @@ export default function POSPage() {
         setDiscount(0);
         setAmountReceived('');
         setSelectedCustomer(null);
-        setLinkedRepair(null);
-        setLoadedPendingSaleId(null);
+        setLinkedRepairs([]);
+        setLoadedPendingSales([]);
+        setMixedPayments({ cash: '', card: '', transfer: '' });
         draftStorage.clearDraft('pos', tenantId, activeBranchId);
     };
 
@@ -447,6 +503,15 @@ export default function POSPage() {
     const changeAmount = paymentMethod === 'cash'
         ? Math.max(0, (parseFloat(amountReceived) || 0) - total)
         : 0;
+
+    // Mixed Payment Calculations
+    const mixedCash = parseFloat(mixedPayments.cash) || 0;
+    const mixedCard = parseFloat(mixedPayments.card) || 0;
+    const mixedTransfer = parseFloat(mixedPayments.transfer) || 0;
+    const totalMixedCovered = mixedCash + mixedCard + mixedTransfer;
+    const mixedRemaining = Math.max(0, total - (mixedCard + mixedTransfer));
+    const mixedChange = mixedCash > mixedRemaining ? mixedCash - mixedRemaining : 0;
+    const mixedMissing = Math.max(0, total - totalMixedCovered);
 
     // ─── Customer search ───
     const handleCustomerSearch = (value) => {
@@ -481,12 +546,18 @@ export default function POSPage() {
         if (cart.length === 0) return;
 
         if (paymentMethod === 'cash' && (parseFloat(amountReceived) || 0) < total) {
-            showToast('Monto recibido insuficiente', 'error');
+            showToast('Monto recibido en efectivo insuficiente', 'error');
             return;
         }
 
-        // Si hay una reparación vinculada en el carrito, requerimos la firma del cliente
-        if (linkedRepair) {
+        if (paymentMethod === 'mixed' && mixedMissing > 0.01) {
+            showToast(`Faltan ${formatCurrency(mixedMissing)} para cubrir el total de la venta`, 'error');
+            return;
+        }
+
+        // Si hay reparaciones vinculadas en el carrito, requerimos la firma del cliente
+        const repairItemsInCart = cart.filter(i => i.type === 'repair' && i.repair_id);
+        if (repairItemsInCart.length > 0) {
             setShowSigModal(true);
             return;
         }
@@ -498,13 +569,50 @@ export default function POSPage() {
     const completeCheckout = async (signatureData) => {
         setShowSigModal(false);
         try {
+            // Collect all repair IDs in cart to mark them as delivered
+            const repairItemsInCart = cart.filter(i => i.type === 'repair' && i.repair_id);
+            // Use the first linked repair_id for the sale header (for backwards compat)
+            const primaryRepairId = repairItemsInCart.length > 0 ? repairItemsInCart[0].repair_id : null;
+            const hasRepairs = repairItemsInCart.length > 0;
+
+            let finalAmountReceived = total;
+            let finalChangeAmount = 0;
+            let paymentBreakdownText = '';
+
+            if (paymentMethod === 'cash') {
+                finalAmountReceived = parseFloat(amountReceived) || total;
+                finalChangeAmount = changeAmount;
+            } else if (paymentMethod === 'mixed') {
+                finalAmountReceived = totalMixedCovered;
+                finalChangeAmount = mixedChange;
+                const parts = [];
+                if (mixedCash > 0) parts.push(`Efectivo: ${formatCurrency(mixedCash)}`);
+                if (mixedCard > 0) parts.push(`Tarjeta: ${formatCurrency(mixedCard)}`);
+                if (mixedTransfer > 0) parts.push(`Transferencia: ${formatCurrency(mixedTransfer)}`);
+                paymentBreakdownText = `[Pago mixto: ${parts.join(', ')}${mixedChange > 0 ? ` | Cambio: ${formatCurrency(mixedChange)}` : ''}]`;
+            }
+
+            const pendingSaleIds = loadedPendingSales.map(s => s.id);
+            const webOrdersNote = loadedPendingSales.length > 0
+                ? `[Pedidos web cobrados: ${loadedPendingSales.map(s => s.order_number).join(', ')}]`
+                : null;
+
+            const combinedNotes = [
+                signatureData ? 'Cobrado en POS con firma de conformidad' : (hasRepairs ? 'Cobrado en POS sin firma de conformidad' : null),
+                webOrdersNote,
+                paymentBreakdownText
+            ].filter(Boolean).join(' | ');
+
             const saleData = {
                 customer_id: selectedCustomer?.id || null,
-                repair_id: linkedRepair?.id || null,
-                pending_sale_id: loadedPendingSaleId || null,
+                repair_id: primaryRepairId,
+                repair_ids: repairItemsInCart.map(i => i.repair_id),
+                pending_sale_id: pendingSaleIds[0] || null,
+                pending_sale_ids: pendingSaleIds,
                 items: cart.map(item => ({
-                    product_id: item.product_id,
-                    service_id: item.service_id,
+                    product_id: item.product_id || null,
+                    service_id: item.service_id || null,
+                    repair_id: item.repair_id || null,
                     description: item.description,
                     quantity: item.quantity,
                     unit_price: item.unit_price,
@@ -512,16 +620,35 @@ export default function POSPage() {
                 })),
                 discount: parseFloat(discount) || 0,
                 payment_method: paymentMethod,
-                amount_received: paymentMethod === 'cash' ? parseFloat(amountReceived) : total,
-                notes: signatureData ? 'Cobrado en POS con firma de conformidad' : (linkedRepair ? 'Cobrado en POS sin firma de conformidad' : (loadedPendingSaleId ? 'Pedido web cobrado en sucursal' : null))
+                amount_received: finalAmountReceived,
+                change_amount: finalChangeAmount,
+                payment_breakdown: paymentMethod === 'mixed' ? {
+                    cash: mixedCash,
+                    card: mixedCard,
+                    transfer: mixedTransfer
+                } : null,
+                notes: combinedNotes || null
             };
 
             const result = await posService.createSale(saleData);
-            
-            // Si hay reparación vinculada, actualizar estado en backend a 'delivered' con la firma
-            if (linkedRepair) {
-                const note = signatureData ? 'Equipo entregado al cliente con firma (cobrado en POS)' : 'Equipo entregado al cliente (sin firma - cobrado en POS)';
-                await repairService.updateStatus(linkedRepair.id, 'delivered', note, null, signatureData);
+
+            // Actualizar estado de TODAS las reparaciones del carrito a 'delivered'
+            if (repairItemsInCart.length > 0) {
+                const note = signatureData
+                    ? 'Equipo entregado al cliente con firma (cobrado en POS)'
+                    : 'Equipo entregado al cliente (sin firma - cobrado en POS)';
+                // Update all repairs, passing signature only on the first one to avoid duplicate storage
+                await Promise.all(
+                    repairItemsInCart.map((item, idx) =>
+                        repairService.updateStatus(
+                            item.repair_id,
+                            'delivered',
+                            note,
+                            null,
+                            idx === 0 ? signatureData : null
+                        )
+                    )
+                );
             }
 
             const saleDetail = await posService.getSaleById(result.sale.id);
@@ -897,13 +1024,19 @@ export default function POSPage() {
                         /* ── Pending Web Sales Tab ── */
                         pendingSales.length > 0 ? (
                             pendingSales.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(sale => {
-                                const isLoaded = loadedPendingSaleId === sale.id;
+                                const isLoaded = loadedPendingSales.some(s => s.id === sale.id);
                                 return (
                                     <div
                                         key={sale.id}
                                         className={`pos-repair-card ${isLoaded ? 'in-cart' : ''}`}
-                                        onClick={() => !isLoaded && loadPendingSaleToCart(sale)}
-                                        style={{ borderColor: isLoaded ? 'var(--color-primary)' : 'rgba(255, 255, 255, 0.08)' }}
+                                        onClick={() => {
+                                            if (isLoaded) {
+                                                removePendingSaleFromCart(sale.id);
+                                            } else {
+                                                loadPendingSaleToCart(sale);
+                                            }
+                                        }}
+                                        style={{ borderColor: isLoaded ? 'var(--color-primary)' : 'rgba(255, 255, 255, 0.08)', cursor: 'pointer' }}
                                     >
                                         <div className="repair-card-header" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '6px', marginBottom: '8px' }}>
                                             <span className="repair-card-ticket" style={{ color: 'var(--color-text)', fontSize: '0.8rem' }}>
@@ -1098,14 +1231,14 @@ export default function POSPage() {
 
                 {/* Customer Selector */}
                 <div className="pos-customer-select">
-                    <label>Cliente {linkedRepair ? '' : '(opcional)'}</label>
+                    <label>Cliente {linkedRepairs.length > 0 ? '' : '(opcional)'}</label>
                     {selectedCustomer ? (
                         <div className="selected-customer">
                             <span className="customer-name">
                                 <User size={14} style={{ marginRight: 6, opacity: 0.5 }} />
                                 {selectedCustomer.first_name} {selectedCustomer.last_name}
                             </span>
-                            {!linkedRepair && (
+                            {linkedRepairs.length === 0 && (
                                 <button className="btn btn-ghost btn-sm" onClick={() => setSelectedCustomer(null)}>
                                     <X size={14} />
                                 </button>
@@ -1141,38 +1274,41 @@ export default function POSPage() {
                     )}
                 </div>
 
-                {/* Linked Pending Web Sale */}
-                {loadedPendingSaleId && (
-                    <div className="pos-repair-link" style={{ marginBottom: 'var(--sp-2)' }}>
+                {/* Linked Pending Web Sales */}
+                {loadedPendingSales.length > 0 && loadedPendingSales.map(order => (
+                    <div key={order.id} className="pos-repair-link" style={{ marginBottom: 'var(--sp-2)' }}>
                         <div className="repair-link-badge" style={{ backgroundColor: 'rgba(255, 255, 255, 0.03)', color: 'var(--color-text)', borderColor: 'var(--color-border)' }}>
                             <ShoppingBag size={14} />
-                            <span>Pedido Web Cargado</span>
-                            <button className="btn btn-ghost btn-sm" onClick={() => {
-                                clearCart();
-                            }} style={{ marginLeft: 'auto', color: 'var(--color-text-secondary)' }}>
+                            <span>Pedido Web: {order.order_number}</span>
+                            <button
+                                type="button"
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => removePendingSaleFromCart(order.id)}
+                                style={{ marginLeft: 'auto', color: 'var(--color-text-secondary)' }}
+                                title="Quitar este pedido del carrito"
+                            >
                                 <X size={12} />
                             </button>
                         </div>
                     </div>
-                )}
+                ))}
 
-                {/* Linked Repair Badge */}
-                {linkedRepair && (
-                    <div className="pos-repair-link">
+                {/* Linked Repair Badges */}
+                {linkedRepairs.length > 0 && linkedRepairs.map(lr => (
+                    <div key={lr.id} className="pos-repair-link">
                         <div className="repair-link-badge">
                             <Hash size={14} />
-                            <span>Reparación Vinculada: {linkedRepair.ticket_number}</span>
+                            <span>Reparación: {lr.ticket_number}</span>
                             <button className="btn btn-ghost btn-sm" onClick={() => {
-                                // Remove repair item from cart
-                                const repairKey = `r-${linkedRepair.id}`;
+                                const repairKey = `r-${lr.id}`;
+                                setLinkedRepairs(prev => prev.filter(r => r.id !== lr.id));
                                 setCart(prev => prev.filter(item => item.key !== repairKey));
-                                setLinkedRepair(null);
                             }} style={{ marginLeft: 'auto' }}>
                                 <X size={12} />
                             </button>
                         </div>
                     </div>
-                )}
+                ))}
 
                 {/* Cart Items */}
                 <div className="pos-cart-items">
@@ -1247,6 +1383,7 @@ export default function POSPage() {
                         {/* Payment Method Selector */}
                         <div className="pos-payment-methods">
                             <button
+                                type="button"
                                 className={`payment-method-btn ${paymentMethod === 'cash' ? 'selected' : ''}`}
                                 onClick={() => setPaymentMethod('cash')}
                             >
@@ -1254,6 +1391,7 @@ export default function POSPage() {
                                 Efectivo
                             </button>
                             <button
+                                type="button"
                                 className={`payment-method-btn ${paymentMethod === 'card' ? 'selected' : ''}`}
                                 onClick={() => setPaymentMethod('card')}
                             >
@@ -1261,11 +1399,20 @@ export default function POSPage() {
                                 Tarjeta
                             </button>
                             <button
+                                type="button"
                                 className={`payment-method-btn ${paymentMethod === 'transfer' ? 'selected' : ''}`}
                                 onClick={() => setPaymentMethod('transfer')}
                             >
                                 <ArrowRightLeft size={18} />
-                                Transferencia
+                                Transfer
+                            </button>
+                            <button
+                                type="button"
+                                className={`payment-method-btn ${paymentMethod === 'mixed' ? 'selected' : ''}`}
+                                onClick={() => setPaymentMethod('mixed')}
+                            >
+                                <Layers size={18} />
+                                Mixto
                             </button>
                         </div>
 
@@ -1293,14 +1440,148 @@ export default function POSPage() {
                             </div>
                         )}
 
+                        {/* Mixed payment inputs */}
+                        {paymentMethod === 'mixed' && (
+                            <div className="mixed-payment-container" style={{
+                                background: 'rgba(255, 255, 255, 0.02)',
+                                border: '1px solid var(--color-border)',
+                                borderRadius: 'var(--radius-md)',
+                                padding: '12px',
+                                marginBottom: 'var(--sp-4)',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '10px'
+                            }}>
+                                <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    Combinar Métodos de Pago
+                                </div>
+
+                                {/* Row: Efectivo */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '105px', flexShrink: 0, fontSize: '12px', fontWeight: 600 }}>
+                                        <Banknote size={15} style={{ color: 'var(--color-text-muted)' }} />
+                                        <span>Efectivo</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        className="input input-sm"
+                                        placeholder="$0.00"
+                                        value={mixedPayments.cash}
+                                        onChange={(e) => setMixedPayments(prev => ({ ...prev, cash: e.target.value }))}
+                                        style={{ flex: 1, textAlign: 'right', fontWeight: 700 }}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost btn-xs"
+                                        onClick={() => setMixedPayments(prev => ({
+                                            ...prev,
+                                            cash: Math.max(0, total - (parseFloat(prev.card) || 0) - (parseFloat(prev.transfer) || 0)).toFixed(2)
+                                        }))}
+                                        style={{ fontSize: '11px', padding: '3px 8px', color: 'var(--color-primary)' }}
+                                        title="Cubrir monto restante con efectivo"
+                                    >
+                                        Resto
+                                    </button>
+                                </div>
+
+                                {/* Row: Tarjeta */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '105px', flexShrink: 0, fontSize: '12px', fontWeight: 600 }}>
+                                        <CreditCard size={15} style={{ color: 'var(--color-text-muted)' }} />
+                                        <span>Tarjeta</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        className="input input-sm"
+                                        placeholder="$0.00"
+                                        value={mixedPayments.card}
+                                        onChange={(e) => setMixedPayments(prev => ({ ...prev, card: e.target.value }))}
+                                        style={{ flex: 1, textAlign: 'right', fontWeight: 700 }}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost btn-xs"
+                                        onClick={() => setMixedPayments(prev => ({
+                                            ...prev,
+                                            card: Math.max(0, total - (parseFloat(prev.cash) || 0) - (parseFloat(prev.transfer) || 0)).toFixed(2)
+                                        }))}
+                                        style={{ fontSize: '11px', padding: '3px 8px', color: 'var(--color-primary)' }}
+                                        title="Cubrir monto restante con tarjeta"
+                                    >
+                                        Resto
+                                    </button>
+                                </div>
+
+                                {/* Row: Transferencia */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '105px', flexShrink: 0, fontSize: '12px', fontWeight: 600 }}>
+                                        <ArrowRightLeft size={15} style={{ color: 'var(--color-text-muted)' }} />
+                                        <span>Transfer</span>
+                                    </div>
+                                    <input
+                                        type="number"
+                                        step="any"
+                                        className="input input-sm"
+                                        placeholder="$0.00"
+                                        value={mixedPayments.transfer}
+                                        onChange={(e) => setMixedPayments(prev => ({ ...prev, transfer: e.target.value }))}
+                                        style={{ flex: 1, textAlign: 'right', fontWeight: 700 }}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost btn-xs"
+                                        onClick={() => setMixedPayments(prev => ({
+                                            ...prev,
+                                            transfer: Math.max(0, total - (parseFloat(prev.cash) || 0) - (parseFloat(prev.card) || 0)).toFixed(2)
+                                        }))}
+                                        style={{ fontSize: '11px', padding: '3px 8px', color: 'var(--color-primary)' }}
+                                        title="Cubrir monto restante con transferencia"
+                                    >
+                                        Resto
+                                    </button>
+                                </div>
+
+                                {/* Breakdown Status */}
+                                <div style={{
+                                    borderTop: '1px solid var(--color-border)',
+                                    paddingTop: '8px',
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    fontSize: '12px'
+                                }}>
+                                    <div>
+                                        {mixedMissing > 0.01 ? (
+                                            <span style={{ color: 'var(--color-danger, #ef4444)', fontWeight: 700 }}>
+                                                Faltan: {formatCurrency(mixedMissing)}
+                                            </span>
+                                        ) : (
+                                            <span style={{ color: 'var(--color-success, #10b981)', fontWeight: 700 }}>
+                                                Total Cubierto ({formatCurrency(totalMixedCovered)})
+                                            </span>
+                                        )}
+                                    </div>
+                                    {mixedChange > 0 && (
+                                        <div style={{ color: 'var(--color-text)', fontWeight: 700 }}>
+                                            Cambio efectivo: <strong style={{ color: 'var(--color-success)' }}>{formatCurrency(mixedChange)}</strong>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
                         <button
                             className="pos-checkout-btn"
                             onClick={handleCheckout}
-                            disabled={cart.length === 0 || (paymentMethod === 'cash' && (parseFloat(amountReceived) || 0) < total)}
+                            disabled={cart.length === 0 || (paymentMethod === 'cash' && (parseFloat(amountReceived) || 0) < total) || (paymentMethod === 'mixed' && mixedMissing > 0.01)}
                             id="pos-checkout"
                         >
                             <CheckCircle2 size={20} />
-                            Cobrar {formatCurrency(total)}
+                            {paymentMethod === 'mixed' && mixedMissing > 0.01
+                                ? `Faltan ${formatCurrency(mixedMissing)} por cubrir`
+                                : `Cobrar ${formatCurrency(total)}`}
                         </button>
                     </div>
                 )}
@@ -1365,7 +1646,9 @@ export default function POSPage() {
                 onClose={() => setShowSigModal(false)}
                 onSave={completeCheckout}
                 title="Confirmar Entrega de Equipo"
-                description="Por favor firme para confirmar la recepción y entrega de conformidad de su equipo."
+                description={linkedRepairs.length > 1
+                    ? `Por favor firme para confirmar la recepción de ${linkedRepairs.length} equipos y entrega de conformidad.`
+                    : 'Por favor firme para confirmar la recepción y entrega de conformidad de su equipo.'}
             />
 
             {/* Toast */}
