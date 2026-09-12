@@ -223,19 +223,10 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                                 </div>
                             </div>
 
-                            {data.signature_approval && (
-                                <div className="signature-area">
-                                    <p className="bold block-text">FIRMA CLIENTE</p>
-                                    <img src={data.signature_approval} alt="Firma" className="signature-img" />
-                                </div>
-                            )}
-
-                            {!data.signature_approval && (
-                                <div className="signature-area">
-                                    <div className="signature-line"></div>
-                                    <p className="bold block-text">FIRMA DE CONFORMIDAD</p>
-                                </div>
-                            )}
+                            <div className="signature-area">
+                                <div className="signature-line"></div>
+                                <p className="bold block-text">FIRMA DE CONFORMIDAD</p>
+                            </div>
 
                             <div className="receipt-footer-notes">
                                 <p className="bold" style={{ borderBottom: '1px solid #000', paddingBottom: '2px' }}>TÉRMINOS Y CONDICIONES</p>
@@ -366,6 +357,12 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                                     </div>
                                 </>
                             )}
+
+                            {/* Espacio para firma física de conformidad */}
+                            <div className="signature-area">
+                                <div className="signature-line"></div>
+                                <p className="bold block-text">FIRMA DE CONFORMIDAD</p>
+                            </div>
 
                             <div className="divider-double" style={{ marginTop: '20px' }}></div>
 

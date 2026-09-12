@@ -7,8 +7,8 @@ import {
 } from 'lucide-react';
 import { inventoryService, posService, customerService, servicesCatalog, settingsService, repairService, orderService, getImageUrl } from '../../services/api';
 import { formatCurrency, STATUS_LABELS } from '../../utils/constants';
+import { useTheme } from '../../context/ThemeContext';
 import PrintReceipt from '../../components/common/PrintReceipt';
-import SignatureModal from '../../components/common/SignatureModal';
 import BarcodeScannerModal from '../../components/BarcodeScannerModal';
 import { showAlert, showConfirm } from '../../utils/swal';
 import './POSPage.css';
@@ -61,7 +61,6 @@ export default function POSPage() {
     const [showReceipt, setShowReceipt] = useState(false);
     const [lastSale, setLastSale] = useState(null);
     const [settings, setSettings] = useState({});
-    const [showSigModal, setShowSigModal] = useState(false);
 
     // Toast
     const [toast, setToast] = useState(null);
@@ -557,27 +556,17 @@ export default function POSPage() {
             return;
         }
 
-        // Si hay reparaciones vinculadas en el carrito, requerimos la firma del cliente
-        const repairItemsInCart = cart.filter(i => i.type === 'repair' && i.repair_id);
-        if (repairItemsInCart.length > 0) {
-            setShowSigModal(true);
-            return;
-        }
-
-        // De lo contrario, cobro directo tradicional
-        await completeCheckout(null);
+        // Cobro directo
+        await completeCheckout();
     };
 
-    const completeCheckout = async (signatureData) => {
+    const completeCheckout = async () => {
         if (processing) return;
-        setShowSigModal(false);
         setProcessing(true);
         try {
             // Collect all repair IDs in cart to mark them as delivered
             const repairItemsInCart = cart.filter(i => i.type === 'repair' && i.repair_id);
-            // Use the first linked repair_id for the sale header (for backwards compat)
             const primaryRepairId = repairItemsInCart.length > 0 ? repairItemsInCart[0].repair_id : null;
-            const hasRepairs = repairItemsInCart.length > 0;
 
             let finalAmountReceived = total;
             let finalChangeAmount = 0;
@@ -602,7 +591,6 @@ export default function POSPage() {
                 : null;
 
             const combinedNotes = [
-                signatureData ? 'Cobrado en POS con firma de conformidad' : (hasRepairs ? 'Cobrado en POS sin firma de conformidad' : null),
                 webOrdersNote,
                 paymentBreakdownText
             ].filter(Boolean).join(' | ');
@@ -631,26 +619,23 @@ export default function POSPage() {
                     card: mixedCard,
                     transfer: mixedTransfer
                 } : null,
-                signature: signatureData || null,
                 notes: combinedNotes || null
             };
 
             const result = await posService.createSale(saleData);
 
-            // Intentar notificaciones o sincronización secundaria de reparaciones de forma segura
+            // Sincronización secundaria opcional
             if (repairItemsInCart.length > 0) {
-                const note = signatureData
-                    ? 'Equipo entregado al cliente con firma (cobrado en POS)'
-                    : 'Equipo entregado al cliente (sin firma - cobrado en POS)';
+                const note = 'Equipo entregado y cobrado en POS';
                 try {
                     await Promise.all(
-                        repairItemsInCart.map((item, idx) =>
+                        repairItemsInCart.map(item =>
                             repairService.updateStatus(
                                 item.repair_id,
                                 'delivered',
                                 note,
                                 null,
-                                idx === 0 ? signatureData : null
+                                null
                             )
                         )
                     );
@@ -1651,16 +1636,6 @@ export default function POSPage() {
                 data={lastSale}
                 type="pos"
                 settings={settings}
-            />
-
-            <SignatureModal
-                isOpen={showSigModal}
-                onClose={() => setShowSigModal(false)}
-                onSave={completeCheckout}
-                title="Confirmar Entrega de Equipo"
-                description={linkedRepairs.length > 1
-                    ? `Por favor firme para confirmar la recepción de ${linkedRepairs.length} equipos y entrega de conformidad.`
-                    : 'Por favor firme para confirmar la recepción y entrega de conformidad de su equipo.'}
             />
 
             {/* Toast */}
