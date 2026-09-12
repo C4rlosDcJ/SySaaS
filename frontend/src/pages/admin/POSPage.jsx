@@ -37,6 +37,7 @@ export default function POSPage() {
     const [amountReceived, setAmountReceived] = useState('');
     const [mixedPayments, setMixedPayments] = useState({ cash: '', card: '', transfer: '' });
     const [loading, setLoading] = useState(true);
+    const [processing, setProcessing] = useState(false);
 
     // Pending web sales state — supports combining multiple web orders for the same client
     const [pendingSales, setPendingSales] = useState([]);
@@ -543,6 +544,7 @@ export default function POSPage() {
 
     // ─── Checkout ───
     const handleCheckout = async () => {
+        if (processing) return;
         if (cart.length === 0) return;
 
         if (paymentMethod === 'cash' && (parseFloat(amountReceived) || 0) < total) {
@@ -567,7 +569,9 @@ export default function POSPage() {
     };
 
     const completeCheckout = async (signatureData) => {
+        if (processing) return;
         setShowSigModal(false);
+        setProcessing(true);
         try {
             // Collect all repair IDs in cart to mark them as delivered
             const repairItemsInCart = cart.filter(i => i.type === 'repair' && i.repair_id);
@@ -627,28 +631,32 @@ export default function POSPage() {
                     card: mixedCard,
                     transfer: mixedTransfer
                 } : null,
+                signature: signatureData || null,
                 notes: combinedNotes || null
             };
 
             const result = await posService.createSale(saleData);
 
-            // Actualizar estado de TODAS las reparaciones del carrito a 'delivered'
+            // Intentar notificaciones o sincronización secundaria de reparaciones de forma segura
             if (repairItemsInCart.length > 0) {
                 const note = signatureData
                     ? 'Equipo entregado al cliente con firma (cobrado en POS)'
                     : 'Equipo entregado al cliente (sin firma - cobrado en POS)';
-                // Update all repairs, passing signature only on the first one to avoid duplicate storage
-                await Promise.all(
-                    repairItemsInCart.map((item, idx) =>
-                        repairService.updateStatus(
-                            item.repair_id,
-                            'delivered',
-                            note,
-                            null,
-                            idx === 0 ? signatureData : null
+                try {
+                    await Promise.all(
+                        repairItemsInCart.map((item, idx) =>
+                            repairService.updateStatus(
+                                item.repair_id,
+                                'delivered',
+                                note,
+                                null,
+                                idx === 0 ? signatureData : null
+                            )
                         )
-                    )
-                );
+                    );
+                } catch (updateErr) {
+                    console.warn('[POS] Notificacion secundaria de reparacion omitida:', updateErr);
+                }
             }
 
             const saleDetail = await posService.getSaleById(result.sale.id);
@@ -658,7 +666,9 @@ export default function POSPage() {
             clearCart();
             loadData();
         } catch (err) {
-            showToast(err.message || 'Error al procesar venta', 'error');
+            showToast(err.response?.data?.message || err.message || 'Error al procesar venta', 'error');
+        } finally {
+            setProcessing(false);
         }
     };
 
@@ -1575,13 +1585,15 @@ export default function POSPage() {
                         <button
                             className="pos-checkout-btn"
                             onClick={handleCheckout}
-                            disabled={cart.length === 0 || (paymentMethod === 'cash' && (parseFloat(amountReceived) || 0) < total) || (paymentMethod === 'mixed' && mixedMissing > 0.01)}
+                            disabled={processing || cart.length === 0 || (paymentMethod === 'cash' && (parseFloat(amountReceived) || 0) < total) || (paymentMethod === 'mixed' && mixedMissing > 0.01)}
                             id="pos-checkout"
                         >
                             <CheckCircle2 size={20} />
-                            {paymentMethod === 'mixed' && mixedMissing > 0.01
-                                ? `Faltan ${formatCurrency(mixedMissing)} por cubrir`
-                                : `Cobrar ${formatCurrency(total)}`}
+                            {processing
+                                ? 'Procesando cobro...'
+                                : paymentMethod === 'mixed' && mixedMissing > 0.01
+                                    ? `Faltan ${formatCurrency(mixedMissing)} por cubrir`
+                                    : `Cobrar ${formatCurrency(total)}`}
                         </button>
                     </div>
                 )}
