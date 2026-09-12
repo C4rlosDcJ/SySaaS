@@ -507,12 +507,13 @@ export default function SalesHistoryPage() {
                                                     {formatCurrency(sale.total)}
                                                 </td>
                                                 <td>
-                                                    <div className={`sale-status-indicator status-${sale.status}`}>
+                                                    <div className={`sale-status-indicator sale-status-${sale.status}`}>
                                                         <span className="status-dot"></span>
                                                         <span>
                                                             {sale.status === 'completed' ? 'Completada' :
                                                              sale.status === 'refunded' ? 'Devuelta' :
-                                                             sale.status === 'cancelled' ? 'Cancelada' : sale.status}
+                                                             sale.status === 'cancelled' ? 'Cancelada' :
+                                                             sale.status === 'pending' ? 'Pendiente' : sale.status}
                                                         </span>
                                                     </div>
                                                 </td>
@@ -652,9 +653,9 @@ export default function SalesHistoryPage() {
                                                 fontSize: '13px',
                                                 fontWeight: 700,
                                                 marginTop: '2px',
-                                                color: selectedSale.status === 'completed' ? '#10b981' : (selectedSale.status === 'refunded' ? '#f59e0b' : '#ef4444')
+                                                color: selectedSale.status === 'completed' ? '#10b981' : (selectedSale.status === 'refunded' ? '#f59e0b' : (selectedSale.status === 'pending' ? 'var(--cool-amber)' : '#ef4444'))
                                             }}>
-                                                {selectedSale.status === 'completed' ? 'Completada' : (selectedSale.status === 'refunded' ? 'Devuelta' : (selectedSale.status === 'cancelled' ? 'Cancelada' : selectedSale.status))}
+                                                {selectedSale.status === 'completed' ? 'Completada' : (selectedSale.status === 'refunded' ? 'Devuelta' : (selectedSale.status === 'cancelled' ? 'Cancelada' : (selectedSale.status === 'pending' ? 'Pendiente' : selectedSale.status)))}
                                             </div>
                                         </div>
                                     </div>
