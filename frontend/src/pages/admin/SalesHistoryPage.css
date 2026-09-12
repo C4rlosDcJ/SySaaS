@@ -203,6 +203,15 @@
     gap: 7px;
     font-size: 12.5px;
     font-weight: 500;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+}
+
+.sale-status-indicator::before {
+    display: none !important;
 }
 
 .sale-status-indicator .status-dot {
@@ -212,35 +221,45 @@
     flex-shrink: 0;
 }
 
+.sale-status-indicator.sale-status-completed,
 .sale-status-indicator.status-completed {
     color: var(--color-text);
 }
 
+.sale-status-indicator.sale-status-completed .status-dot,
 .sale-status-indicator.status-completed .status-dot {
     background-color: #22c55e;
 }
 
+.sale-status-indicator.sale-status-cancelled,
 .sale-status-indicator.status-cancelled {
     color: var(--color-text-muted);
     text-decoration: line-through;
 }
 
+.sale-status-indicator.sale-status-cancelled .status-dot,
 .sale-status-indicator.status-cancelled .status-dot {
     background-color: #ef4444;
 }
 
+.sale-status-indicator.sale-status-refunded,
 .sale-status-indicator.status-refunded {
     color: #d97706;
 }
 
+.sale-status-indicator.sale-status-refunded .status-dot,
 .sale-status-indicator.status-refunded .status-dot {
     background-color: #f59e0b;
 }
 
+.sale-status-indicator.sale-status-pending,
 .sale-status-indicator.status-pending {
     color: var(--cool-amber);
+    background: transparent !important;
+    border: none !important;
 }
 
+.sale-status-indicator.sale-status-pending .status-dot,
 .sale-status-indicator.status-pending .status-dot {
     background-color: var(--cool-amber);
 }
