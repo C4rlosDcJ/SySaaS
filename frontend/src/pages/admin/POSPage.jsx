@@ -23,6 +23,13 @@ export default function POSPage() {
     const { user, isSuperAdmin } = useAuth();
     const tenantId = tenant?.id;
 
+    // ─── Plan checks (computed early so useEffect deps are always defined) ───
+    const planSlug = (tenant?.plan_slug || tenant?.plan_name || '').toLowerCase();
+    const isOrdersPlanAllowed =
+        (tenant?.plan_id && Number(tenant.plan_id) >= 2) ||
+        ['pro', 'enterprise'].some(p => planSlug.includes(p));
+    const isScannerPlanAllowed = isOrdersPlanAllowed;
+
     const isRestoringRef = useRef(true);
 
     // ─── State ───
@@ -1058,13 +1065,6 @@ export default function POSPage() {
         showToast(`No se encontró ningún artículo con código: ${code}`, 'error');
         return { success: false };
     };
-
-    // ─── Plan Check: Lector de Cámara y Pedidos Web para Pro y Enterprise ───
-    const planSlug = (tenant?.plan_slug || tenant?.plan_name || '').toLowerCase();
-    const isOrdersPlanAllowed = 
-        (tenant?.plan_id && Number(tenant.plan_id) >= 2) || 
-        ['pro', 'enterprise'].some(p => planSlug.includes(p));
-    const isScannerPlanAllowed = isOrdersPlanAllowed;
 
     const handleOpenScanner = () => {
         if (!isScannerPlanAllowed) {
