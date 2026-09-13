@@ -35,7 +35,9 @@ import SettingsPage from './pages/admin/SettingsPage';
 import NewRepairPage from './pages/admin/NewRepairPage';
 import RepairDetailPage from './pages/shared/RepairDetailPage';
 import POSPage from './pages/admin/POSPage';
+import POSErrorBoundary from './components/POSErrorBoundary';
 import InventoryPage from './pages/admin/InventoryPage';
+
 import SalesHistoryPage from './pages/admin/SalesHistoryPage';
 import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminSuppliers from './pages/admin/AdminSuppliers';
@@ -377,9 +379,12 @@ function AppRoutes() {
       } />
       <Route path="/admin/pos" element={
         <DashboardLayout adminOnly>
-          <POSPage />
+          <POSErrorBoundary>
+            <POSPage />
+          </POSErrorBoundary>
         </DashboardLayout>
       } />
+
       <Route path="/admin/inventario" element={
         <DashboardLayout adminOnly>
           <InventoryPage />
