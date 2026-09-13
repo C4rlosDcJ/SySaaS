@@ -395,16 +395,80 @@ async function dbInit() {
         }
 
         // 15. Migración de Funcionalidades Extendidas (Proveedores, Órdenes de Compra, Cupones)
-        console.log(`[DB-INIT] Verificando tablas de funcionalidades extendidas (suppliers, coupons)...`);
-        const [suppliersTable] = await connection.query(`SHOW TABLES LIKE 'suppliers'`);
-        if (suppliersTable.length === 0) {
-            const featuresExpansionPath = path.join(__dirname, '../../database/features_expansion.sql');
-            if (fs.existsSync(featuresExpansionPath)) {
-                console.log(`[DB-INIT] Leyendo ${path.basename(featuresExpansionPath)}...`);
-                const featuresSql = cleanSql(fs.readFileSync(featuresExpansionPath, 'utf8'), dbName);
-                await connection.query(featuresSql);
-                console.log(`[DB-INIT] Migración de funcionalidades extendidas aplicada exitosamente.`);
-            }
+        console.log(`[DB-INIT] Verificando tablas de funcionalidades extendidas (suppliers, coupons, purchase_orders)...`);
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS suppliers (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    tenant_id INT NOT NULL,
+                    company_name VARCHAR(150) NOT NULL,
+                    contact_name VARCHAR(100),
+                    email VARCHAR(100),
+                    phone VARCHAR(20),
+                    tax_id VARCHAR(30),
+                    address TEXT,
+                    notes TEXT,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE
+                ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+            `);
+
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS purchase_orders (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    tenant_id INT NOT NULL,
+                    branch_id INT NOT NULL,
+                    supplier_id INT NOT NULL,
+                    po_number VARCHAR(50) NOT NULL,
+                    status ENUM('draft', 'ordered', 'received', 'canceled') DEFAULT 'draft',
+                    total_amount DECIMAL(10,2) DEFAULT 0.00,
+                    notes TEXT,
+                    created_by INT,
+                    ordered_at TIMESTAMP NULL,
+                    received_at TIMESTAMP NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+                    FOREIGN KEY (branch_id) REFERENCES branches(id) ON DELETE CASCADE,
+                    FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE
+                ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+            `);
+
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS purchase_order_items (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    purchase_order_id INT NOT NULL,
+                    product_id INT NOT NULL,
+                    quantity INT NOT NULL DEFAULT 1,
+                    unit_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                    subtotal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                    FOREIGN KEY (purchase_order_id) REFERENCES purchase_orders(id) ON DELETE CASCADE,
+                    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+                ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+            `);
+
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS coupons (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    tenant_id INT NOT NULL,
+                    code VARCHAR(50) NOT NULL,
+                    discount_type ENUM('percentage', 'fixed') NOT NULL DEFAULT 'percentage',
+                    discount_value DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+                    min_purchase DECIMAL(10,2) DEFAULT 0.00,
+                    max_uses INT DEFAULT NULL,
+                    uses_count INT DEFAULT 0,
+                    expires_at TIMESTAMP NULL,
+                    is_active BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE CASCADE,
+                    UNIQUE KEY uk_tenant_coupon (tenant_id, code)
+                ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+            `);
+            console.log(`[DB-INIT] Tablas de proveedores, órdenes de compra y cupones verificadas/creadas.`);
+        } catch (featErr) {
+            console.error(`[DB-INIT] Error al verificar/crear tablas de funcionalidades extendidas:`, featErr.message);
         }
 
         // 16. Migración de SuperAdmin Expansion (Anuncios Globales)
