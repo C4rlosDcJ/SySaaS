@@ -247,8 +247,8 @@ export default function POSPage() {
                 return;
             }
 
-            // Cmd+K / Ctrl+K: Enfocar y seleccionar buscador
-            if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
+            // / : Enfocar y seleccionar el buscador del POS
+            if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
                 e.preventDefault();
                 searchRef.current?.focus();
                 searchRef.current?.select();
@@ -1203,8 +1203,8 @@ export default function POSPage() {
                                         <X size={14} />
                                     </button>
                                 ) : (
-                                    <kbd className="pos-search-kbd" onClick={() => searchRef.current?.focus()}>
-                                        ⌘K
+                                    <kbd className="pos-search-kbd" onClick={() => searchRef.current?.focus()} title="Presiona / para buscar">
+                                        /
                                     </kbd>
                                 )}
                             </div>
@@ -2166,12 +2166,8 @@ export default function POSPage() {
                             <div className="pos-shortcut-section-label">Busqueda y Navegacion</div>
 
                             <div className="pos-shortcut-card-row">
-                                <span className="pos-shortcut-card-desc">Enfocar y seleccionar automaticamente el buscador principal</span>
-                                <div className="pos-shortcut-keys">
-                                    <kbd className="pos-shortcut-card-key">&#8984;K</kbd>
-                                    <span className="pos-shortcut-sep">/</span>
-                                    <kbd className="pos-shortcut-card-key">Ctrl+K</kbd>
-                                </div>
+                                <span className="pos-shortcut-card-desc">Enfocar y seleccionar el buscador del POS</span>
+                                <kbd className="pos-shortcut-card-key">/</kbd>
                             </div>
 
                             <div className="pos-shortcut-card-row">
