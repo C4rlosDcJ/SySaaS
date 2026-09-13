@@ -3,7 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import {
     ShoppingCart, Search, Package, Wrench, X, Plus, Minus, Trash2,
     CreditCard, Banknote, ArrowRightLeft, Printer, CheckCircle2,
-    User, ShoppingBag, ClipboardList, Hash, AlertCircle, Store, Camera, Layers, Tag, Keyboard
+    User, ShoppingBag, ClipboardList, Hash, AlertCircle, Store, Camera, Layers, Tag, Keyboard,
+    Pause, Percent, Play
 } from 'lucide-react';
 import { inventoryService, posService, customerService, servicesCatalog, settingsService, repairService, orderService, couponService, getImageUrl } from '../../services/api';
 import { formatCurrency, STATUS_LABELS } from '../../utils/constants';
@@ -85,12 +86,32 @@ export default function POSPage() {
     // Keyboard Shortcuts Modal
     const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
+    // Paused Orders (Poner en espera)
+    const [pausedOrders, setPausedOrders] = useState(() => {
+        try {
+            const saved = localStorage.getItem(`sysaas_paused_orders_${tenantId}_${activeBranchId}`);
+            return saved ? JSON.parse(saved) : [];
+        } catch {
+            return [];
+        }
+    });
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(`sysaas_paused_orders_${tenantId}_${activeBranchId}`, JSON.stringify(pausedOrders));
+        } catch (e) {
+            console.error('Error saving paused orders', e);
+        }
+    }, [pausedOrders, tenantId, activeBranchId]);
+
     // Reset de página al cambiar de modo
     useEffect(() => {
         setCurrentPage(1);
     }, [mode, selectedCategory, search, repairSearch, pendingSearch]);
 
     const searchRef = useRef(null);
+    const discountRef = useRef(null);
+    const cashInputRef = useRef(null);
     const customerSearchTimeout = useRef(null);
     const loadedRepairIdRef = useRef(null);
 
@@ -102,32 +123,174 @@ export default function POSPage() {
         searchRef.current?.focus();
     };
 
+    // Pausar orden actual y poner en espera (F4)
+    const handlePauseOrder = () => {
+        if (cart.length === 0) {
+            showToast('El carrito está vacío, nada que poner en espera', 'error');
+            return;
+        }
+
+        const newPausedOrder = {
+            id: Date.now().toString(),
+            timestamp: new Date().toISOString(),
+            cart: [...cart],
+            selectedCustomer: selectedCustomer ? { ...selectedCustomer } : null,
+            discount,
+            appliedCoupon: appliedCoupon ? { ...appliedCoupon } : null,
+            couponCode,
+            paymentMethod,
+            linkedRepairs: [...linkedRepairs],
+            loadedPendingSales: [...loadedPendingSales],
+            mixedPayments: { ...mixedPayments }
+        };
+
+        setPausedOrders(prev => [newPausedOrder, ...prev]);
+        clearCart();
+        showToast('Orden guardada en espera con éxito', 'success');
+    };
+
+    // Reanudar orden en espera
+    const handleResumeOrder = (orderId) => {
+        const order = pausedOrders.find(o => o.id === orderId);
+        if (!order) return;
+
+        if (cart.length > 0) {
+            // Guardar la actual antes de reanudar
+            const currentOrder = {
+                id: Date.now().toString(),
+                timestamp: new Date().toISOString(),
+                cart: [...cart],
+                selectedCustomer: selectedCustomer ? { ...selectedCustomer } : null,
+                discount,
+                appliedCoupon: appliedCoupon ? { ...appliedCoupon } : null,
+                couponCode,
+                paymentMethod,
+                linkedRepairs: [...linkedRepairs],
+                loadedPendingSales: [...loadedPendingSales],
+                mixedPayments: { ...mixedPayments }
+            };
+            setPausedOrders(prev => [currentOrder, ...prev.filter(o => o.id !== orderId)]);
+        } else {
+            setPausedOrders(prev => prev.filter(o => o.id !== orderId));
+        }
+
+        setCart(order.cart || []);
+        setSelectedCustomer(order.selectedCustomer || null);
+        setDiscount(order.discount || 0);
+        setAppliedCoupon(order.appliedCoupon || null);
+        setCouponCode(order.couponCode || '');
+        setPaymentMethod(order.paymentMethod || 'cash');
+        setLinkedRepairs(order.linkedRepairs || []);
+        setLoadedPendingSales(order.loadedPendingSales || []);
+        setMixedPayments(order.mixedPayments || { cash: '', card: '', transfer: '' });
+        showToast('Orden en espera recuperada al carrito', 'success');
+    };
+
+    const handleDiscardPausedOrder = (orderId, e) => {
+        if (e) e.stopPropagation();
+        setPausedOrders(prev => prev.filter(o => o.id !== orderId));
+        showToast('Orden en espera descartada');
+    };
+
     // ─── Atajos de Teclado Globales para POS ───
     useEffect(() => {
         const handleKeyDown = (e) => {
-            // Si el modal de atajos está abierto y presiona Escape, cerrarlo
-            if (e.key === 'Escape' && showShortcutsModal) {
+            // Si el modal de atajos está abierto y presiona Escape o F9, cerrarlo
+            if (showShortcutsModal) {
+                if (e.key === 'Escape' || e.key === 'F9') {
+                    e.preventDefault();
+                    setShowShortcutsModal(false);
+                    return;
+                }
+            }
+
+            // F9: Abrir / Cerrar esta guía de atajos de teclado
+            if (e.key === 'F9') {
                 e.preventDefault();
-                setShowShortcutsModal(false);
+                setShowShortcutsModal(prev => !prev);
                 return;
             }
 
-            // 1. Abrir modal de ayuda de atajos con '?' (Shift + /)
+            // 1. Abrir modal de ayuda de atajos también con '?' (Shift + /) fuera de inputs
             if (e.key === '?' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
                 e.preventDefault();
                 setShowShortcutsModal(prev => !prev);
                 return;
             }
 
-            // 2. F1 o Command/Ctrl + K: Enfocar buscador
-            if (e.key === 'F1' || ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K'))) {
+            // 2. F2 o Command/Ctrl + K: Enfocar buscador de productos / código de barras
+            if (e.key === 'F2' || ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K'))) {
                 e.preventDefault();
                 searchRef.current?.focus();
                 searchRef.current?.select();
                 return;
             }
 
-            // Si está dentro de un input/textarea, solo escuchar Escape para desenfocar/limpiar
+            // F4: Pausar orden actual y poner en espera
+            if (e.key === 'F4') {
+                e.preventDefault();
+                handlePauseOrder();
+                return;
+            }
+
+            // F7: Aplicar % de descuento global a la orden
+            if (e.key === 'F7') {
+                e.preventDefault();
+                if (cart.length === 0) {
+                    showToast('Agrega productos al carrito para aplicar descuento', 'error');
+                    return;
+                }
+                const pctInput = window.prompt('Ingresa el porcentaje de descuento global (ej: 10 para 10%):');
+                if (pctInput !== null && pctInput.trim() !== '') {
+                    const pct = parseFloat(pctInput);
+                    if (!isNaN(pct) && pct >= 0 && pct <= 100) {
+                        const calculatedDiscount = Number(((subtotal * pct) / 100).toFixed(2));
+                        setDiscount(calculatedDiscount);
+                        if (appliedCoupon) setAppliedCoupon(null);
+                        showToast(`Descuento de ${pct}% aplicado (-$${calculatedDiscount})`, 'success');
+                    } else {
+                        showToast('Porcentaje inválido (debe ser entre 0 y 100)', 'error');
+                    }
+                }
+                return;
+            }
+
+            // F8: Vaciar todos los artículos del carrito
+            if (e.key === 'F8') {
+                e.preventDefault();
+                if (cart.length > 0) {
+                    clearCart();
+                    showToast('Carrito vaciado');
+                }
+                return;
+            }
+
+            // F12: Abrir ventana de cobro y liquidación / enfocar campo de pago
+            if (e.key === 'F12') {
+                e.preventDefault();
+                if (cart.length === 0) {
+                    showToast('El carrito está vacío', 'error');
+                    return;
+                }
+                if (paymentMethod === 'cash') {
+                    cashInputRef.current?.focus();
+                    cashInputRef.current?.select();
+                } else {
+                    handleCheckout();
+                }
+                return;
+            }
+
+            // Enter en el campo de efectivo o cobro: Concluir venta
+            if (e.key === 'Enter' && document.activeElement === cashInputRef.current) {
+                e.preventDefault();
+                if (cart.length > 0 && !processing) {
+                    handleCheckout();
+                }
+                return;
+            }
+
+            // Si está dentro de un input/textarea, escuchar Escape para desenfocar/limpiar
             if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
                 if (e.key === 'Escape') {
                     if (document.activeElement === searchRef.current) {
@@ -143,44 +306,38 @@ export default function POSPage() {
                 return;
             }
 
-            // 3. F2: Cambiar a modo Productos
-            if (e.key === 'F2') {
+            // + : Aumentar en 1 la cantidad del último producto en el carrito
+            if (e.key === '+' || e.key === '=') {
                 e.preventDefault();
-                setMode('products');
-                return;
-            }
-
-            // 4. F3: Cambiar a modo Servicios
-            if (e.key === 'F3') {
-                e.preventDefault();
-                setMode('services');
-                return;
-            }
-
-            // 5. F4: Cambiar a modo Reparaciones
-            if (e.key === 'F4') {
-                e.preventDefault();
-                setMode('repairs');
-                return;
-            }
-
-            // 6. F6: Cambiar a modo Pedidos Web
-            if (e.key === 'F6') {
-                e.preventDefault();
-                if (isOrdersPlanAllowed) {
-                    setMode('pending_sales');
+                if (cart.length > 0) {
+                    const lastItem = cart[cart.length - 1];
+                    if (lastItem.type !== 'repair') {
+                        updateQuantity(lastItem.key, 1);
+                        showToast(`+1 ${lastItem.description}`);
+                    }
                 }
                 return;
             }
 
-            // 7. F7: Abrir Escáner de Cámara (si tiene plan)
-            if (e.key === 'F7') {
+            // - : Disminuir en 1 la cantidad del último producto en el carrito
+            if (e.key === '-' || e.key === '_') {
                 e.preventDefault();
-                handleOpenScanner();
+                if (cart.length > 0) {
+                    const lastItem = cart[cart.length - 1];
+                    if (lastItem.type !== 'repair') {
+                        if (lastItem.quantity > 1) {
+                            updateQuantity(lastItem.key, -1);
+                            showToast(`-1 ${lastItem.description}`);
+                        } else {
+                            removeFromCart(lastItem.key);
+                            showToast(`Eliminado ${lastItem.description}`);
+                        }
+                    }
+                }
                 return;
             }
 
-            // 8. 1 / 2 / 3 / 4 para cambiar método de pago rápidamente
+            // 1 / 2 / 3 / 4 para cambiar método de pago rápidamente
             if (e.key === '1') {
                 e.preventDefault();
                 setPaymentMethod('cash');
@@ -202,8 +359,8 @@ export default function POSPage() {
                 return;
             }
 
-            // 9. F9 o Ctrl/Cmd + Enter: Cobrar / Checkout
-            if (e.key === 'F9' || ((e.metaKey || e.ctrlKey) && e.key === 'Enter')) {
+            // Ctrl/Cmd + Enter: Cobrar / Checkout
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                 e.preventDefault();
                 if (cart.length > 0 && !processing) {
                     handleCheckout();
@@ -211,7 +368,7 @@ export default function POSPage() {
                 return;
             }
 
-            // 10. Escape: Limpiar carrito o deseleccionar cliente si no está en input
+            // Escape fuera de inputs: Cerrar modales o limpiar
             if (e.key === 'Escape') {
                 if (appliedCoupon) {
                     handleRemoveCoupon();
@@ -221,7 +378,7 @@ export default function POSPage() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [showShortcutsModal, search, repairSearch, pendingSearch, isOrdersPlanAllowed, cart.length, processing, appliedCoupon, total, amountReceived, paymentMethod, mixedMissing]);
+    }, [showShortcutsModal, search, repairSearch, pendingSearch, isOrdersPlanAllowed, cart, processing, appliedCoupon, total, subtotal, amountReceived, paymentMethod, mixedMissing, pausedOrders]);
 
     // ─── Restaurar borrador de POS ───
     useEffect(() => {
@@ -1422,15 +1579,63 @@ export default function POSPage() {
                     </h2>
                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         {cart.length > 0 && (
-                            <button className="btn btn-ghost btn-sm" onClick={clearCart}>
-                                <Trash2 size={14} /> Limpiar
-                            </button>
+                            <>
+                                <button
+                                    className="btn btn-ghost btn-sm"
+                                    onClick={handlePauseOrder}
+                                    title="Pausar orden y poner en espera (F4)"
+                                    style={{ gap: 4 }}
+                                >
+                                    <Pause size={14} /> Pausar
+                                </button>
+                                <button className="btn btn-ghost btn-sm" onClick={clearCart} title="Vaciar carrito (F8)">
+                                    <Trash2 size={14} /> Limpiar
+                                </button>
+                            </>
                         )}
                         <button className="btn btn-ghost btn-icon mobile-cart-close" onClick={() => setShowMobileCart(false)} style={{ display: 'none' }}>
                             <X size={18} />
                         </button>
                     </div>
                 </div>
+
+                {/* Paused Orders Bar (Órdenes en espera) */}
+                {pausedOrders.length > 0 && (
+                    <div className="pos-paused-orders-bar">
+                        <div className="pos-paused-orders-title">
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: '0.75rem', color: 'var(--color-warning, #f59e0b)' }}>
+                                <Pause size={12} /> {pausedOrders.length} {pausedOrders.length === 1 ? 'orden en espera' : 'órdenes en espera'}
+                            </span>
+                        </div>
+                        <div className="pos-paused-orders-list">
+                            {pausedOrders.map((po, index) => {
+                                const poTotal = po.cart.reduce((sum, item) => sum + (item.unit_price * item.quantity) - (item.discount || 0), 0) - (po.discount || 0);
+                                const clientName = po.selectedCustomer ? `${po.selectedCustomer.first_name} ${po.selectedCustomer.last_name}` : 'Cliente Mostrador';
+                                return (
+                                    <div
+                                        key={po.id}
+                                        className="pos-paused-order-chip"
+                                        onClick={() => handleResumeOrder(po.id)}
+                                        title="Clic para reanudar esta orden"
+                                    >
+                                        <div className="pos-paused-order-chip-info">
+                                            <span className="po-name">#{index + 1} {clientName}</span>
+                                            <span className="po-meta">{po.cart.length} arts · {formatCurrency(Math.max(0, poTotal))}</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            className="pos-paused-order-chip-del"
+                                            onClick={(e) => handleDiscardPausedOrder(po.id, e)}
+                                            title="Descartar orden en espera"
+                                        >
+                                            <X size={12} />
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Customer Selector */}
                 <div className="pos-customer-select">
@@ -1569,6 +1774,7 @@ export default function POSPage() {
                                     Descuento General
                                 </span>
                                 <input
+                                    ref={discountRef}
                                     type="number"
                                     className="input input-sm"
                                     placeholder="0"
@@ -1673,6 +1879,7 @@ export default function POSPage() {
                                 <div className="cash-input-box" style={{ display: 'flex', flexDirection: 'column', gap: '6px', padding: '12px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)' }}>
                                     <label style={{ fontSize: '10px', fontWeight: 700, color: 'var(--color-text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Efectivo Recibido</label>
                                     <input
+                                        ref={cashInputRef}
                                         type="number"
                                         className="input"
                                         placeholder="$0.00"
@@ -1916,80 +2123,66 @@ export default function POSPage() {
                     <div className="pos-shortcuts-modal" onClick={(e) => e.stopPropagation()}>
                         <div className="pos-shortcuts-modal-header">
                             <div className="pos-shortcuts-modal-title">
-                                <Keyboard size={20} />
-                                <span>Atajos de Teclado del Punto de Venta</span>
+                                <Keyboard size={22} />
+                                <span>Atajos de Teclado del POS</span>
                             </div>
                             <button
                                 type="button"
                                 className="pos-shortcuts-close-btn"
                                 onClick={() => setShowShortcutsModal(false)}
                             >
-                                <X size={18} />
+                                <X size={20} />
                             </button>
                         </div>
                         <div className="pos-shortcuts-modal-body">
-                            <div className="pos-shortcuts-section">
-                                <h4>Búsqueda y Navegación</h4>
-                                <div className="pos-shortcut-row">
-                                    <div className="pos-shortcut-keys">
-                                        <kbd>⌘K</kbd> <span>o</span> <kbd>Ctrl + K</kbd> <span>o</span> <kbd>F1</kbd>
-                                    </div>
-                                    <div className="pos-shortcut-desc">Enfocar buscador principal</div>
-                                </div>
-                                <div className="pos-shortcut-row">
-                                    <div className="pos-shortcut-keys">
-                                        <kbd>Esc</kbd>
-                                    </div>
-                                    <div className="pos-shortcut-desc">Limpiar búsqueda o desenfocar</div>
-                                </div>
-                                <div className="pos-shortcut-row">
-                                    <div className="pos-shortcut-keys">
-                                        <kbd>Enter</kbd>
-                                    </div>
-                                    <div className="pos-shortcut-desc">Agregar producto o escanear código</div>
-                                </div>
+                            <div className="pos-shortcut-card-row">
+                                <span className="pos-shortcut-card-desc">Enfocar buscador de productos / código de barras</span>
+                                <kbd className="pos-shortcut-card-key">F2</kbd>
                             </div>
 
-                            <div className="pos-shortcuts-section">
-                                <h4>Pestañas y Modos</h4>
-                                <div className="pos-shortcut-row">
-                                    <div className="pos-shortcut-keys"><kbd>F2</kbd></div>
-                                    <div className="pos-shortcut-desc">Pestaña Productos</div>
-                                </div>
-                                <div className="pos-shortcut-row">
-                                    <div className="pos-shortcut-keys"><kbd>F3</kbd></div>
-                                    <div className="pos-shortcut-desc">Pestaña Servicios</div>
-                                </div>
-                                <div className="pos-shortcut-row">
-                                    <div className="pos-shortcut-keys"><kbd>F4</kbd></div>
-                                    <div className="pos-shortcut-desc">Pestaña Reparaciones</div>
-                                </div>
-                                <div className="pos-shortcut-row">
-                                    <div className="pos-shortcut-keys"><kbd>F6</kbd></div>
-                                    <div className="pos-shortcut-desc">Pestaña Pedidos Web</div>
-                                </div>
-                                <div className="pos-shortcut-row">
-                                    <div className="pos-shortcut-keys"><kbd>F7</kbd></div>
-                                    <div className="pos-shortcut-desc">Escanear con cámara</div>
-                                </div>
+                            <div className="pos-shortcut-card-row">
+                                <span className="pos-shortcut-card-desc">Pausar orden actual y poner en espera</span>
+                                <kbd className="pos-shortcut-card-key">F4</kbd>
                             </div>
 
-                            <div className="pos-shortcuts-section">
-                                <h4>Métodos de Pago y Cobro</h4>
-                                <div className="pos-shortcut-row">
-                                    <div className="pos-shortcut-keys"><kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> / <kbd>4</kbd></div>
-                                    <div className="pos-shortcut-desc">Efectivo / Tarjeta / Transfer / Mixto</div>
-                                </div>
-                                <div className="pos-shortcut-row">
-                                    <div className="pos-shortcut-keys">
-                                        <kbd>F9</kbd> <span>o</span> <kbd>⌘ + Enter</kbd>
-                                    </div>
-                                    <div className="pos-shortcut-desc">Completar cobro (Checkout)</div>
-                                </div>
-                                <div className="pos-shortcut-row">
-                                    <div className="pos-shortcut-keys"><kbd>?</kbd></div>
-                                    <div className="pos-shortcut-desc">Abrir / cerrar esta ventana de atajos</div>
-                                </div>
+                            <div className="pos-shortcut-card-row">
+                                <span className="pos-shortcut-card-desc">Aplicar % de descuento global a la orden</span>
+                                <kbd className="pos-shortcut-card-key">F7</kbd>
+                            </div>
+
+                            <div className="pos-shortcut-card-row">
+                                <span className="pos-shortcut-card-desc">Vaciar todos los artículos del carrito</span>
+                                <kbd className="pos-shortcut-card-key">F8</kbd>
+                            </div>
+
+                            <div className="pos-shortcut-card-row">
+                                <span className="pos-shortcut-card-desc">Abrir / Cerrar esta guía de atajos de teclado</span>
+                                <kbd className="pos-shortcut-card-key">F9</kbd>
+                            </div>
+
+                            <div className="pos-shortcut-card-row">
+                                <span className="pos-shortcut-card-desc">Abrir ventana de cobro y liquidación</span>
+                                <kbd className="pos-shortcut-card-key">F12</kbd>
+                            </div>
+
+                            <div className="pos-shortcut-card-row">
+                                <span className="pos-shortcut-card-desc">Confirmar pago / Concluir venta en modal de cobro</span>
+                                <kbd className="pos-shortcut-card-key">Enter</kbd>
+                            </div>
+
+                            <div className="pos-shortcut-card-row">
+                                <span className="pos-shortcut-card-desc">Aumentar en 1 la cantidad del último producto en el carrito</span>
+                                <kbd className="pos-shortcut-card-key">+</kbd>
+                            </div>
+
+                            <div className="pos-shortcut-card-row">
+                                <span className="pos-shortcut-card-desc">Disminuir en 1 la cantidad del último producto en el carrito</span>
+                                <kbd className="pos-shortcut-card-key">-</kbd>
+                            </div>
+
+                            <div className="pos-shortcut-card-row">
+                                <span className="pos-shortcut-card-desc">Cerrar modales o salir del buscador</span>
+                                <kbd className="pos-shortcut-card-key">Esc</kbd>
                             </div>
                         </div>
                     </div>
