@@ -1097,3 +1097,217 @@
         width: 22px;
     }
 }
+
+/* =====================================================
+   POS Enhanced Search & Keyboard Shortcuts Styles
+   ===================================================== */
+.pos-search-box-interactive {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.pos-search-input-field {
+    padding-right: 48px !important;
+    font-size: var(--font-sm);
+    transition: all var(--transition-fast, 0.15s ease);
+}
+
+.pos-search-kbd {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    background: var(--color-bg-body, rgba(255, 255, 255, 0.06));
+    border: 1px solid var(--color-border, rgba(255, 255, 255, 0.1));
+    border-radius: 4px;
+    padding: 2px 5px;
+    cursor: pointer;
+    user-select: none;
+    line-height: 1;
+    transition: all var(--transition-fast, 0.15s ease);
+}
+
+.pos-search-kbd:hover {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.pos-search-clear-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: var(--radius-full, 9999px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast, 0.15s ease);
+}
+
+.pos-search-clear-btn:hover {
+    color: var(--color-text);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.pos-shortcuts-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    padding: 0;
+    background: var(--color-bg-input, rgba(255, 255, 255, 0.05));
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border, rgba(255, 255, 255, 0.12));
+    border-radius: var(--radius-md, 8px);
+    cursor: pointer;
+    transition: all var(--transition-fast, 0.15s ease);
+    flex-shrink: 0;
+}
+
+.pos-shortcuts-btn:hover {
+    background: var(--color-bg-hover, rgba(255, 255, 255, 0.08));
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.pos-shortcuts-btn:active {
+    transform: scale(0.92);
+}
+
+/* Modal de Atajos de Teclado */
+.pos-shortcuts-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
+    padding: var(--sp-4);
+    animation: fadeIn 0.15s ease-out;
+}
+
+.pos-shortcuts-modal {
+    background: var(--color-bg-surface, #1e1e24);
+    border: 1px solid var(--color-border-strong, rgba(255, 255, 255, 0.15));
+    border-radius: var(--radius-lg, 14px);
+    width: 100%;
+    max-width: 540px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    animation: slideUp 0.18s ease-out;
+}
+
+.pos-shortcuts-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--sp-4) var(--sp-5);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.pos-shortcuts-modal-title {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    font-size: var(--font-md);
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.pos-shortcuts-modal-title svg {
+    color: var(--color-primary);
+}
+
+.pos-shortcuts-close-btn {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+}
+
+.pos-shortcuts-close-btn:hover {
+    color: var(--color-text);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.pos-shortcuts-modal-body {
+    padding: var(--sp-4) var(--sp-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+}
+
+.pos-shortcuts-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.pos-shortcuts-section h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    margin: 0 0 2px;
+}
+
+.pos-shortcut-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
+    background: var(--color-bg-input, rgba(255, 255, 255, 0.03));
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm, 6px);
+}
+
+.pos-shortcut-keys {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.pos-shortcut-keys kbd {
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-text);
+    background: var(--color-bg-body, #121214);
+    border: 1px solid var(--color-border-strong, rgba(255, 255, 255, 0.2));
+    border-radius: 4px;
+    padding: 2px 6px;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.pos-shortcut-desc {
+    font-size: var(--font-xs);
+    font-weight: 500;
+    color: var(--color-text);
+}
+
