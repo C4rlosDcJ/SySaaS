@@ -267,6 +267,46 @@ async function dbInit() {
             console.error(`[DB-INIT] Error al verificar/alterar la tabla repair_images:`, e.message);
         }
 
+        // 11.2. Crear tabla repair_status_history si no existe
+        console.log(`[DB-INIT] Verificando tabla "repair_status_history"...`);
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS repair_status_history (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    repair_id INT NOT NULL,
+                    status VARCHAR(50) NOT NULL,
+                    notes TEXT,
+                    changed_by INT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (repair_id) REFERENCES repairs(id) ON DELETE CASCADE,
+                    FOREIGN KEY (changed_by) REFERENCES users(id) ON DELETE SET NULL
+                ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+            `);
+            console.log(`[DB-INIT] Tabla repair_status_history verificada/creada.`);
+        } catch (e) {
+            console.error(`[DB-INIT] Error al verificar/crear la tabla repair_status_history:`, e.message);
+        }
+
+        // 11.3. Crear tabla repair_notes si no existe
+        console.log(`[DB-INIT] Verificando tabla "repair_notes"...`);
+        try {
+            await connection.query(`
+                CREATE TABLE IF NOT EXISTS repair_notes (
+                    id INT PRIMARY KEY AUTO_INCREMENT,
+                    repair_id INT NOT NULL,
+                    user_id INT NOT NULL,
+                    note TEXT NOT NULL,
+                    is_internal BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (repair_id) REFERENCES repairs(id) ON DELETE CASCADE,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
+            `);
+            console.log(`[DB-INIT] Tabla repair_notes verificada/creada.`);
+        } catch (e) {
+            console.error(`[DB-INIT] Error al verificar/crear la tabla repair_notes:`, e.message);
+        }
+
         // 12. Asegurar que la columna barcode exista en la tabla services_catalog
         console.log(`[DB-INIT] Verificando columna "barcode" en tabla "services_catalog"...`);
         try {

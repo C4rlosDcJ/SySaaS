@@ -175,6 +175,8 @@ exports.getOrders = async (req, res) => {
             FROM sales s
             LEFT JOIN users u ON s.customer_id = u.id
             WHERE s.tenant_id = ?
+              AND s.repair_id IS NULL
+              AND (s.cashier_id IS NULL OR s.notes LIKE '%Pedido creado por el cliente%')
         `;
         const params = [tenantId];
 
@@ -489,10 +491,15 @@ exports.getOrderStats = async (req, res) => {
         const tenantId = req.tenantCtx.tenantId;
         const branchId = req.tenantCtx.branchId;
 
-        const [pending] = await db.query(
-            "SELECT COUNT(*) as count FROM sales WHERE status = 'pending' AND tenant_id = ? AND branch_id = ?",
-            [tenantId, branchId]
-        );
+        let query = "SELECT COUNT(*) as count FROM sales WHERE status = 'pending' AND tenant_id = ? AND repair_id IS NULL AND (cashier_id IS NULL OR notes LIKE '%Pedido creado por el cliente%')";
+        const params = [tenantId];
+
+        if (branchId) {
+            query += " AND branch_id = ?";
+            params.push(branchId);
+        }
+
+        const [pending] = await db.query(query, params);
         res.json({
             pendingCount: pending[0].count,
             inProgressCount: 0,
