@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
     ShoppingCart, Search, Package, Wrench, X, Plus, Minus, Trash2,
     CreditCard, Banknote, ArrowRightLeft, Printer, CheckCircle2,
-    User, ShoppingBag, ClipboardList, Hash, AlertCircle, Store, Camera, Layers, Tag
+    User, ShoppingBag, ClipboardList, Hash, AlertCircle, Store, Camera, Layers, Tag, Keyboard
 } from 'lucide-react';
 import { inventoryService, posService, customerService, servicesCatalog, settingsService, repairService, orderService, couponService, getImageUrl } from '../../services/api';
 import { formatCurrency, STATUS_LABELS } from '../../utils/constants';
@@ -82,6 +82,9 @@ export default function POSPage() {
     }, []);
     const [showMobileCart, setShowMobileCart] = useState(false);
 
+    // Keyboard Shortcuts Modal
+    const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+
     // Reset de página al cambiar de modo
     useEffect(() => {
         setCurrentPage(1);
@@ -90,6 +93,135 @@ export default function POSPage() {
     const searchRef = useRef(null);
     const customerSearchTimeout = useRef(null);
     const loadedRepairIdRef = useRef(null);
+
+    // Limpiar búsqueda activa
+    const handleClearSearch = () => {
+        if (mode === 'repairs') setRepairSearch('');
+        else if (mode === 'pending_sales') setPendingSearch('');
+        else setSearch('');
+        searchRef.current?.focus();
+    };
+
+    // ─── Atajos de Teclado Globales para POS ───
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Si el modal de atajos está abierto y presiona Escape, cerrarlo
+            if (e.key === 'Escape' && showShortcutsModal) {
+                e.preventDefault();
+                setShowShortcutsModal(false);
+                return;
+            }
+
+            // 1. Abrir modal de ayuda de atajos con '?' (Shift + /)
+            if (e.key === '?' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+                e.preventDefault();
+                setShowShortcutsModal(prev => !prev);
+                return;
+            }
+
+            // 2. F1 o Command/Ctrl + K: Enfocar buscador
+            if (e.key === 'F1' || ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K'))) {
+                e.preventDefault();
+                searchRef.current?.focus();
+                searchRef.current?.select();
+                return;
+            }
+
+            // Si está dentro de un input/textarea, solo escuchar Escape para desenfocar/limpiar
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName)) {
+                if (e.key === 'Escape') {
+                    if (document.activeElement === searchRef.current) {
+                        if (search || repairSearch || pendingSearch) {
+                            handleClearSearch();
+                        } else {
+                            searchRef.current?.blur();
+                        }
+                    } else {
+                        document.activeElement.blur();
+                    }
+                }
+                return;
+            }
+
+            // 3. F2: Cambiar a modo Productos
+            if (e.key === 'F2') {
+                e.preventDefault();
+                setMode('products');
+                return;
+            }
+
+            // 4. F3: Cambiar a modo Servicios
+            if (e.key === 'F3') {
+                e.preventDefault();
+                setMode('services');
+                return;
+            }
+
+            // 5. F4: Cambiar a modo Reparaciones
+            if (e.key === 'F4') {
+                e.preventDefault();
+                setMode('repairs');
+                return;
+            }
+
+            // 6. F6: Cambiar a modo Pedidos Web
+            if (e.key === 'F6') {
+                e.preventDefault();
+                if (isOrdersPlanAllowed) {
+                    setMode('pending_sales');
+                }
+                return;
+            }
+
+            // 7. F7: Abrir Escáner de Cámara (si tiene plan)
+            if (e.key === 'F7') {
+                e.preventDefault();
+                handleOpenScanner();
+                return;
+            }
+
+            // 8. 1 / 2 / 3 / 4 para cambiar método de pago rápidamente
+            if (e.key === '1') {
+                e.preventDefault();
+                setPaymentMethod('cash');
+                return;
+            }
+            if (e.key === '2') {
+                e.preventDefault();
+                setPaymentMethod('card');
+                return;
+            }
+            if (e.key === '3') {
+                e.preventDefault();
+                setPaymentMethod('transfer');
+                return;
+            }
+            if (e.key === '4') {
+                e.preventDefault();
+                setPaymentMethod('mixed');
+                return;
+            }
+
+            // 9. F9 o Ctrl/Cmd + Enter: Cobrar / Checkout
+            if (e.key === 'F9' || ((e.metaKey || e.ctrlKey) && e.key === 'Enter')) {
+                e.preventDefault();
+                if (cart.length > 0 && !processing) {
+                    handleCheckout();
+                }
+                return;
+            }
+
+            // 10. Escape: Limpiar carrito o deseleccionar cliente si no está en input
+            if (e.key === 'Escape') {
+                if (appliedCoupon) {
+                    handleRemoveCoupon();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [showShortcutsModal, search, repairSearch, pendingSearch, isOrdersPlanAllowed, cart.length, processing, appliedCoupon, total, amountReceived, paymentMethod, mixedMissing]);
 
     // ─── Restaurar borrador de POS ───
     useEffect(() => {
@@ -246,18 +378,37 @@ export default function POSPage() {
         return () => clearTimeout(timeout);
     }, [mode, pendingSearch]);
 
-    // ─── Filtered items ───
+    // ─── Filtered items con búsqueda inteligente multi-término ───
     const filteredProducts = products.filter(p => {
-        const matchSearch = !search ||
-            p.name.toLowerCase().includes(search.toLowerCase()) ||
-            (p.sku && p.sku.toLowerCase().includes(search.toLowerCase())) ||
-            (p.barcode && p.barcode.includes(search));
         const matchCategory = !selectedCategory || p.category_id === selectedCategory;
-        return matchSearch && matchCategory;
+        if (!matchCategory) return false;
+        if (!search.trim()) return true;
+
+        const terms = search.toLowerCase().trim().split(/\s+/);
+        const searchableText = [
+            p.name,
+            p.sku,
+            p.barcode,
+            p.brand,
+            p.model,
+            p.category_name,
+            p.description
+        ].filter(Boolean).join(' ').toLowerCase();
+
+        // Todos los términos ingresados deben coincidir
+        return terms.every(term => searchableText.includes(term));
     });
 
     const filteredServices = services.filter(s => {
-        return !search || s.name.toLowerCase().includes(search.toLowerCase());
+        if (!search.trim()) return true;
+        const terms = search.toLowerCase().trim().split(/\s+/);
+        const searchableText = [
+            s.name,
+            s.barcode,
+            s.category_name,
+            s.description
+        ].filter(Boolean).join(' ').toLowerCase();
+        return terms.every(term => searchableText.includes(term));
     });
 
     // ─── Cart operations ───
@@ -781,15 +932,15 @@ export default function POSPage() {
                     </h1>
                     <div className="pos-search-row">
                         <div className="pos-search-input-group">
-                            <div className="search-box">
+                            <div className="search-box pos-search-box-interactive">
                                 <Search size={16} className="search-icon" />
                                 <input
                                     ref={searchRef}
                                     type="text"
-                                    className="input"
+                                    className="input pos-search-input-field"
                                     placeholder={
-                                        mode === 'products' ? 'Buscar producto, SKU o código...' :
-                                        mode === 'services' ? 'Buscar servicio...' :
+                                        mode === 'products' ? 'Buscar por nombre, SKU, marca, código...' :
+                                        mode === 'services' ? 'Buscar servicio por nombre o código...' :
                                         mode === 'pending_sales' ? 'Buscar pedido por folio o cliente...' :
                                         'Buscar ticket, cliente o modelo...'
                                     }
@@ -860,15 +1011,38 @@ export default function POSPage() {
                                     }}
                                     id="pos-search"
                                 />
+                                {(search || repairSearch || pendingSearch) ? (
+                                    <button
+                                        type="button"
+                                        className="pos-search-clear-btn"
+                                        onClick={handleClearSearch}
+                                        title="Limpiar búsqueda (Esc)"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                ) : (
+                                    <kbd className="pos-search-kbd" onClick={() => searchRef.current?.focus()}>
+                                        ⌘K
+                                    </kbd>
+                                )}
                             </div>
                             <button
                                 type="button"
                                 className={`pos-scan-btn ${!isScannerPlanAllowed ? 'plan-locked' : ''}`}
-                                title={isScannerPlanAllowed ? "Escanear código de barras con la cámara" : "Función exclusiva para planes Pro y Enterprise"}
+                                title={isScannerPlanAllowed ? "Escanear código de barras con la cámara (F7)" : "Función exclusiva para planes Pro y Enterprise"}
                                 aria-label="Escanear código de barras con la cámara"
                                 onClick={handleOpenScanner}
                             >
                                 <Camera size={18} />
+                            </button>
+                            <button
+                                type="button"
+                                className="pos-shortcuts-btn"
+                                title="Ver todos los atajos de teclado (?)"
+                                aria-label="Atajos de teclado"
+                                onClick={() => setShowShortcutsModal(true)}
+                            >
+                                <Keyboard size={18} />
                             </button>
                         </div>
                         <div className="pos-mode-toggle">
@@ -1734,6 +1908,92 @@ export default function POSPage() {
                     onClose={() => setShowBarcodeScanner(false)}
                     onScan={handleBarcodeScanned}
                 />
+            )}
+
+            {/* ═══ Keyboard Shortcuts Help Modal ═══ */}
+            {showShortcutsModal && (
+                <div className="pos-shortcuts-modal-backdrop" onClick={() => setShowShortcutsModal(false)}>
+                    <div className="pos-shortcuts-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="pos-shortcuts-modal-header">
+                            <div className="pos-shortcuts-modal-title">
+                                <Keyboard size={20} />
+                                <span>Atajos de Teclado del Punto de Venta</span>
+                            </div>
+                            <button
+                                type="button"
+                                className="pos-shortcuts-close-btn"
+                                onClick={() => setShowShortcutsModal(false)}
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="pos-shortcuts-modal-body">
+                            <div className="pos-shortcuts-section">
+                                <h4>Búsqueda y Navegación</h4>
+                                <div className="pos-shortcut-row">
+                                    <div className="pos-shortcut-keys">
+                                        <kbd>⌘K</kbd> <span>o</span> <kbd>Ctrl + K</kbd> <span>o</span> <kbd>F1</kbd>
+                                    </div>
+                                    <div className="pos-shortcut-desc">Enfocar buscador principal</div>
+                                </div>
+                                <div className="pos-shortcut-row">
+                                    <div className="pos-shortcut-keys">
+                                        <kbd>Esc</kbd>
+                                    </div>
+                                    <div className="pos-shortcut-desc">Limpiar búsqueda o desenfocar</div>
+                                </div>
+                                <div className="pos-shortcut-row">
+                                    <div className="pos-shortcut-keys">
+                                        <kbd>Enter</kbd>
+                                    </div>
+                                    <div className="pos-shortcut-desc">Agregar producto o escanear código</div>
+                                </div>
+                            </div>
+
+                            <div className="pos-shortcuts-section">
+                                <h4>Pestañas y Modos</h4>
+                                <div className="pos-shortcut-row">
+                                    <div className="pos-shortcut-keys"><kbd>F2</kbd></div>
+                                    <div className="pos-shortcut-desc">Pestaña Productos</div>
+                                </div>
+                                <div className="pos-shortcut-row">
+                                    <div className="pos-shortcut-keys"><kbd>F3</kbd></div>
+                                    <div className="pos-shortcut-desc">Pestaña Servicios</div>
+                                </div>
+                                <div className="pos-shortcut-row">
+                                    <div className="pos-shortcut-keys"><kbd>F4</kbd></div>
+                                    <div className="pos-shortcut-desc">Pestaña Reparaciones</div>
+                                </div>
+                                <div className="pos-shortcut-row">
+                                    <div className="pos-shortcut-keys"><kbd>F6</kbd></div>
+                                    <div className="pos-shortcut-desc">Pestaña Pedidos Web</div>
+                                </div>
+                                <div className="pos-shortcut-row">
+                                    <div className="pos-shortcut-keys"><kbd>F7</kbd></div>
+                                    <div className="pos-shortcut-desc">Escanear con cámara</div>
+                                </div>
+                            </div>
+
+                            <div className="pos-shortcuts-section">
+                                <h4>Métodos de Pago y Cobro</h4>
+                                <div className="pos-shortcut-row">
+                                    <div className="pos-shortcut-keys"><kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> / <kbd>4</kbd></div>
+                                    <div className="pos-shortcut-desc">Efectivo / Tarjeta / Transfer / Mixto</div>
+                                </div>
+                                <div className="pos-shortcut-row">
+                                    <div className="pos-shortcut-keys">
+                                        <kbd>F9</kbd> <span>o</span> <kbd>⌘ + Enter</kbd>
+                                    </div>
+                                    <div className="pos-shortcut-desc">Completar cobro (Checkout)</div>
+                                </div>
+                                <div className="pos-shortcut-row">
+                                    <div className="pos-shortcut-keys"><kbd>?</kbd></div>
+                                    <div className="pos-shortcut-desc">Abrir / cerrar esta ventana de atajos</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
