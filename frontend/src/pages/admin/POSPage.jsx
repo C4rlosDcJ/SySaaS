@@ -233,18 +233,11 @@ export default function POSPage() {
         const handleKeyDown = (e) => {
             // F11 o Escape (con modal abierto): cerrar modal de atajos
             if (showShortcutsModal) {
-                if (e.key === 'Escape' || e.key === 'F11') {
+                if (e.key === 'Escape') {
                     e.preventDefault();
                     setShowShortcutsModal(false);
                     return;
                 }
-            }
-
-            // F11: Abrir/cerrar guia de atajos
-            if (e.key === 'F11') {
-                e.preventDefault();
-                setShowShortcutsModal(prev => !prev);
-                return;
             }
 
             // ? (fuera de inputs): Abrir/cerrar guia de atajos
@@ -254,8 +247,8 @@ export default function POSPage() {
                 return;
             }
 
-            // F1 / Cmd+K / Ctrl+K: Enfocar y seleccionar buscador
-            if (e.key === 'F1' || ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K'))) {
+            // Cmd+K / Ctrl+K: Enfocar y seleccionar buscador
+            if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) {
                 e.preventDefault();
                 searchRef.current?.focus();
                 searchRef.current?.select();
@@ -288,6 +281,14 @@ export default function POSPage() {
 
             // F5: Pausar orden actual y poner en espera
             if (e.key === 'F5') {
+                // Intentar prevenir reload - funciona en Chrome/Edge, no en Firefox
+                e.preventDefault();
+                handlePauseOrder();
+                return;
+            }
+
+            // F12: Pausar orden actual (alternativa segura a F5)
+            if (e.key === 'F12') {
                 e.preventDefault();
                 handlePauseOrder();
                 return;
@@ -2167,8 +2168,6 @@ export default function POSPage() {
                             <div className="pos-shortcut-card-row">
                                 <span className="pos-shortcut-card-desc">Enfocar y seleccionar automaticamente el buscador principal</span>
                                 <div className="pos-shortcut-keys">
-                                    <kbd className="pos-shortcut-card-key">F1</kbd>
-                                    <span className="pos-shortcut-sep">/</span>
                                     <kbd className="pos-shortcut-card-key">&#8984;K</kbd>
                                     <span className="pos-shortcut-sep">/</span>
                                     <kbd className="pos-shortcut-card-key">Ctrl+K</kbd>
@@ -2223,7 +2222,11 @@ export default function POSPage() {
 
                             <div className="pos-shortcut-card-row">
                                 <span className="pos-shortcut-card-desc">Pausar orden actual y guardar en espera</span>
-                                <kbd className="pos-shortcut-card-key">F5</kbd>
+                                <div className="pos-shortcut-keys">
+                                    <kbd className="pos-shortcut-card-key">F5</kbd>
+                                    <span className="pos-shortcut-sep">/</span>
+                                    <kbd className="pos-shortcut-card-key">F12</kbd>
+                                </div>
                             </div>
 
                             <div className="pos-shortcut-card-row">
@@ -2271,11 +2274,7 @@ export default function POSPage() {
 
                             <div className="pos-shortcut-card-row">
                                 <span className="pos-shortcut-card-desc">Abre esta ventana modal interactiva con la guia de todos los atajos</span>
-                                <div className="pos-shortcut-keys">
-                                    <kbd className="pos-shortcut-card-key">F11</kbd>
-                                    <span className="pos-shortcut-sep">/</span>
-                                    <kbd className="pos-shortcut-card-key">?</kbd>
-                                </div>
+                                <kbd className="pos-shortcut-card-key">?</kbd>
                             </div>
 
                         </div>
