@@ -463,14 +463,21 @@ exports.cancelSale = async (req, res) => {
         const tenantId = req.tenantCtx.tenantId;
         const branchId = req.tenantCtx.branchId;
 
-        const [sales] = await connection.query('SELECT * FROM sales WHERE id = ? AND tenant_id = ? AND branch_id = ?', [id, tenantId, branchId]);
+        // Buscar la venta por ID y tenantId (permitiendo encontrarla aunque el usuario esté en otra sucursal de la empresa)
+        let saleQuery = 'SELECT * FROM sales WHERE id = ? AND tenant_id = ?';
+        const saleParams = [id, tenantId];
+
+        const [sales] = await connection.query(saleQuery, saleParams);
 
         if (sales.length === 0) {
             await connection.rollback();
             return res.status(404).json({ message: 'Venta no encontrada.' });
         }
 
-        if (sales[0].status === 'cancelled') {
+        const currentSale = sales[0];
+        const effectiveBranchId = currentSale.branch_id || branchId;
+
+        if (currentSale.status === 'cancelled') {
             await connection.rollback();
             return res.status(400).json({ message: 'La venta ya está cancelada.' });
         }
@@ -480,17 +487,19 @@ exports.cancelSale = async (req, res) => {
 
         for (const item of items) {
             if (item.product_id && !item.is_returned) {
-                // Devolver stock a branch_inventory
-                await connection.query(
-                    'UPDATE branch_inventory SET stock = stock + ? WHERE product_id = ? AND branch_id = ?',
-                    [item.quantity, item.product_id, branchId]
-                );
+                // Devolver stock a branch_inventory usando la sucursal de la venta
+                if (effectiveBranchId) {
+                    await connection.query(
+                        'UPDATE branch_inventory SET stock = stock + ? WHERE product_id = ? AND branch_id = ?',
+                        [item.quantity, item.product_id, effectiveBranchId]
+                    );
 
-                await connection.query(
-                    `INSERT INTO stock_movements (tenant_id, branch_id, product_id, type, quantity, reference, notes, created_by)
-                     VALUES (?, ?, ?, 'in', ?, ?, 'Cancelación de venta', ?)`,
-                    [tenantId, branchId, item.product_id, item.quantity, sales[0].sale_number, req.user.id]
-                );
+                    await connection.query(
+                        `INSERT INTO stock_movements (tenant_id, branch_id, product_id, type, quantity, reference, notes, created_by)
+                         VALUES (?, ?, ?, 'in', ?, ?, 'Cancelación de venta', ?)`,
+                        [tenantId, effectiveBranchId, item.product_id, item.quantity, currentSale.sale_number, req.user.id]
+                    );
+                }
             }
         }
 
@@ -501,10 +510,10 @@ exports.cancelSale = async (req, res) => {
                 linkedRepairIds.add(item.repair_id);
             }
         }
-        if (sales[0].repair_id && linkedRepairIds.size === 0) {
-            const hasReturnedGlobal = items.some(i => i.repair_id === sales[0].repair_id && i.is_returned);
+        if (currentSale.repair_id && linkedRepairIds.size === 0) {
+            const hasReturnedGlobal = items.some(i => i.repair_id === currentSale.repair_id && i.is_returned);
             if (!hasReturnedGlobal) {
-                linkedRepairIds.add(sales[0].repair_id);
+                linkedRepairIds.add(currentSale.repair_id);
             }
         }
 
@@ -528,10 +537,14 @@ exports.cancelSale = async (req, res) => {
                     [revertStatus, revertPayment, newAdvance, rId, tenantId]
                 );
 
-                await connection.query(
-                    'INSERT INTO repair_status_history (repair_id, status, notes, changed_by) VALUES (?, ?, ?, ?)',
-                    [rId, revertStatus, `Estado revertido por cancelación de venta ${sales[0].sale_number}`, req.user.id]
-                );
+                try {
+                    await connection.query(
+                        'INSERT INTO repair_status_history (repair_id, status, notes, changed_by) VALUES (?, ?, ?, ?)',
+                        [rId, revertStatus, `Estado revertido por cancelación de venta ${currentSale.sale_number}`, req.user?.id || null]
+                    );
+                } catch (histErr) {
+                    console.warn('[POS] No se pudo insertar en repair_status_history al cancelar venta:', histErr.message);
+                }
             }
         }
 
@@ -541,14 +554,14 @@ exports.cancelSale = async (req, res) => {
             [id]
         );
 
-        await connection.query('UPDATE sales SET status = ? WHERE id = ? AND tenant_id = ? AND branch_id = ?', ['cancelled', id, tenantId, branchId]);
+        await connection.query('UPDATE sales SET status = ? WHERE id = ? AND tenant_id = ?', ['cancelled', id, tenantId]);
 
         await connection.commit();
         res.json({ message: 'Venta cancelada exitosamente.' });
     } catch (error) {
         await connection.rollback();
         console.error('[POS] Error al cancelar venta:', error);
-        res.status(500).json({ message: 'Error al cancelar venta.' });
+        res.status(500).json({ message: error.message || 'Error al cancelar venta.' });
     } finally {
         connection.release();
     }
@@ -567,10 +580,10 @@ exports.returnSaleItem = async (req, res) => {
         const tenantId = req.tenantCtx.tenantId;
         const branchId = req.tenantCtx.branchId;
 
-        // Verificar que la venta exista y pertenezca al tenant y sucursal
+        // Verificar que la venta exista y pertenezca al tenant
         const [sales] = await connection.query(
-            'SELECT * FROM sales WHERE id = ? AND tenant_id = ? AND branch_id = ?',
-            [saleId, tenantId, branchId]
+            'SELECT * FROM sales WHERE id = ? AND tenant_id = ?',
+            [saleId, tenantId]
         );
 
         if (sales.length === 0) {
@@ -579,6 +592,8 @@ exports.returnSaleItem = async (req, res) => {
         }
 
         const sale = sales[0];
+        const effectiveBranchId = sale.branch_id || branchId;
+
         if (sale.status === 'cancelled') {
             await connection.rollback();
             return res.status(400).json({ message: 'No se puede devolver un ítem de una venta ya cancelada.' });
@@ -602,16 +617,16 @@ exports.returnSaleItem = async (req, res) => {
         }
 
         // 1. Si es producto, reponer stock a branch_inventory y registrar movimiento
-        if (item.product_id) {
+        if (item.product_id && effectiveBranchId) {
             await connection.query(
                 'UPDATE branch_inventory SET stock = stock + ? WHERE product_id = ? AND branch_id = ?',
-                [item.quantity, item.product_id, branchId]
+                [item.quantity, item.product_id, effectiveBranchId]
             );
 
             await connection.query(
                 `INSERT INTO stock_movements (tenant_id, branch_id, product_id, type, quantity, reference, notes, created_by)
                  VALUES (?, ?, ?, 'in', ?, ?, ?, ?)`,
-                [tenantId, branchId, item.product_id, item.quantity, sale.sale_number, `Devolución de ítem: ${item.description}${reason ? ` (${reason})` : ''}`, req.user.id]
+                [tenantId, effectiveBranchId, item.product_id, item.quantity, sale.sale_number, `Devolución de ítem: ${item.description}${reason ? ` (${reason})` : ''}`, req.user?.id || null]
             );
         }
 
@@ -636,10 +651,14 @@ exports.returnSaleItem = async (req, res) => {
                     [revertStatus, newPayment, newAdvance, targetRepairId, tenantId]
                 );
 
-                await connection.query(
-                    'INSERT INTO repair_status_history (repair_id, status, notes, changed_by) VALUES (?, ?, ?, ?)',
-                    [targetRepairId, revertStatus, `Ítem retirado por devolución de venta ${sale.sale_number}${reason ? `: ${reason}` : ''}`, req.user.id]
-                );
+                try {
+                    await connection.query(
+                        'INSERT INTO repair_status_history (repair_id, status, notes, changed_by) VALUES (?, ?, ?, ?)',
+                        [targetRepairId, revertStatus, `Ítem retirado por devolución de venta ${sale.sale_number}${reason ? `: ${reason}` : ''}`, req.user?.id || null]
+                    );
+                } catch (histErr) {
+                    console.warn('[POS] No se pudo insertar en repair_status_history al devolver item:', histErr.message);
+                }
             }
         }
 
