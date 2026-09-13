@@ -87,16 +87,22 @@ export default function POSPage() {
     const [showShortcutsModal, setShowShortcutsModal] = useState(false);
 
     // Paused Orders (Poner en espera)
-    const [pausedOrders, setPausedOrders] = useState(() => {
-        try {
-            const saved = localStorage.getItem(`sysaas_paused_orders_${tenantId}_${activeBranchId}`);
-            return saved ? JSON.parse(saved) : [];
-        } catch {
-            return [];
-        }
-    });
+    const [pausedOrders, setPausedOrders] = useState([]);
 
     useEffect(() => {
+        if (!tenantId || !activeBranchId) return;
+        try {
+            const saved = localStorage.getItem(`sysaas_paused_orders_${tenantId}_${activeBranchId}`);
+            if (saved) {
+                setPausedOrders(JSON.parse(saved));
+            }
+        } catch (e) {
+            console.error('Error loading paused orders', e);
+        }
+    }, [tenantId, activeBranchId]);
+
+    useEffect(() => {
+        if (!tenantId || !activeBranchId) return;
         try {
             localStorage.setItem(`sysaas_paused_orders_${tenantId}_${activeBranchId}`, JSON.stringify(pausedOrders));
         } catch (e) {
@@ -114,6 +120,24 @@ export default function POSPage() {
     const cashInputRef = useRef(null);
     const customerSearchTimeout = useRef(null);
     const loadedRepairIdRef = useRef(null);
+
+    // ─── Calculations ───
+    const subtotal = cart.reduce((sum, item) =>
+        sum + (item.unit_price * item.quantity) - (item.discount || 0), 0
+    );
+    const total = Math.max(0, subtotal - (parseFloat(discount) || 0));
+    const changeAmount = paymentMethod === 'cash'
+        ? Math.max(0, (parseFloat(amountReceived) || 0) - total)
+        : 0;
+
+    // Mixed Payment Calculations
+    const mixedCash = parseFloat(mixedPayments.cash) || 0;
+    const mixedCard = parseFloat(mixedPayments.card) || 0;
+    const mixedTransfer = parseFloat(mixedPayments.transfer) || 0;
+    const totalMixedCovered = mixedCash + mixedCard + mixedTransfer;
+    const mixedRemaining = Math.max(0, total - (mixedCard + mixedTransfer));
+    const mixedChange = mixedCash > mixedRemaining ? mixedCash - mixedRemaining : 0;
+    const mixedMissing = Math.max(0, total - totalMixedCovered);
 
     // Limpiar búsqueda activa
     const handleClearSearch = () => {
@@ -835,24 +859,6 @@ export default function POSPage() {
         setDiscount(0);
         showToast('Cupón removido');
     };
-
-    // ─── Calculations ───
-    const subtotal = cart.reduce((sum, item) =>
-        sum + (item.unit_price * item.quantity) - (item.discount || 0), 0
-    );
-    const total = Math.max(0, subtotal - (parseFloat(discount) || 0));
-    const changeAmount = paymentMethod === 'cash'
-        ? Math.max(0, (parseFloat(amountReceived) || 0) - total)
-        : 0;
-
-    // Mixed Payment Calculations
-    const mixedCash = parseFloat(mixedPayments.cash) || 0;
-    const mixedCard = parseFloat(mixedPayments.card) || 0;
-    const mixedTransfer = parseFloat(mixedPayments.transfer) || 0;
-    const totalMixedCovered = mixedCash + mixedCard + mixedTransfer;
-    const mixedRemaining = Math.max(0, total - (mixedCard + mixedTransfer));
-    const mixedChange = mixedCash > mixedRemaining ? mixedCash - mixedRemaining : 0;
-    const mixedMissing = Math.max(0, total - totalMixedCovered);
 
     // ─── Customer search ───
     const handleCustomerSearch = (value) => {
