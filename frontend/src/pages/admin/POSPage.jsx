@@ -94,7 +94,12 @@ export default function POSPage() {
         try {
             const saved = localStorage.getItem(`sysaas_paused_orders_${tenantId}_${activeBranchId}`);
             if (saved) {
-                setPausedOrders(JSON.parse(saved));
+                const parsed = JSON.parse(saved);
+                // Sanitize: only keep entries with a valid cart array to prevent render crashes
+                const valid = Array.isArray(parsed)
+                    ? parsed.filter(o => o && Array.isArray(o.cart))
+                    : [];
+                setPausedOrders(valid);
             }
         } catch (e) {
             console.error('Error loading paused orders', e);
@@ -1615,7 +1620,8 @@ export default function POSPage() {
                         </div>
                         <div className="pos-paused-orders-list">
                             {pausedOrders.map((po, index) => {
-                                const poTotal = po.cart.reduce((sum, item) => sum + (item.unit_price * item.quantity) - (item.discount || 0), 0) - (po.discount || 0);
+                                const poCart = Array.isArray(po.cart) ? po.cart : [];
+                                const poTotal = poCart.reduce((sum, item) => sum + (item.unit_price * item.quantity) - (item.discount || 0), 0) - (po.discount || 0);
                                 const clientName = po.selectedCustomer ? `${po.selectedCustomer.first_name} ${po.selectedCustomer.last_name}` : 'Cliente Mostrador';
                                 return (
                                     <div
@@ -1626,7 +1632,7 @@ export default function POSPage() {
                                     >
                                         <div className="pos-paused-order-chip-info">
                                             <span className="po-name">#{index + 1} {clientName}</span>
-                                            <span className="po-meta">{po.cart.length} arts · {formatCurrency(Math.max(0, poTotal))}</span>
+                                            <span className="po-meta">{poCart.length} arts · {formatCurrency(Math.max(0, poTotal))}</span>
                                         </div>
                                         <button
                                             type="button"
