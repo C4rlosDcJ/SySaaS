@@ -99,15 +99,23 @@ exports.getPurchaseOrders = async (req, res) => {
         const tenantId = req.tenantCtx.tenantId;
         const branchId = req.tenantCtx.branchId;
 
-        const [orders] = await db.query(`
+        let query = `
             SELECT po.*, s.company_name as supplier_name, b.name as branch_name
             FROM purchase_orders po
             JOIN suppliers s ON po.supplier_id = s.id
             JOIN branches b ON po.branch_id = b.id
-            WHERE po.tenant_id = ? AND po.branch_id = ?
-            ORDER BY po.created_at DESC
-        `, [tenantId, branchId]);
+            WHERE po.tenant_id = ?
+        `;
+        const params = [tenantId];
 
+        if (branchId) {
+            query += ' AND po.branch_id = ?';
+            params.push(branchId);
+        }
+
+        query += ' ORDER BY po.created_at DESC';
+
+        const [orders] = await db.query(query, params);
         res.json(orders);
     } catch (error) {
         console.error('[SUPPLIERS] Error al obtener órdenes de compra:', error);
@@ -123,8 +131,16 @@ exports.createPurchaseOrder = async (req, res) => {
 
         const { supplier_id, items, notes } = req.body;
         const tenantId = req.tenantCtx.tenantId;
-        const branchId = req.tenantCtx.branchId;
+        let branchId = req.tenantCtx.branchId;
         const userId = req.user.id;
+
+        if (!branchId) {
+            const [mainBranches] = await connection.query(
+                'SELECT id FROM branches WHERE tenant_id = ? AND is_main = TRUE LIMIT 1',
+                [tenantId]
+            );
+            branchId = mainBranches.length > 0 ? mainBranches[0].id : null;
+        }
 
         if (!supplier_id || !items || items.length === 0) {
             return res.status(400).json({ message: 'Proveedor e ítems son requeridos.' });
@@ -214,11 +230,23 @@ exports.receivePurchaseOrder = async (req, res) => {
                 );
             }
 
-            // Registrar movimiento de stock
-            await connection.query(`
-                INSERT INTO stock_movements (tenant_id, product_id, type, quantity, reference, notes)
-                VALUES (?, ?, 'in', ?, ?, ?)
-            `, [tenantId, item.product_id, item.quantity, po.po_number, `Recepción de Orden de Compra #${po.po_number}`]);
+            // Registrar movimiento de stock de forma segura
+            try {
+                await connection.query(`
+                    INSERT INTO stock_movements (tenant_id, branch_id, product_id, type, quantity, reference, notes, created_by)
+                    VALUES (?, ?, ?, 'in', ?, ?, ?, ?)
+                `, [tenantId, po.branch_id, item.product_id, item.quantity, po.po_number, `Recepción de Orden de Compra #${po.po_number}`, req.user?.id || null]);
+            } catch (stockMovErr) {
+                // Fallback sin branch_id o created_by si la tabla stock_movements en prod tiene esquema antiguo
+                try {
+                    await connection.query(`
+                        INSERT INTO stock_movements (product_id, type, quantity, reference, notes, created_by)
+                        VALUES (?, 'in', ?, ?, ?, ?)
+                    `, [item.product_id, item.quantity, po.po_number, `Recepción de Orden de Compra #${po.po_number}`, req.user?.id || null]);
+                } catch (fallbackErr) {
+                    console.warn('[SUPPLIERS] No se pudo registrar stock_movement:', fallbackErr.message);
+                }
+            }
         }
 
         // Marcar orden como recibida

@@ -296,6 +296,18 @@ exports.createSale = async (req, res) => {
             }
         }
 
+        // Si se aplicó un cupón de descuento, incrementar su contador de usos
+        if (req.body.coupon_code) {
+            try {
+                await connection.query(
+                    'UPDATE coupons SET uses_count = uses_count + 1 WHERE tenant_id = ? AND code = ?',
+                    [tenantId, req.body.coupon_code.trim().toUpperCase()]
+                );
+            } catch (couponErr) {
+                console.warn('[POS] No se pudo incrementar contador de cupón:', couponErr.message);
+            }
+        }
+
         await connection.commit();
 
         res.status(201).json({

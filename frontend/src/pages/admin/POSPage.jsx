@@ -3,9 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import {
     ShoppingCart, Search, Package, Wrench, X, Plus, Minus, Trash2,
     CreditCard, Banknote, ArrowRightLeft, Printer, CheckCircle2,
-    User, ShoppingBag, ClipboardList, Hash, AlertCircle, Store, Camera, Layers
+    User, ShoppingBag, ClipboardList, Hash, AlertCircle, Store, Camera, Layers, Tag
 } from 'lucide-react';
-import { inventoryService, posService, customerService, servicesCatalog, settingsService, repairService, orderService, getImageUrl } from '../../services/api';
+import { inventoryService, posService, customerService, servicesCatalog, settingsService, repairService, orderService, couponService, getImageUrl } from '../../services/api';
 import { formatCurrency, STATUS_LABELS } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
 import PrintReceipt from '../../components/common/PrintReceipt';
@@ -33,6 +33,9 @@ export default function POSPage() {
     const [search, setSearch] = useState('');
     const [cart, setCart] = useState([]);
     const [discount, setDiscount] = useState(0);
+    const [couponCode, setCouponCode] = useState('');
+    const [appliedCoupon, setAppliedCoupon] = useState(null);
+    const [couponLoading, setCouponLoading] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('cash');
     const [amountReceived, setAmountReceived] = useState('');
     const [mixedPayments, setMixedPayments] = useState({ cash: '', card: '', transfer: '' });
@@ -487,12 +490,42 @@ export default function POSPage() {
     const clearCart = () => {
         setCart([]);
         setDiscount(0);
+        setCouponCode('');
+        setAppliedCoupon(null);
         setAmountReceived('');
         setSelectedCustomer(null);
         setLinkedRepairs([]);
         setLoadedPendingSales([]);
         setMixedPayments({ cash: '', card: '', transfer: '' });
         draftStorage.clearDraft('pos', tenantId, activeBranchId);
+    };
+
+    const handleApplyCoupon = async () => {
+        if (!couponCode.trim()) return;
+        setCouponLoading(true);
+        try {
+            const currentSubtotal = cart.reduce((sum, item) =>
+                sum + (item.unit_price * item.quantity) - (item.discount || 0), 0
+            );
+            const res = await couponService.validate(couponCode.trim(), currentSubtotal);
+            if (res && res.valid) {
+                setAppliedCoupon(res);
+                setDiscount(res.calculated_discount || 0);
+                showToast(`Cupón "${res.code}" aplicado: -$${res.calculated_discount.toFixed(2)}`, 'success');
+            }
+        } catch (err) {
+            showToast(err.message || 'Cupón inválido o expirado', 'error');
+            setAppliedCoupon(null);
+        } finally {
+            setCouponLoading(false);
+        }
+    };
+
+    const handleRemoveCoupon = () => {
+        setAppliedCoupon(null);
+        setCouponCode('');
+        setDiscount(0);
+        showToast('Cupón removido');
     };
 
     // ─── Calculations ───
@@ -611,6 +644,7 @@ export default function POSPage() {
                     discount: item.discount || 0
                 })),
                 discount: parseFloat(discount) || 0,
+                coupon_code: appliedCoupon ? appliedCoupon.code : null,
                 payment_method: paymentMethod,
                 amount_received: finalAmountReceived,
                 change_amount: finalChangeAmount,
@@ -1365,10 +1399,58 @@ export default function POSPage() {
                                     className="input input-sm"
                                     placeholder="0"
                                     value={discount}
-                                    onChange={(e) => setDiscount(e.target.value)}
+                                    onChange={(e) => {
+                                        setDiscount(e.target.value);
+                                        if (appliedCoupon) setAppliedCoupon(null);
+                                    }}
                                     style={{ width: '90px', textAlign: 'right', flexShrink: 0 }}
                                 />
                             </div>
+
+                            {/* Cupón de Descuento */}
+                            <div className="cart-total-row" style={{ alignItems: 'center', borderTop: '1px dashed var(--color-border)', paddingTop: '6px', marginTop: '2px' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: '0.8rem', color: appliedCoupon ? 'var(--color-success)' : 'var(--color-text-secondary)' }}>
+                                    <Tag size={13} />
+                                    {appliedCoupon ? `Cupón ${appliedCoupon.code}` : 'Cupón'}
+                                </span>
+                                {appliedCoupon ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--color-success)' }}>
+                                            -{formatCurrency(discount)}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={handleRemoveCoupon}
+                                            style={{ background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer', padding: 0 }}
+                                            title="Quitar cupón"
+                                        >
+                                            <X size={13} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                                        <input
+                                            type="text"
+                                            className="input input-sm"
+                                            placeholder="Código"
+                                            value={couponCode}
+                                            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                                            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleApplyCoupon(); } }}
+                                            style={{ width: '85px', textTransform: 'uppercase', fontSize: '0.75rem', padding: '2px 6px', height: '26px' }}
+                                        />
+                                        <button
+                                            type="button"
+                                            className="btn btn-sm btn-ghost"
+                                            onClick={handleApplyCoupon}
+                                            disabled={couponLoading || !couponCode.trim()}
+                                            style={{ height: '26px', padding: '0 8px', fontSize: '0.75rem' }}
+                                        >
+                                            {couponLoading ? '...' : 'Aplicar'}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="cart-total-row grand-total">
                                 <span>Total</span>
                                 <span>{formatCurrency(total)}</span>
