@@ -210,6 +210,36 @@ async function dbInit() {
             console.error(`[DB-INIT] Error al alterar la tabla sales:`, e.message);
         }
 
+        // 10.1. Asegurar que las columnas repair_id, is_returned, returned_at, return_reason existan en 'sale_items'
+        console.log(`[DB-INIT] Verificando columnas en tabla "sale_items"...`);
+        try {
+            const [repairIdCol] = await connection.query(`SHOW COLUMNS FROM sale_items LIKE 'repair_id'`);
+            if (repairIdCol.length === 0) {
+                await connection.query(`ALTER TABLE sale_items ADD COLUMN repair_id INT NULL DEFAULT NULL AFTER service_id`);
+                console.log(`[DB-INIT] Columna repair_id añadida a la tabla sale_items.`);
+            }
+
+            const [isReturnedCol] = await connection.query(`SHOW COLUMNS FROM sale_items LIKE 'is_returned'`);
+            if (isReturnedCol.length === 0) {
+                await connection.query(`ALTER TABLE sale_items ADD COLUMN is_returned TINYINT(1) NOT NULL DEFAULT 0 AFTER total`);
+                console.log(`[DB-INIT] Columna is_returned añadida a la tabla sale_items.`);
+            }
+
+            const [returnedAtCol] = await connection.query(`SHOW COLUMNS FROM sale_items LIKE 'returned_at'`);
+            if (returnedAtCol.length === 0) {
+                await connection.query(`ALTER TABLE sale_items ADD COLUMN returned_at DATETIME NULL DEFAULT NULL AFTER is_returned`);
+                console.log(`[DB-INIT] Columna returned_at añadida a la tabla sale_items.`);
+            }
+
+            const [returnReasonCol] = await connection.query(`SHOW COLUMNS FROM sale_items LIKE 'return_reason'`);
+            if (returnReasonCol.length === 0) {
+                await connection.query(`ALTER TABLE sale_items ADD COLUMN return_reason VARCHAR(255) NULL DEFAULT NULL AFTER returned_at`);
+                console.log(`[DB-INIT] Columna return_reason añadida a la tabla sale_items.`);
+            }
+        } catch (e) {
+            console.error(`[DB-INIT] Error al verificar/alterar la tabla sale_items:`, e.message);
+        }
+
         // 11. Asegurar que las columnas is_unique e image_url existan en la tabla products
         console.log(`[DB-INIT] Verificando columnas "is_unique" e "image_url" en tabla "products"...`);
         try {

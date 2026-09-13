@@ -483,7 +483,7 @@ exports.cancelSale = async (req, res) => {
         }
 
         // Obtener items para devolver stock a la sucursal (solo no devueltos previamente)
-        const [items] = await connection.query('SELECT si.*, si.repair_id FROM sale_items si WHERE si.sale_id = ?', [id]);
+        const [items] = await connection.query('SELECT si.* FROM sale_items si WHERE si.sale_id = ?', [id]);
 
         for (const item of items) {
             if (item.product_id && !item.is_returned) {
@@ -548,11 +548,15 @@ exports.cancelSale = async (req, res) => {
             }
         }
 
-        // Marcar todos los ítems como devueltos
-        await connection.query(
-            'UPDATE sale_items SET is_returned = 1, returned_at = COALESCE(returned_at, NOW()), return_reason = COALESCE(return_reason, \'Cancelación total de venta\') WHERE sale_id = ?',
-            [id]
-        );
+        // Marcar todos los ítems como devueltos (de forma segura si existen las columnas)
+        try {
+            await connection.query(
+                'UPDATE sale_items SET is_returned = 1, returned_at = COALESCE(returned_at, NOW()), return_reason = COALESCE(return_reason, \'Cancelación total de venta\') WHERE sale_id = ?',
+                [id]
+            );
+        } catch (itemErr) {
+            console.warn('[POS] No se pudo actualizar is_returned en sale_items (posible migración pendiente):', itemErr.message);
+        }
 
         await connection.query('UPDATE sales SET status = ? WHERE id = ? AND tenant_id = ?', ['cancelled', id, tenantId]);
 
