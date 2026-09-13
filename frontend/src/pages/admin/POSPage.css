@@ -1257,57 +1257,113 @@
     padding: var(--sp-4) var(--sp-5);
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
+    gap: 10px;
 }
 
-.pos-shortcuts-section {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.pos-shortcuts-section h4 {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    font-weight: 700;
-    color: var(--color-text-muted);
-    margin: 0 0 2px;
-}
-
-.pos-shortcut-row {
+.pos-shortcut-card-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 6px 10px;
-    background: var(--color-bg-input, rgba(255, 255, 255, 0.03));
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm, 6px);
+    padding: 12px 18px;
+    background: var(--color-bg-input, rgba(255, 255, 255, 0.04));
+    border: 1px solid var(--color-border, rgba(255, 255, 255, 0.08));
+    border-radius: 12px;
+    transition: all var(--transition-fast, 0.15s ease);
 }
 
-.pos-shortcut-keys {
+.pos-shortcut-card-row:hover {
+    background: var(--color-bg-hover, rgba(255, 255, 255, 0.07));
+    border-color: var(--color-border-strong, rgba(255, 255, 255, 0.15));
+}
+
+.pos-shortcut-card-desc {
+    font-size: var(--font-sm, 13px);
+    font-weight: 500;
+    color: var(--color-text, #ffffff);
+}
+
+.pos-shortcut-card-key {
+    font-family: var(--font-mono, monospace);
+    font-size: 12px;
+    font-weight: 700;
+    color: #ffffff;
+    background: #000000;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 4px 14px;
+    min-width: 38px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+    letter-spacing: 0.02em;
+}
+
+/* ── Paused Orders (Órdenes en espera) Bar ── */
+.pos-paused-orders-bar {
+    padding: 10px 14px;
+    background: rgba(245, 158, 11, 0.06);
+    border-bottom: 1px solid rgba(245, 158, 11, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.pos-paused-orders-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.pos-paused-order-chip {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    color: var(--color-text-muted);
+    gap: 8px;
+    padding: 5px 10px;
+    background: var(--color-bg-surface, #1e1e24);
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-radius: var(--radius-full, 9999px);
+    cursor: pointer;
+    transition: all var(--transition-fast, 0.15s ease);
 }
 
-.pos-shortcut-keys kbd {
-    font-family: var(--font-mono, monospace);
+.pos-paused-order-chip:hover {
+    background: rgba(245, 158, 11, 0.15);
+    border-color: var(--color-warning, #f59e0b);
+    transform: translateY(-1px);
+}
+
+.pos-paused-order-chip-info {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.15;
+}
+
+.pos-paused-order-chip-info .po-name {
     font-size: 11px;
     font-weight: 700;
     color: var(--color-text);
-    background: var(--color-bg-body, #121214);
-    border: 1px solid var(--color-border-strong, rgba(255, 255, 255, 0.2));
-    border-radius: 4px;
-    padding: 2px 6px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-.pos-shortcut-desc {
-    font-size: var(--font-xs);
-    font-weight: 500;
-    color: var(--color-text);
+.pos-paused-order-chip-info .po-meta {
+    font-size: 10px;
+    color: var(--color-text-muted);
 }
+
+.pos-paused-order-chip-del {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    padding: 2px;
+    border-radius: var(--radius-full, 9999px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+}
+
+.pos-paused-order-chip-del:hover {
+    color: var(--color-danger, #ef4444);
+    background: rgba(239, 68, 68, 0.15);
+}
+
 
