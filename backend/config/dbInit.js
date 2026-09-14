@@ -193,7 +193,13 @@ async function dbInit() {
         } catch (e) {
             console.error(`[DB-INIT] Error al verificar/agregar columnas de firma en repairs:`, e.message);
         }
-
+        // 8.11. Asegurar que estimated_delivery en repairs sea DATETIME para permitir hora de entrega
+        console.log(`[DB-INIT] Asegurando que la columna "estimated_delivery" en tabla "repairs" sea DATETIME...`);
+        try {
+            await connection.query(`ALTER TABLE repairs MODIFY COLUMN estimated_delivery DATETIME NULL DEFAULT NULL`);
+        } catch (e) {
+            console.warn(`[DB-INIT] No se pudo modificar columna estimated_delivery en repairs:`, e.message);
+        }
 
         // 9. Modificar tipo de setting_value a LONGTEXT para soportar logos pesados en base64
         console.log(`[DB-INIT] Asegurando que la columna "setting_value" en tabla "settings" soporte datos largos (LONGTEXT)...`);

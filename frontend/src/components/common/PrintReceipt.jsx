@@ -109,7 +109,7 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                                     <p className="bold">Entregado: {formatDateTime(data.delivered_at)}</p>
                                 )}
                                 {data.estimated_delivery && (
-                                    <p className="bold">Entrega Estimada: {formatDate(data.estimated_delivery, { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                                    <p className="bold">Entrega Estimada: {formatDateTime(data.estimated_delivery)}</p>
                                 )}
                                 
                                 <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
