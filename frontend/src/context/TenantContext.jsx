@@ -56,7 +56,16 @@ export function TenantProvider({ children }) {
     };
 
     const updateTenantInfo = (partialData) => {
-        setTenant(prev => prev ? ({ ...prev, ...partialData }) : partialData);
+        setTenant(prev => {
+            const next = prev ? ({ ...prev, ...partialData }) : partialData;
+            try {
+                // Notificar a otras vistas o pestañas
+                window.dispatchEvent(new CustomEvent('sysaas_tenant_updated', { detail: next }));
+            } catch (e) {
+                // ignore
+            }
+            return next;
+        });
     };
 
     const value = {

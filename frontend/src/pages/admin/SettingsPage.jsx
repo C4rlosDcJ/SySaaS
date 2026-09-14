@@ -192,23 +192,40 @@ export default function SettingsPage() {
         e.preventDefault();
         try {
             setSaving(true);
-            await settingsService.update({
+            const res = await settingsService.update({
                 ...settings,
                 border_radius: borderRadius,
                 logo_border_radius: logoBorderRadius,
-                company_name_transform: companyNameTransform
+                company_name_transform: companyNameTransform,
+                brand_font: brandFont
             });
-            // Only update TenantContext after a successful explicit save by the user.
-            // Limit the update to visible branding fields to avoid contaminating other tenant data.
+
+            // Sincronizar TenantContext con los datos actualizados retornados por el servidor o el estado de settings
             if (updateTenantInfo) {
-                const patch = {};
-                if (settings.business_name) patch.company_name = settings.business_name;
-                if (settings.business_logo !== undefined) patch.logo_url = settings.business_logo;
-                if (Object.keys(patch).length > 0) updateTenantInfo(patch);
+                const patch = {
+                    company_name: settings.business_name,
+                    logo_url: settings.business_logo,
+                    tax_id: settings.tax_id,
+                    currency: settings.currency,
+                    tax_rate: settings.tax_rate,
+                    phone: settings.contact_phone,
+                    address: settings.contact_address,
+                    ...(res?.tenant || {})
+                };
+                updateTenantInfo(patch);
             }
+
+            // Sincronizar ThemeContext para reflejar el nombre y estilos en toda la app de inmediato
+            if (setBusinessName && settings.business_name) {
+                setBusinessName(settings.business_name);
+            }
+            if (setBusinessLogo && settings.business_logo !== undefined) {
+                setBusinessLogo(settings.business_logo);
+            }
+
             showAlert({
                 title: 'Configuración Guardada',
-                text: 'Los parámetros y logotipo de tu empresa han sido actualizados con éxito.',
+                text: 'Los parámetros y logotipo de tu empresa han sido actualizados con éxito en todo el sistema.',
                 icon: 'success'
             });
         } catch (error) {
