@@ -37,31 +37,81 @@ exports.trackRepair = async (req, res) => {
             return res.status(400).json({ message: 'Número de ticket inválido.' });
         }
 
-        // Si empieza con VTA- o algún prefijo de sucursal de venta, buscamos en la tabla de ventas
-        if (ticketCode.includes('-VTA-') || ticketCode.startsWith('VTA-')) {
-            const [sales] = await db.query(`
-                SELECT 
-                    s.id, s.tenant_id, s.branch_id, s.sale_number, s.subtotal, s.discount, s.tax, s.total,
-                    s.payment_method, s.amount_received, s.change_amount, s.status,
-                    s.notes, s.created_at, s.repair_id,
-                    u.first_name as customer_first_name, u.last_name as customer_last_name,
-                    c.first_name as cashier_first_name, c.last_name as cashier_last_name
-                FROM sales s
-                LEFT JOIN users u ON s.customer_id = u.id
-                LEFT JOIN users c ON s.cashier_id = c.id
-                WHERE s.sale_number = ?
-            `, [ticketCode]);
+        // 1. Intentar buscar primero en la tabla de reparaciones
+        const [repairs] = await db.query(`
+            SELECT 
+                r.id, r.tenant_id, r.branch_id, r.ticket_number, r.model, r.status, r.payment_status,
+                r.priority, r.estimated_delivery, r.warranty_days, r.warranty_expires,
+                r.physical_condition, r.existing_damage, r.function_checklist,
+                r.problem_description, r.service_requested, r.technical_observations,
+                r.diagnosis_cost, r.labor_cost, r.parts_cost, r.discount, r.total_cost,
+                r.advance_payment, r.created_at, r.started_at, r.completed_at, r.delivered_at,
+                r.parent_repair_id, pr.ticket_number as parent_ticket_number,
+                dt.name as device_type_name, b.name as brand_name, r.brand_other,
+                u.first_name as customer_first_name, u.last_name as customer_last_name
+            FROM repairs r
+            LEFT JOIN device_types dt ON r.device_type_id = dt.id
+            LEFT JOIN brands b ON r.brand_id = b.id
+            LEFT JOIN users u ON r.customer_id = u.id
+            LEFT JOIN repairs pr ON r.parent_repair_id = pr.id
+            WHERE r.ticket_number = ?
+        `, [ticketCode]);
 
-            if (sales.length === 0) {
-                return res.status(404).json({ message: 'No se encontró ningún pedido o venta con ese número.' });
-            }
+        if (repairs.length > 0) {
+            const repair = repairs[0];
 
+            // Obtener historial de estados (sin datos internos)
+            const [history] = await db.query(`
+                SELECT status, notes, created_at
+                FROM repair_status_history
+                WHERE repair_id = ?
+                ORDER BY created_at ASC
+            `, [repair.id]);
+
+            // Obtener notas públicas (no internas)
+            const [notes] = await db.query(`
+                SELECT rn.note, rn.created_at, u.first_name
+                FROM repair_notes rn
+                LEFT JOIN users u ON rn.user_id = u.id
+                WHERE rn.repair_id = ? AND rn.is_internal = FALSE
+                ORDER BY rn.created_at DESC
+            `, [repair.id]);
+
+            const contactInfo = await getTenantContactInfo(repair.tenant_id);
+
+            return res.json({
+                is_sale: false,
+                is_repair: true,
+                business_name: contactInfo.businessName,
+                contact_phone: contactInfo.contactPhone,
+                ...repair,
+                history,
+                notes
+            });
+        }
+
+        // 2. Si no es un ticket de reparación, buscar en la tabla de ventas
+        const [sales] = await db.query(`
+            SELECT 
+                s.id, s.tenant_id, s.branch_id, s.sale_number, s.subtotal, s.discount, s.tax, s.total,
+                s.payment_method, s.amount_received, s.change_amount, s.status,
+                s.notes, s.created_at, s.repair_id,
+                u.first_name as customer_first_name, u.last_name as customer_last_name, u.email as customer_email,
+                c.first_name as cashier_first_name, c.last_name as cashier_last_name
+            FROM sales s
+            LEFT JOIN users u ON s.customer_id = u.id
+            LEFT JOIN users c ON s.cashier_id = c.id
+            WHERE s.sale_number = ?
+        `, [ticketCode]);
+
+        if (sales.length > 0) {
             const sale = sales[0];
 
             // Obtener ítems de la venta
             const [items] = await db.query(`
                 SELECT 
                     si.id, si.description, si.quantity, si.unit_price, si.discount, si.total, si.is_returned,
+                    si.repair_id, si.service_id, si.product_id,
                     p.name as product_name, p.sku,
                     sc.name as service_name
                 FROM sale_items si
@@ -70,10 +120,18 @@ exports.trackRepair = async (req, res) => {
                 WHERE si.sale_id = ?
             `, [sale.id]);
 
-            // Si tiene reparación asociada, traemos los datos completos
+            // Determinar si la venta tiene una reparación vinculada
+            let targetRepairId = sale.repair_id;
+            if (!targetRepairId && items.length > 0) {
+                const itemWithRepair = items.find(i => i.repair_id);
+                if (itemWithRepair) {
+                    targetRepairId = itemWithRepair.repair_id;
+                }
+            }
+
             let repairData = null;
-            if (sale.repair_id) {
-                const [repairs] = await db.query(`
+            if (targetRepairId) {
+                const [linkedRepairs] = await db.query(`
                     SELECT 
                         r.id, r.tenant_id, r.branch_id, r.ticket_number, r.model, r.status, r.payment_status,
                         r.priority, r.estimated_delivery, r.warranty_days, r.warranty_expires,
@@ -81,30 +139,32 @@ exports.trackRepair = async (req, res) => {
                         r.problem_description, r.service_requested, r.technical_observations,
                         r.diagnosis_cost, r.labor_cost, r.parts_cost, r.discount, r.total_cost,
                         r.advance_payment, r.created_at, r.started_at, r.completed_at, r.delivered_at,
+                        r.parent_repair_id, pr.ticket_number as parent_ticket_number,
                         dt.name as device_type_name, b.name as brand_name, r.brand_other
                     FROM repairs r
                     LEFT JOIN device_types dt ON r.device_type_id = dt.id
                     LEFT JOIN brands b ON r.brand_id = b.id
+                    LEFT JOIN repairs pr ON r.parent_repair_id = pr.id
                     WHERE r.id = ?
-                `, [sale.repair_id]);
+                `, [targetRepairId]);
 
-                if (repairs.length > 0) {
-                    repairData = repairs[0];
-                    // Historial de estados
+                if (linkedRepairs.length > 0) {
+                    repairData = linkedRepairs[0];
+
                     const [history] = await db.query(`
                         SELECT status, notes, created_at
                         FROM repair_status_history
                         WHERE repair_id = ?
                         ORDER BY created_at ASC
-                    `, [sale.repair_id]);
-                    // Notas públicas
+                    `, [targetRepairId]);
+
                     const [notes] = await db.query(`
                         SELECT rn.note, rn.created_at, u.first_name
                         FROM repair_notes rn
                         LEFT JOIN users u ON rn.user_id = u.id
                         WHERE rn.repair_id = ? AND rn.is_internal = FALSE
                         ORDER BY rn.created_at DESC
-                    `, [sale.repair_id]);
+                    `, [targetRepairId]);
 
                     repairData.history = history;
                     repairData.notes = notes;
@@ -117,6 +177,9 @@ exports.trackRepair = async (req, res) => {
                 is_sale: true,
                 is_repair: !!repairData,
                 repair: repairData,
+                repair_ticket: repairData?.ticket_number || null,
+                repair_warranty_days: repairData?.warranty_days || null,
+                repair_warranty_expires: repairData?.warranty_expires || null,
                 business_name: contactInfo.businessName,
                 contact_phone: contactInfo.contactPhone,
                 ...sale,
@@ -124,58 +187,8 @@ exports.trackRepair = async (req, res) => {
             });
         }
 
-        // De lo contrario, buscamos en la tabla de reparaciones
-        const [repairs] = await db.query(`
-            SELECT 
-                r.id, r.tenant_id, r.branch_id, r.ticket_number, r.model, r.status, r.payment_status,
-                r.priority, r.estimated_delivery, r.warranty_days, r.warranty_expires,
-                r.physical_condition, r.existing_damage, r.function_checklist,
-                r.problem_description, r.service_requested, r.technical_observations,
-                r.diagnosis_cost, r.labor_cost, r.parts_cost, r.discount, r.total_cost,
-                r.advance_payment, r.created_at, r.started_at, r.completed_at, r.delivered_at,
-                dt.name as device_type_name, b.name as brand_name, r.brand_other,
-                u.first_name as customer_first_name, u.last_name as customer_last_name
-            FROM repairs r
-            LEFT JOIN device_types dt ON r.device_type_id = dt.id
-            LEFT JOIN brands b ON r.brand_id = b.id
-            LEFT JOIN users u ON r.customer_id = u.id
-            WHERE r.ticket_number = ?
-        `, [ticketCode]);
-
-        if (repairs.length === 0) {
-            return res.status(404).json({ message: 'No se encontró ninguna reparación con ese número de ticket.' });
-        }
-
-        const repair = repairs[0];
-
-        // Obtener historial de estados (sin datos internos)
-        const [history] = await db.query(`
-            SELECT status, notes, created_at
-            FROM repair_status_history
-            WHERE repair_id = ?
-            ORDER BY created_at ASC
-        `, [repair.id]);
-
-        // Obtener notas públicas (no internas)
-        const [notes] = await db.query(`
-            SELECT rn.note, rn.created_at, u.first_name
-            FROM repair_notes rn
-            LEFT JOIN users u ON rn.user_id = u.id
-            WHERE rn.repair_id = ? AND rn.is_internal = FALSE
-            ORDER BY rn.created_at DESC
-        `, [repair.id]);
-
-        const contactInfo = await getTenantContactInfo(repair.tenant_id);
-
-        res.json({
-            is_sale: false,
-            is_repair: true,
-            business_name: contactInfo.businessName,
-            contact_phone: contactInfo.contactPhone,
-            ...repair,
-            history,
-            notes
-        });
+        // Si no se encuentra ni en reparaciones ni en ventas
+        return res.status(404).json({ message: 'No se encontró ninguna orden de reparación ni venta con ese número de ticket.' });
     } catch (error) {
         console.error('[PUBLIC] Error al rastrear:', error);
         res.status(500).json({ message: 'Error al realizar el rastreo.' });
