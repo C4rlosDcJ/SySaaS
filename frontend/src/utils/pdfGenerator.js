@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { formatCurrency, formatDate, STATUS_LABELS } from './constants';
+import { formatCurrency, formatDate, formatDateTime, STATUS_LABELS } from './constants';
 
 export const generateServiceTicket = async (repair, settings = {}) => {
     // A4 Format: 210mm x 297mm
@@ -158,7 +158,7 @@ export const generateServiceTicket = async (repair, settings = {}) => {
         ['Garantía Pactada:', `${repair.warranty_days || settings.default_warranty_days || 30} días`],
     ];
     if (repair.estimated_delivery) {
-        receptionDetails.push(['Entrega Estimada:', formatDate(repair.estimated_delivery, { day: '2-digit', month: 'long', year: 'numeric' })]);
+        receptionDetails.push(['Entrega Estimada:', formatDateTime(repair.estimated_delivery)]);
     }
     if (repair.delivered_at) {
         receptionDetails.push(['Fecha de Entrega:', formatDate(repair.delivered_at, { day: '2-digit', month: 'long', year: 'numeric' })]);

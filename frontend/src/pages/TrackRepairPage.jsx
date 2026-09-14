@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar';
 import Tilt3DCard from '../components/Tilt3DCard';
 import { useTheme } from '../context/ThemeContext';
 import { buildWhatsAppUrl } from '../utils/whatsappUtils';
+import { formatCurrency, formatDate, formatDateTime } from '../utils/constants';
 import './TrackRepairPage.css';
 
 function TrackRepairPage() {
@@ -43,20 +44,6 @@ function TrackRepairPage() {
         // eslint-disable-next-line
     }, []);
 
-    const formatCurrency = (val) => {
-        return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(val || 0);
-    };
-
-    const formatDate = (dateString) => {
-        if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleDateString('es-MX', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
 
     const translateStatus = (statusStr) => {
         if (!statusStr) return 'Pendiente';
@@ -425,7 +412,7 @@ function TrackRepairPage() {
                                             {repair.estimated_delivery && (
                                                 <div className="info-item">
                                                     <span className="info-label text-muted">Entrega Estimada</span>
-                                                    <span className="info-value font-bold text-primary">{formatDate(repair.estimated_delivery)}</span>
+                                                    <span className="info-value font-bold text-primary">{formatDateTime(repair.estimated_delivery)}</span>
                                                 </div>
                                             )}
                                             <div className="info-item">

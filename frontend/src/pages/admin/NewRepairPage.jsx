@@ -753,8 +753,8 @@ export default function NewRepairPage() {
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label>Entrega Estimada</label>
-                                <input type="date" name="estimated_delivery" className="input" value={formData.estimated_delivery} onChange={handleChange} />
+                                <label>Entrega Estimada (Fecha y Hora)</label>
+                                <input type="datetime-local" name="estimated_delivery" className="input" value={formData.estimated_delivery} onChange={handleChange} />
                             </div>
                             <div className="form-group">
                                 <label>Garantía (Días)</label>

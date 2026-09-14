@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { repairService, userService, settingsService, uploadService, posService, BACKEND_URL } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import { STATUS_LABELS, STATUS_COLORS, formatCurrency, formatDate } from '../../utils/constants';
+import { STATUS_LABELS, STATUS_COLORS, formatCurrency, formatDate, formatDateTime } from '../../utils/constants';
 import {
     Wrench, Clock, User, MessageSquare, AlertCircle, CheckCircle2,
     ChevronLeft, Smartphone, CreditCard, ShieldCheck, Send, Plus, X,
@@ -56,6 +56,18 @@ export default function RepairDetailPage() {
     const [noteText, setNoteText] = useState('');
     const [isInternal, setIsInternal] = useState(false);
     const [addingNote, setAddingNote] = useState(false);
+
+    const formatDatetimeLocal = (val) => {
+        if (!val) return '';
+        const d = new Date(val);
+        if (isNaN(d.getTime())) return '';
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const hh = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+    };
 
     // States for client review
     const [clientRating, setClientRating] = useState(5);
@@ -136,7 +148,8 @@ export default function RepairDetailPage() {
             setRepair(data);
             setNewStatus(data.status);
             setWarrantyDays(data.warranty_days);
-            setStatusEstimatedDelivery(data.estimated_delivery ? data.estimated_delivery.split('T')[0] : '');
+            const deliveryLocal = formatDatetimeLocal(data.estimated_delivery);
+            setStatusEstimatedDelivery(deliveryLocal);
             setCosts({
                 diagnosis_cost: data.diagnosis_cost || 0,
                 labor_cost: data.labor_cost || 0,
@@ -161,7 +174,7 @@ export default function RepairDetailPage() {
                 problem_description: data.problem_description || '',
                 priority: data.priority || 'normal',
                 service_requested: data.service_requested || '',
-                estimated_delivery: data.estimated_delivery ? data.estimated_delivery.split('T')[0] : ''
+                estimated_delivery: deliveryLocal
             });
             setInspectionData({
                 physical_condition: data.physical_condition || 5,
@@ -260,7 +273,7 @@ export default function RepairDetailPage() {
             const updates = {};
             if (parseInt(warrantyDays) !== parseInt(repair.warranty_days)) updates.warranty_days = warrantyDays;
 
-            const currentDelivery = repair.estimated_delivery ? repair.estimated_delivery.split('T')[0] : '';
+            const currentDelivery = formatDatetimeLocal(repair.estimated_delivery);
             if (statusEstimatedDelivery !== currentDelivery) {
                 updates.estimated_delivery = statusEstimatedDelivery || null;
             }
@@ -283,19 +296,11 @@ export default function RepairDetailPage() {
                 if (newStatus === 'delivered') {
                     const balance = parseFloat(repair.total_cost) - parseFloat(repair.advance_payment || 0);
                     if (repair.payment_status !== 'paid' && balance > 0) {
-                        navigate(`/admin/pos?repair_id=${repair.id}`);
-                        setIsEditingCosts(false);
                         setIsEditingTechnical(false);
                         setUpdatingStatus(false);
+                        await fetchRepairData();
                         return;
                     }
-                    setSigType('delivery');
-                    setShowSigModal(true);
-                    setIsEditingCosts(false);
-                    setIsEditingTechnical(false);
-                    setUpdatingStatus(false);
-                    await fetchRepairData();
-                    return;
                 }
                 await repairService.updateStatus(id, newStatus, statusNote, statusEstimatedDelivery || null);
                 setStatusNote('');
@@ -488,19 +493,19 @@ export default function RepairDetailPage() {
                             <div className="delivery-input" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span className="text-sm text-muted">Entrega:</span>
                                 <input
-                                    type="date"
+                                    type="datetime-local"
                                     value={statusEstimatedDelivery}
                                     onChange={e => setStatusEstimatedDelivery(e.target.value)}
                                     className="input input-sm"
-                                    style={{ width: '135px' }}
-                                    title="Fecha estimada de entrega"
+                                    style={{ width: '210px' }}
+                                    title="Fecha y hora estimada de entrega"
                                 />
                             </div>
                             <div className="warranty-input" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <span className="text-sm text-muted">Garantía (días):</span>
                                 <input type="number" value={warrantyDays} onChange={e => setWarrantyDays(e.target.value)} className="input input-sm w-16 text-center" />
                             </div>
-                            <button className="btn btn-primary" onClick={handleUpdateStatus} disabled={updatingStatus || (newStatus === repair.status && parseInt(warrantyDays) === parseInt(repair.warranty_days) && statusEstimatedDelivery === (repair.estimated_delivery ? repair.estimated_delivery.split('T')[0] : '') && !statusNote && !isEditingCosts && !isEditingTechnical)}>
+                            <button className="btn btn-primary" onClick={handleUpdateStatus} disabled={updatingStatus || (newStatus === repair.status && parseInt(warrantyDays) === parseInt(repair.warranty_days) && statusEstimatedDelivery === (repair.estimated_delivery ? formatDatetimeLocal(repair.estimated_delivery) : '') && !statusNote && !isEditingCosts && !isEditingTechnical)}>
                                 <SaveIcon size={16} /> {updatingStatus ? 'Guardando...' : 'Guardar'}
                             </button>
                         </div>
@@ -680,8 +685,8 @@ export default function RepairDetailPage() {
                             <div className="info-item">
                                 <label>Entrega Estimada</label>
                                 {isEditingTechnical ? (
-                                    <input type="date" className="input input-sm" value={technicalData.estimated_delivery} onChange={e => setTechnicalData({...technicalData, estimated_delivery: e.target.value})} />
-                                ) : <span>{repair.estimated_delivery ? formatDate(repair.estimated_delivery).split(',')[0] : 'No definida'}</span>}
+                                    <input type="datetime-local" className="input input-sm" value={technicalData.estimated_delivery} onChange={e => setTechnicalData({...technicalData, estimated_delivery: e.target.value})} />
+                                ) : <span>{repair.estimated_delivery ? formatDateTime(repair.estimated_delivery) : 'No definida'}</span>}
                             </div>
                         </div>
 
@@ -1135,9 +1140,9 @@ export default function RepairDetailPage() {
                                         </select>
                                     </div>
                                     <div className="input-group" style={{ marginBottom: '1.25rem' }}>
-                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Fecha de Entrega Estimada</label>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: 600 }}>Fecha y Hora de Entrega Estimada</label>
                                         <input 
-                                            type="date" 
+                                            type="datetime-local" 
                                             className="input" 
                                             value={warrantyDeliveryDate} 
                                             onChange={e => setWarrantyDeliveryDate(e.target.value)} 
