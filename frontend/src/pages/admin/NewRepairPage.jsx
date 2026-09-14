@@ -116,12 +116,15 @@ export default function NewRepairPage() {
             setBrands(brandsData || []);
             setTechnicians(staff || []);
             setSettings(settingsData || {});
-            const defWarranty = settingsData?.default_warranty_days;
+            const defWarranty = settingsData?.default_warranty_days || tenant?.default_warranty_days;
             if (defWarranty) {
-                setFormData(prev => ({
-                    ...prev,
-                    warranty_days: prev.warranty_days || parseInt(defWarranty)
-                }));
+                const parsedDays = parseInt(defWarranty, 10);
+                if (!isNaN(parsedDays)) {
+                    setFormData(prev => ({
+                        ...prev,
+                        warranty_days: parsedDays
+                    }));
+                }
             }
         } catch (error) {
             console.error('Error fetching initial data:', error);

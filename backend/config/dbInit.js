@@ -678,6 +678,22 @@ async function dbInit() {
             console.error(`[DB-INIT] Error al verificar características de planes:`, e.message);
         }
 
+        // 20. Asegurar que la tabla settings tenga el índice único compuesto por tenant_id y setting_key
+        try {
+            const [settingsIndexes] = await connection.query(`SHOW INDEX FROM settings WHERE Key_name = 'setting_key'`);
+            if (settingsIndexes.length > 0) {
+                await connection.query(`ALTER TABLE settings DROP INDEX setting_key`);
+                console.log(`[DB-INIT] Índice setting_key simple eliminado de settings.`);
+            }
+            const [compositeIndexes] = await connection.query(`SHOW INDEX FROM settings WHERE Key_name = 'uk_tenant_setting'`);
+            if (compositeIndexes.length === 0) {
+                await connection.query(`ALTER TABLE settings ADD UNIQUE KEY uk_tenant_setting (tenant_id, setting_key)`);
+                console.log(`[DB-INIT] Índice único compuesto (tenant_id, setting_key) añadido a settings.`);
+            }
+        } catch (idxErr) {
+            console.warn(`[DB-INIT] Nota sobre índices en settings:`, idxErr.message);
+        }
+
         console.log(`[DB-INIT] Base de datos "${dbName}" inicializada correctamente.`);
 
     } catch (error) {

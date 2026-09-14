@@ -210,6 +210,10 @@ export default function SettingsPage() {
                     tax_rate: settings.tax_rate,
                     phone: settings.contact_phone,
                     address: settings.contact_address,
+                    default_warranty_days: settings.default_warranty_days,
+                    repair_ticket_prefix: settings.repair_ticket_prefix,
+                    ticket_terms_conditions: settings.ticket_terms_conditions,
+                    ticket_footer_note: settings.ticket_footer_note,
                     ...(res?.tenant || {})
                 };
                 updateTenantInfo(patch);

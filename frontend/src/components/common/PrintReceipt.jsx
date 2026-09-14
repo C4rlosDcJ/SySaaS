@@ -11,6 +11,7 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
     const contactEmail = settings.contact_email || tenant?.email || '';
     const contactPhone = settings.contact_phone || tenant?.phone || '';
     const contactAddress = settings.business_address || tenant?.address || 'Dirección de la empresa';
+    const defaultWarrantyDays = settings.default_warranty_days || tenant?.default_warranty_days || 30;
 
     const trackingCode = data.ticket_number || data.sale_number;
     const trackingUrl = `${window.location.origin}/rastrear?ticketId=${encodeURIComponent(trackingCode || '')}`;
@@ -145,7 +146,7 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                                     <p><span>S/N o IMEI:</span> <span className="bold">{data.imei || data.serial_number}</span></p>
                                 )}
                                 {data.physical_condition && <p><span>Estado Estético:</span> <span>{data.physical_condition}/5</span></p>}
-                                <p><span>Garantía Aplicable:</span> <span className="bold">{data.warranty_days || settings.default_warranty_days || 30} días</span></p>
+                                <p><span>Garantía Aplicable:</span> <span className="bold">{data.warranty_days || defaultWarrantyDays} días</span></p>
                                 {data.warranty_expires && (
                                     <p><span>Vence el:</span> <span className="bold">{formatDate(data.warranty_expires, { year: 'numeric', month: 'long', day: 'numeric' })}</span></p>
                                 )}
@@ -235,7 +236,7 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                                         <p style={{ whiteSpace: 'pre-line' }}>{settings.ticket_terms_conditions}</p>
                                     ) : (
                                         <>
-                                            <p>1. Toda reparación cuenta con <b>{data.warranty_days || settings.default_warranty_days || 30} días de garantía</b> exclusiva sobre refacciones instaladas y mano de obra.</p>
+                                            <p>1. Toda reparación cuenta con <b>{data.warranty_days || defaultWarrantyDays} días de garantía</b> exclusiva sobre refacciones instaladas y mano de obra.</p>
                                             <p>2. No nos hacemos responsables por pérdida de datos. Respalde su equipo antes de dejarlo.</p>
                                             <p>3. Equipos no reclamados tras 30 días generarán cargos de almacenaje de $50.00 diarios.</p>
                                             <p>4. La garantía se anula si el equipo presenta sellos violados, humedad o golpes posteriores.</p>
@@ -283,10 +284,10 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                                     {data.repair_ticket ? (
                                         <>
                                             <p><span>Folio Reparación:</span> <span className="bold">{data.repair_ticket}</span></p>
-                                            <p><span>Garantía Reparación:</span> <span className="bold">{data.repair_warranty_days || settings.default_warranty_days || 30} días</span></p>
+                                            <p><span>Garantía Reparación:</span> <span className="bold">{data.repair_warranty_days || defaultWarrantyDays} días</span></p>
                                         </>
                                     ) : (
-                                        <p><span>Garantía Aplicable:</span> <span className="bold">{settings.default_warranty_days || 30} días</span></p>
+                                        <p><span>Garantía Aplicable:</span> <span className="bold">{defaultWarrantyDays} días</span></p>
                                     )}
                                 </div>
                             </div>
