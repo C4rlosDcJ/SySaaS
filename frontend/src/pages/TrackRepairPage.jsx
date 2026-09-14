@@ -203,10 +203,10 @@ function TrackRepairPage() {
                     </span>
 
                     <h1 style={{ marginTop: '8px', fontSize: '24px', fontWeight: 800, letterSpacing: '-0.02em' }}>
-                        Consulta de Servicio Técnico
+                        Consulta de Servicio Técnico y Ventas
                     </h1>
                     <p className="text-muted font-mono" style={{ fontSize: '13px' }}>
-                        Ingresa el folio del ticket (ej. REP-1001) para verificar el estatus y diagnóstico del equipo.
+                        Ingresa el folio de tu ticket (ej. REP-1001 o folio de comprobante de venta) para verificar estatus, garantía y detalles.
                     </p>
 
                     <div className="track-search-card mt-md">
@@ -216,7 +216,7 @@ function TrackRepairPage() {
                                 <input
                                     type="text"
                                     className="input font-mono"
-                                    placeholder="Ej. REP-1001 o VTA-1002"
+                                    placeholder="Ej. REP-1001 o folio de ticket..."
                                     value={ticketId}
                                     onChange={(e) => setTicketId(e.target.value)}
                                 />
@@ -275,6 +275,28 @@ function TrackRepairPage() {
                                         </div>
                                     </div>
                                 </Tilt3DCard>
+
+                                {/* Banner de venta vinculada si la reparación fue cobrada en POS */}
+                                {isSale && (
+                                    <div className="card mb-md" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.1), rgba(37,99,235,0.05))', borderLeft: '4px solid #3b82f6', padding: '14px 18px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <CreditCard size={20} style={{ color: '#3b82f6' }} />
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                                                    <p style={{ margin: 0, fontWeight: 700, color: '#3b82f6', fontSize: '14px' }}>
+                                                        Reparación Pagada y Liquidada en Punto de Venta
+                                                    </p>
+                                                    <span className="badge font-mono" style={{ background: 'rgba(59,130,246,0.2)', color: '#3b82f6', fontSize: '11px', padding: '2px 8px', borderRadius: '4px' }}>
+                                                        Folio de Venta: {result.sale_number}
+                                                    </span>
+                                                </div>
+                                                <p style={{ margin: '4px 0 0', fontSize: '13px', color: 'var(--color-text-muted, #999)' }}>
+                                                    Esta reparación cuenta con comprobante de pago emitido el {formatDate(result.created_at)} por un total de <strong style={{ color: 'var(--color-text, #fff)' }}>{formatCurrency(result.total)}</strong>.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Banner de garantía si es ingreso por garantía */}
                                 {repair.parent_repair_id && (
