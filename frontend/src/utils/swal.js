@@ -42,10 +42,10 @@ export const showConfirm = ({ title, text, icon = 'warning', confirmText = 'Conf
     }).then(res => res.isConfirmed);
 };
 
-// Toast rapido para notificaciones de exito / error / info
+// Toast rapido para notificaciones de exito / error / info (ubicado en top-end para no tapar paneles de accion inferiores)
 const swalToast = Swal.mixin({
     toast: true,
-    position: 'bottom-end',
+    position: 'top-end',
     showConfirmButton: false,
     timer: 3000,
     timerProgressBar: true,

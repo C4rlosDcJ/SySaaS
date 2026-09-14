@@ -1020,18 +1020,18 @@
     .modal-overlay { background: white !important; }
 }
 
-/* ─── Toast notification ─── */
+/* ─── Toast notification (top-right para no obstruir panel de cobro ni inputs) ─── */
 .pos-toast {
     position: fixed;
-    bottom: 24px;
+    top: 24px;
     right: 24px;
     padding: var(--sp-3) var(--sp-5);
     border-radius: var(--radius-md);
     font-size: var(--font-sm);
     font-weight: 600;
     color: white;
-    z-index: 2000;
-    animation: slideUp 0.3s ease, fadeIn 0.3s ease;
+    z-index: 9999;
+    animation: slideDown 0.3s ease, fadeIn 0.3s ease;
     box-shadow: var(--shadow-lg);
 }
 

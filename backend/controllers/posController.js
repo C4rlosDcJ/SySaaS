@@ -27,6 +27,11 @@ exports.createSale = async (req, res) => {
         const tenantId = req.tenantCtx.tenantId;
         const branchId = req.tenantCtx.branchId;
 
+        // repair_ids es el array completo enviado por el frontend; repair_id es la primera para compatibilidad
+        const allRepairIds = Array.isArray(repair_ids) && repair_ids.length > 0
+            ? repair_ids
+            : (repair_id ? [repair_id] : []);
+
         if (!items || items.length === 0) {
             return res.status(400).json({ message: 'La venta debe tener al menos un ítem.' });
         }
@@ -249,11 +254,6 @@ exports.createSale = async (req, res) => {
         }
 
         // Si la venta está vinculada a reparaciones, actualizar estado de pago para TODAS
-        // repair_ids es el array completo enviado por el frontend; repair_id es sólo la primera (para compatibilidad de header)
-        const allRepairIds = Array.isArray(repair_ids) && repair_ids.length > 0
-            ? repair_ids
-            : (repair_id ? [repair_id] : []);
-
         for (const rId of allRepairIds) {
             const [repair] = await connection.query(
                 'SELECT total_cost, advance_payment, status, warranty_days, delivered_at, warranty_expires FROM repairs WHERE id = ? AND tenant_id = ?',
