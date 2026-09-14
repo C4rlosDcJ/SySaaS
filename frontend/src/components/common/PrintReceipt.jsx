@@ -231,12 +231,20 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                             <div className="receipt-footer-notes">
                                 <p className="bold" style={{ borderBottom: '1px solid #000', paddingBottom: '2px' }}>TÉRMINOS Y CONDICIONES</p>
                                 <div style={{ textAlign: 'left', fontSize: '8.5px', marginTop: '6px' }}>
-                                    <p>1. Toda reparación cuenta con <b>{data.warranty_days || settings.default_warranty_days || 30} días de garantía</b> exclusiva sobre refacciones instaladas y mano de obra.</p>
-                                    <p>2. No nos hacemos responsables por pérdida de datos. Respalde su equipo antes de dejarlo.</p>
-                                    <p>3. Equipos no reclamados tras 30 días generarán cargos de almacenaje de $50.00 diarios.</p>
-                                    <p>4. La garantía se anula si el equipo presenta sellos violados, humedad o golpes posteriores.</p>
+                                    {settings.ticket_terms_conditions ? (
+                                        <p style={{ whiteSpace: 'pre-line' }}>{settings.ticket_terms_conditions}</p>
+                                    ) : (
+                                        <>
+                                            <p>1. Toda reparación cuenta con <b>{data.warranty_days || settings.default_warranty_days || 30} días de garantía</b> exclusiva sobre refacciones instaladas y mano de obra.</p>
+                                            <p>2. No nos hacemos responsables por pérdida de datos. Respalde su equipo antes de dejarlo.</p>
+                                            <p>3. Equipos no reclamados tras 30 días generarán cargos de almacenaje de $50.00 diarios.</p>
+                                            <p>4. La garantía se anula si el equipo presenta sellos violados, humedad o golpes posteriores.</p>
+                                        </>
+                                    )}
                                 </div>
-                                <p className="bold" style={{ marginTop: '12px', fontSize: '10px' }}>¡GRACIAS POR SU PREFERENCIA!</p>
+                                <p className="bold" style={{ marginTop: '12px', fontSize: '10px' }}>
+                                    {settings.ticket_footer_note || '¡GRACIAS POR SU PREFERENCIA!'}
+                                </p>
                             </div>
 
                             {/* Decorative Monospace Barcode */}
@@ -369,7 +377,9 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                             <div className="receipt-footer-notes">
                                 <p>Conserve este ticket como comprobante de su compra.</p>
                                 <p>Cualquier cambio o devolución se realiza en los primeros 7 días naturales presentando este ticket impreso en buen estado.</p>
-                                <p className="bold" style={{ marginTop: '12px', fontSize: '10px' }}>¡MUCHAS GRACIAS POR SU COMPRA!</p>
+                                <p className="bold" style={{ marginTop: '12px', fontSize: '10px' }}>
+                                    {settings.ticket_footer_note || '¡MUCHAS GRACIAS POR SU COMPRA!'}
+                                </p>
                             </div>
 
                             {/* Decorative Monospace Barcode */}

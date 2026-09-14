@@ -368,6 +368,15 @@ export const ThemeProvider = ({ children }) => {
     });
   };
 
+  const setBusinessNameAndPersist = (name) => {
+    isUserChange.current = true;
+    setBusinessName(name);
+    localStorage.setItem('businessName', name);
+    settingsService.update({ business_name: name }).catch((err) => {
+      console.warn('[Theme] Error al guardar nombre en BD:', err.message);
+    });
+  };
+
   const setBusinessLogoAndPersist = (logo) => {
     isUserChange.current = true;
     setBusinessLogo(logo);
@@ -378,6 +387,28 @@ export const ThemeProvider = ({ children }) => {
       console.warn('[Theme] Error al guardar logo en BD:', err.message);
     });
   };
+
+  // Escuchar eventos globales de sincronización de empresa
+  useEffect(() => {
+    const handleTenantUpdated = (e) => {
+      const updated = e.detail;
+      if (!updated) return;
+      if (updated.company_name) {
+        setBusinessName(updated.company_name);
+        localStorage.setItem('businessName', updated.company_name);
+      }
+      if (updated.logo_url !== undefined) {
+        setBusinessLogo(updated.logo_url || '');
+        localStorage.setItem('businessLogo', updated.logo_url || '');
+      }
+      if (updated.primary_color) {
+        setAccentColor(updated.primary_color);
+        localStorage.setItem('accentColor', updated.primary_color);
+      }
+    };
+    window.addEventListener('sysaas_tenant_updated', handleTenantUpdated);
+    return () => window.removeEventListener('sysaas_tenant_updated', handleTenantUpdated);
+  }, []);
 
   // Setters persistidores para toggles de landing
   const setLandingShowStatsAndPersist = (val) => {
@@ -506,7 +537,7 @@ export const ThemeProvider = ({ children }) => {
       brandFont,
       setBrandFont: setBrandFontAndPersist,
       businessName,
-      setBusinessName,
+      setBusinessName: setBusinessNameAndPersist,
       businessLogo,
       setBusinessLogo: setBusinessLogoAndPersist,
       // Toggles de la Landing Page

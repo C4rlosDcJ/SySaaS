@@ -16,7 +16,7 @@ exports.getAll = async (req, res) => {
         }, {});
 
         // Respaldo bidireccional y sincronización con la tabla tenants
-        const [tenants] = await db.query('SELECT company_name, logo_url FROM tenants WHERE id = ?', [tenantId]);
+        const [tenants] = await db.query('SELECT company_name, logo_url, tax_id, currency, tax_rate, phone, address FROM tenants WHERE id = ?', [tenantId]);
         if (tenants.length > 0) {
             const tenant = tenants[0];
             // Si no está en settings pero sí en tenants, usar de tenants
@@ -25,6 +25,21 @@ exports.getAll = async (req, res) => {
             }
             if (!settings.business_name && tenant.company_name) {
                 settings.business_name = tenant.company_name;
+            }
+            if (!settings.tax_id && tenant.tax_id) {
+                settings.tax_id = tenant.tax_id;
+            }
+            if (!settings.currency && tenant.currency) {
+                settings.currency = tenant.currency;
+            }
+            if (settings.tax_rate === undefined && tenant.tax_rate !== undefined && tenant.tax_rate !== null) {
+                settings.tax_rate = String(tenant.tax_rate);
+            }
+            if (!settings.contact_phone && tenant.phone) {
+                settings.contact_phone = tenant.phone;
+            }
+            if (!settings.contact_address && tenant.address) {
+                settings.contact_address = tenant.address;
             }
 
             // Si está en settings pero no en tenants, asegurar consistencia en tenants
@@ -62,16 +77,67 @@ exports.update = async (req, res) => {
             );
         }
 
-        // Sincronizar tabla tenants para mantener consistencia de logo y razón social
+        // Sincronizar tabla tenants para mantener consistencia en toda la empresa y sesiones de usuarios
+        const tenantUpdates = [];
+        const tenantParams = [];
+
         if (settings.business_logo !== undefined) {
             const cleanLogo = settings.business_logo && settings.business_logo.trim() !== '' ? settings.business_logo : null;
-            await db.query('UPDATE tenants SET logo_url = ? WHERE id = ?', [cleanLogo, tenantId]);
+            tenantUpdates.push('logo_url = ?');
+            tenantParams.push(cleanLogo);
         }
-        if (settings.business_name && settings.business_name.trim() !== '') {
-            await db.query('UPDATE tenants SET company_name = ? WHERE id = ?', [settings.business_name.trim(), tenantId]);
+        if (settings.business_name !== undefined && settings.business_name.trim() !== '') {
+            tenantUpdates.push('company_name = ?');
+            tenantParams.push(settings.business_name.trim());
+        }
+        if (settings.tax_id !== undefined) {
+            tenantUpdates.push('tax_id = ?');
+            tenantParams.push(settings.tax_id ? settings.tax_id.trim() : null);
+        }
+        if (settings.currency !== undefined && settings.currency.trim() !== '') {
+            tenantUpdates.push('currency = ?');
+            tenantParams.push(settings.currency.trim().toUpperCase());
+        }
+        if (settings.tax_rate !== undefined && settings.tax_rate !== '') {
+            const parsedTax = parseFloat(settings.tax_rate);
+            if (!isNaN(parsedTax)) {
+                tenantUpdates.push('tax_rate = ?');
+                tenantParams.push(parsedTax);
+            }
+        }
+        if (settings.contact_phone !== undefined) {
+            tenantUpdates.push('phone = ?');
+            tenantParams.push(settings.contact_phone ? settings.contact_phone.trim() : null);
+        }
+        if (settings.contact_address !== undefined) {
+            tenantUpdates.push('address = ?');
+            tenantParams.push(settings.contact_address ? settings.contact_address.trim() : null);
+        }
+        if (settings.accent_color !== undefined && settings.accent_color.trim() !== '') {
+            tenantUpdates.push('primary_color = ?');
+            tenantParams.push(settings.accent_color.trim());
         }
 
-        res.json({ message: 'Configuraciones actualizadas correctamente.' });
+        if (tenantUpdates.length > 0) {
+            tenantParams.push(tenantId);
+            await db.query(`UPDATE tenants SET ${tenantUpdates.join(', ')} WHERE id = ?`, tenantParams);
+        }
+
+        // Obtener el registro actualizado del tenant para devolverlo al cliente
+        const [updatedTenants] = await db.query(
+            `SELECT t.id, t.plan_id, t.company_name, t.slug, t.logo_url, t.primary_color, t.currency, 
+                    t.tax_rate, t.tax_id, t.phone, t.address, t.subscription_status, t.billing_cycle,
+                    sp.name as plan_name, sp.slug as plan_slug, sp.features as plan_features
+             FROM tenants t
+             JOIN saas_plans sp ON t.plan_id = sp.id
+             WHERE t.id = ?`,
+            [tenantId]
+        );
+
+        res.json({
+            message: 'Configuraciones actualizadas correctamente.',
+            tenant: updatedTenants.length > 0 ? updatedTenants[0] : null
+        });
     } catch (error) {
         console.error('[SETTINGS] Error al actualizar configuraciones:', error);
         res.status(500).json({ message: 'Error al actualizar configuraciones.' });
