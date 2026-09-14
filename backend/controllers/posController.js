@@ -149,6 +149,9 @@ exports.createSale = async (req, res) => {
         let saleId = allPendingSaleIds[0] || null;
         let saleNumber;
 
+        const firstProvidedRepairId = allRepairIds.length > 0 ? allRepairIds[0] : null;
+        const headerRepairId = activeRepairId || firstProvidedRepairId || null;
+
         if (allPendingSaleIds.length > 0) {
             const primaryPendingId = allPendingSaleIds[0];
             // Obtener número de venta existente de la venta principal
@@ -168,7 +171,7 @@ exports.createSale = async (req, res) => {
                 `UPDATE sales SET customer_id = ?, repair_id = ?, cashier_id = ?, subtotal = ?, discount = ?, total = ?,
                   payment_method = ?, amount_received = ?, change_amount = ?, status = 'completed', notes = ?
                   WHERE id = ? AND tenant_id = ? AND branch_id = ?`,
-                [customer_id || null, activeRepairId, req.user.id,
+                [customer_id || null, headerRepairId, req.user.id,
                  subtotal, discount || 0, total, payment_method || 'cash',
                  amount_received || total, changeAmount, notes || null, primaryPendingId, tenantId, branchId]
             );
@@ -203,7 +206,7 @@ exports.createSale = async (req, res) => {
                 `INSERT INTO sales (tenant_id, branch_id, sale_number, customer_id, repair_id, cashier_id, subtotal, discount, total,
                   payment_method, amount_received, change_amount, notes, status)
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'completed')`,
-                [tenantId, branchId, saleNumber, customer_id || null, activeRepairId, req.user.id,
+                [tenantId, branchId, saleNumber, customer_id || null, headerRepairId, req.user.id,
                  subtotal, discount || 0, total, payment_method || 'cash',
                  amount_received || total, changeAmount, notes || null]
             );
@@ -320,7 +323,7 @@ exports.createSale = async (req, res) => {
                 sale_number: saleNumber,
                 total,
                 change_amount: changeAmount,
-                repair_id: activeRepairId,
+                repair_id: headerRepairId,
                 repair_ticket: generatedRepairTicket
             }
         });
