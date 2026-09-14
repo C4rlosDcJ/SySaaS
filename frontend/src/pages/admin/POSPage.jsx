@@ -1039,7 +1039,6 @@ export default function POSPage() {
                 icon: 'error',
                 confirmText: 'Entendido'
             });
-            showToastSwal(errorMsg, 'error');
         } finally {
             setProcessing(false);
         }
