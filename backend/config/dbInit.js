@@ -177,6 +177,24 @@ async function dbInit() {
             console.log(`[DB-INIT] Columna warranty_tech_notes añadida a repairs.`);
         }
 
+        // 8.10. Verificar y agregar columna signature_delivery y signature_approval a repairs si no existen
+        console.log(`[DB-INIT] Verificando columnas de firma en tabla "repairs"...`);
+        try {
+            const [signatureDeliveryCol] = await connection.query(`SHOW COLUMNS FROM repairs LIKE 'signature_delivery'`);
+            if (signatureDeliveryCol.length === 0) {
+                await connection.query(`ALTER TABLE repairs ADD COLUMN signature_delivery LONGTEXT NULL DEFAULT NULL`);
+                console.log(`[DB-INIT] Columna signature_delivery añadida a repairs.`);
+            }
+            const [signatureApprovalCol] = await connection.query(`SHOW COLUMNS FROM repairs LIKE 'signature_approval'`);
+            if (signatureApprovalCol.length === 0) {
+                await connection.query(`ALTER TABLE repairs ADD COLUMN signature_approval LONGTEXT NULL DEFAULT NULL`);
+                console.log(`[DB-INIT] Columna signature_approval añadida a repairs.`);
+            }
+        } catch (e) {
+            console.error(`[DB-INIT] Error al verificar/agregar columnas de firma en repairs:`, e.message);
+        }
+
+
         // 9. Modificar tipo de setting_value a LONGTEXT para soportar logos pesados en base64
         console.log(`[DB-INIT] Asegurando que la columna "setting_value" en tabla "settings" soporte datos largos (LONGTEXT)...`);
         await connection.query(`ALTER TABLE settings MODIFY COLUMN setting_value LONGTEXT`);

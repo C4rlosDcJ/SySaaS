@@ -11,7 +11,7 @@ import { formatCurrency, STATUS_LABELS } from '../../utils/constants';
 import { useTheme } from '../../context/ThemeContext';
 import PrintReceipt from '../../components/common/PrintReceipt';
 import BarcodeScannerModal from '../../components/BarcodeScannerModal';
-import { showAlert, showConfirm } from '../../utils/swal';
+import { showAlert, showConfirm, showToastSwal, showInputPrompt } from '../../utils/swal';
 import './POSPage.css';
 import { useTenant } from '../../context/TenantContext';
 import { useAuth } from '../../context/AuthContext';
@@ -340,21 +340,28 @@ export default function POSPage() {
             if (e.key === 'F10') {
                 e.preventDefault();
                 if (cart.length === 0) {
-                    showToast('Agrega productos al carrito para aplicar descuento', 'error');
+                    showToastSwal('Agrega productos al carrito para aplicar descuento', 'warning');
                     return;
                 }
-                const pctInput = window.prompt('Porcentaje de descuento global (ej: 10 para 10%):');
-                if (pctInput !== null && pctInput.trim() !== '') {
-                    const pct = parseFloat(pctInput);
-                    if (!isNaN(pct) && pct >= 0 && pct <= 100) {
-                        const calculatedDiscount = Number(((subtotal * pct) / 100).toFixed(2));
-                        setDiscount(calculatedDiscount);
-                        if (appliedCoupon) setAppliedCoupon(null);
-                        showToast(`Descuento de ${pct}% aplicado (-$${calculatedDiscount})`, 'success');
-                    } else {
-                        showToast('Porcentaje invalido (debe ser entre 0 y 100)', 'error');
+                showInputPrompt({
+                    title: 'Descuento Global',
+                    label: 'Ingresa el porcentaje de descuento (0 - 100):',
+                    placeholder: 'Ejemplo: 10 para 10%',
+                    inputType: 'number',
+                    validationMessage: 'El porcentaje debe ser entre 0 y 100.'
+                }).then((res) => {
+                    if (res && res.isConfirmed && res.value !== undefined) {
+                        const pct = parseFloat(res.value);
+                        if (!isNaN(pct) && pct >= 0 && pct <= 100) {
+                            const calculatedDiscount = Number(((subtotal * pct) / 100).toFixed(2));
+                            setDiscount(calculatedDiscount);
+                            if (appliedCoupon) setAppliedCoupon(null);
+                            showToastSwal(`Descuento de ${pct}% aplicado (-$${calculatedDiscount})`, 'success');
+                        } else {
+                            showToastSwal('Porcentaje invalido (debe ser entre 0 y 100)', 'error');
+                        }
                     }
-                }
+                });
                 return;
             }
 
@@ -1025,15 +1032,23 @@ export default function POSPage() {
             clearCart();
             loadData();
         } catch (err) {
-            showToast(err.response?.data?.message || err.message || 'Error al procesar venta', 'error');
+            const errorMsg = err.response?.data?.message || err.message || 'Error al procesar venta';
+            showAlert({
+                title: 'Error al registrar venta',
+                text: errorMsg,
+                icon: 'error',
+                confirmText: 'Entendido'
+            });
+            showToastSwal(errorMsg, 'error');
         } finally {
             setProcessing(false);
         }
     };
 
-    // ─── Toast ───
+    // ─── Toast / SweetAlert Notification ───
     const showToast = (message, type = 'success') => {
         setToast({ message, type });
+        showToastSwal(message, type);
         setTimeout(() => setToast(null), 3000);
     };
 
