@@ -16,6 +16,7 @@ router.get('/analytics', auth, isSuperAdmin, tenantController.getGlobalAnalytics
 router.get('/', auth, isSuperAdmin, tenantController.getTenants);
 router.post('/', auth, isSuperAdmin, tenantController.createTenant);
 router.get('/users', auth, isSuperAdmin, tenantController.getGlobalUsers);
+router.put('/users/:id', auth, isSuperAdmin, tenantController.updateGlobalUser);
 router.put('/users/:id/toggle-status', auth, isSuperAdmin, tenantController.toggleUserStatus);
 router.put('/users/:id/reset-password', auth, isSuperAdmin, tenantController.resetUserPassword);
 router.get('/:id(\\d+)', auth, isSuperAdmin, tenantController.getTenantById);

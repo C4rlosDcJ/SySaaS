@@ -1,21 +1,43 @@
 import { useState, useEffect } from 'react';
-import { superAdminService } from '../../services/api';
-import { Users, Search, RefreshCw, Shield, Building2, Key, UserCheck, UserX, Filter, X } from 'lucide-react';
+import { superAdminService, tenantService } from '../../services/api';
+import { Users, Search, RefreshCw, Shield, Building2, Key, UserCheck, UserX, Filter, X, Edit2 } from 'lucide-react';
 import { showAlert } from '../../utils/swal';
 
 export default function SuperUsersPage() {
     const [users, setUsers] = useState([]);
+    const [tenants, setTenants] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [roleFilter, setRoleFilter] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [resetModal, setResetModal] = useState(null);
     const [newPassword, setNewPassword] = useState('');
+    const [editModal, setEditModal] = useState(null);
+    const [editForm, setEditForm] = useState({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        role: 'client',
+        tenant_id: '',
+        is_active: 1,
+        password: ''
+    });
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
         loadUsers();
+        loadTenants();
     }, [roleFilter, statusFilter]);
+
+    const loadTenants = async () => {
+        try {
+            const res = await tenantService.getAll({ limit: 100 });
+            setTenants(Array.isArray(res) ? res : (res?.tenants || []));
+        } catch (err) {
+            console.error('Error al cargar empresas:', err);
+        }
+    };
 
     const loadUsers = async () => {
         try {
@@ -38,6 +60,47 @@ export default function SuperUsersPage() {
         loadUsers();
     };
 
+    const handleOpenEditModal = (user) => {
+        setEditModal(user);
+        setEditForm({
+            first_name: user.first_name || '',
+            last_name: user.last_name || '',
+            email: user.email || '',
+            phone: user.phone || '',
+            role: user.role || 'client',
+            tenant_id: user.tenant_id ? String(user.tenant_id) : '',
+            is_active: user.is_active ? 1 : 0,
+            password: ''
+        });
+    };
+
+    const handleUpdateUser = async (e) => {
+        e.preventDefault();
+        if (!editModal) return;
+        setSubmitting(true);
+        try {
+            const payload = {
+                first_name: editForm.first_name,
+                last_name: editForm.last_name,
+                email: editForm.email,
+                phone: editForm.phone,
+                role: editForm.role,
+                tenant_id: editForm.tenant_id ? parseInt(editForm.tenant_id) : null,
+                is_active: editForm.is_active
+            };
+            if (editForm.password && editForm.password.trim().length >= 6) {
+                payload.password = editForm.password.trim();
+            }
+            await superAdminService.updateGlobalUser(editModal.id, payload);
+            showAlert({ title: 'Usuario Actualizado', text: 'Los datos del usuario han sido actualizados exitosamente.', icon: 'success' });
+            setEditModal(null);
+            loadUsers();
+        } catch (err) {
+            showAlert({ title: 'Error', text: err.message || 'Error al actualizar usuario', icon: 'error' });
+        } finally {
+            setSubmitting(false);
+        }
+    };
 
     const handleToggleStatus = async (userId) => {
         try {
@@ -184,6 +247,14 @@ export default function SuperUsersPage() {
                                             <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
                                                 <button
                                                     className="btn btn-sm btn-ghost"
+                                                    onClick={() => handleOpenEditModal(u)}
+                                                    title="Editar usuario"
+                                                    style={{ color: 'var(--color-primary)' }}
+                                                >
+                                                    <Edit2 size={14} />
+                                                </button>
+                                                <button
+                                                    className="btn btn-sm btn-ghost"
                                                     onClick={() => handleToggleStatus(u.id)}
                                                     title={u.is_active ? 'Desactivar' : 'Activar'}
                                                     style={{ color: u.is_active ? 'var(--color-error)' : 'var(--color-success)' }}
@@ -204,6 +275,123 @@ export default function SuperUsersPage() {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit User Modal */}
+            {editModal && (
+                <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+                    <div className="card" style={{ width: '100%', maxWidth: '520px', padding: '24px', position: 'relative', maxHeight: '90vh', overflowY: 'auto' }}>
+                        <button onClick={() => setEditModal(null)} style={{ position: 'absolute', top: '16px', right: '16px', background: 'none', border: 'none', color: 'var(--color-text-secondary)', cursor: 'pointer' }}><X size={20} /></button>
+                        <h3 style={{ margin: '0 0 4px 0', fontSize: '18px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Edit2 size={18} className="text-primary" /> Editar Usuario
+                        </h3>
+                        <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', marginBottom: '18px' }}>
+                            Modifica los datos generales, rol, empresa y estado del usuario <strong>{editModal.email}</strong>.
+                        </p>
+
+                        <form onSubmit={handleUpdateUser} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div>
+                                    <label className="label">Nombre *</label>
+                                    <input
+                                        type="text" className="input" required
+                                        value={editForm.first_name}
+                                        onChange={e => setEditForm({ ...editForm, first_name: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="label">Apellido *</label>
+                                    <input
+                                        type="text" className="input" required
+                                        value={editForm.last_name}
+                                        onChange={e => setEditForm({ ...editForm, last_name: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div>
+                                    <label className="label">Correo Electrónico *</label>
+                                    <input
+                                        type="email" className="input" required
+                                        value={editForm.email}
+                                        onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="label">Teléfono</label>
+                                    <input
+                                        type="text" className="input" placeholder="Ej. 5512345678"
+                                        value={editForm.phone}
+                                        onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                <div>
+                                    <label className="label">Rol en la Plataforma *</label>
+                                    <select
+                                        className="input"
+                                        value={editForm.role}
+                                        onChange={e => setEditForm({ ...editForm, role: e.target.value })}
+                                    >
+                                        <option value="client">Cliente</option>
+                                        <option value="tenant_admin">Admin Empresa</option>
+                                        <option value="admin">Administrador</option>
+                                        <option value="branch_manager">Gerente</option>
+                                        <option value="technician">Técnico</option>
+                                        <option value="cashier">Cajero</option>
+                                        <option value="salesperson">Vendedor</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="label">Empresa Asignada</label>
+                                    <select
+                                        className="input"
+                                        value={editForm.tenant_id}
+                                        onChange={e => setEditForm({ ...editForm, tenant_id: e.target.value })}
+                                    >
+                                        <option value="">Sin empresa (Global)</option>
+                                        {tenants.map(t => (
+                                            <option key={t.id} value={t.id}>{t.company_name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="label">Estado de la Cuenta</label>
+                                <select
+                                    className="input"
+                                    value={editForm.is_active}
+                                    onChange={e => setEditForm({ ...editForm, is_active: parseInt(e.target.value) })}
+                                >
+                                    <option value={1}>Activo</option>
+                                    <option value={0}>Inactivo</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="label">Nueva Contraseña (Opcional)</label>
+                                <input
+                                    type="password" className="input"
+                                    placeholder="Dejar vacío para conservar actual (mín. 6 caracteres)"
+                                    value={editForm.password}
+                                    onChange={e => setEditForm({ ...editForm, password: e.target.value })}
+                                    minLength={6}
+                                />
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+                                <button type="button" className="btn btn-secondary" onClick={() => setEditModal(null)}>Cancelar</button>
+                                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                                    {submitting ? 'Guardando...' : 'Guardar Cambios'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

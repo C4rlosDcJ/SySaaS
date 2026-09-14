@@ -423,6 +423,61 @@ exports.resetUserPassword = async (req, res) => {
     }
 };
 
+// Editar usuario global (SuperAdmin)
+exports.updateGlobalUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { first_name, last_name, email, phone, role, tenant_id, branch_id, password, is_active } = req.body;
+
+        const [users] = await db.query('SELECT id, role, email FROM users WHERE id = ?', [id]);
+        if (users.length === 0) {
+            return res.status(404).json({ message: 'Usuario no encontrado.' });
+        }
+        if (users[0].role === 'superadmin') {
+            return res.status(403).json({ message: 'No se puede modificar la cuenta de SuperAdmin desde este módulo.' });
+        }
+
+        // Si se cambia el email, validar que no esté en uso por otro usuario
+        if (email && email.trim() !== '' && email.toLowerCase() !== users[0].email.toLowerCase()) {
+            const [existing] = await db.query('SELECT id FROM users WHERE email = ? AND id != ?', [email.trim().toLowerCase(), id]);
+            if (existing.length > 0) {
+                return res.status(400).json({ message: 'El correo electrónico ya está registrado por otro usuario.' });
+            }
+        }
+
+        const updates = [];
+        const params = [];
+
+        if (first_name !== undefined) { updates.push('first_name = ?'); params.push(first_name.trim()); }
+        if (last_name !== undefined) { updates.push('last_name = ?'); params.push(last_name.trim()); }
+        if (email !== undefined) { updates.push('email = ?'); params.push(email.trim().toLowerCase()); }
+        if (phone !== undefined) { updates.push('phone = ?'); params.push(phone ? phone.trim() : null); }
+        if (role !== undefined) { updates.push('role = ?'); params.push(role); }
+        if (tenant_id !== undefined) { updates.push('tenant_id = ?'); params.push(tenant_id ? parseInt(tenant_id) : null); }
+        if (branch_id !== undefined) { updates.push('branch_id = ?'); params.push(branch_id ? parseInt(branch_id) : null); }
+        if (is_active !== undefined) { updates.push('is_active = ?'); params.push(is_active ? 1 : 0); }
+
+        if (password && password.trim().length >= 6) {
+            const bcrypt = require('bcryptjs');
+            const hashedPassword = await bcrypt.hash(password.trim(), 10);
+            updates.push('password = ?');
+            params.push(hashedPassword);
+        }
+
+        if (updates.length === 0) {
+            return res.status(400).json({ message: 'No se enviaron datos para actualizar.' });
+        }
+
+        params.push(id);
+        await db.query(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params);
+
+        res.json({ message: 'Usuario actualizado exitosamente.' });
+    } catch (error) {
+        console.error('[SUPER_USERS] Error al actualizar usuario:', error);
+        res.status(500).json({ message: error.message || 'Error al actualizar usuario.' });
+    }
+};
+
 
 // =====================================================
 // Gestión de Planes SaaS (SuperAdmin)
