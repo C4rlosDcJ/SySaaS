@@ -579,6 +579,10 @@ export const superAdminService = {
         const query = new URLSearchParams(params).toString();
         return fetchAPI(`/tenants/users${query ? `?${query}` : ''}`);
     },
+    updateGlobalUser: (id, data) => fetchAPI(`/tenants/users/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+    }),
     toggleUserStatus: (id) => fetchAPI(`/tenants/users/${id}/toggle-status`, { method: 'PUT' }),
     resetUserPassword: (id, new_password) => fetchAPI(`/tenants/users/${id}/reset-password`, {
         method: 'PUT',
