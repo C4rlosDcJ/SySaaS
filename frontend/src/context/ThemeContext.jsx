@@ -405,6 +405,22 @@ export const ThemeProvider = ({ children }) => {
         setAccentColor(updated.primary_color);
         localStorage.setItem('accentColor', updated.primary_color);
       }
+      if (updated.default_warranty_days !== undefined) {
+        setDefaultWarrantyDays(String(updated.default_warranty_days));
+        localStorage.setItem('defaultWarrantyDays', String(updated.default_warranty_days));
+      }
+      if (updated.contact_address !== undefined) {
+        setContactAddress(updated.contact_address);
+        localStorage.setItem('contactAddress', updated.contact_address);
+      }
+      if (updated.contact_phone !== undefined) {
+        setContactPhone(updated.contact_phone);
+        localStorage.setItem('contactPhone', updated.contact_phone);
+      }
+      if (updated.contact_email !== undefined) {
+        setContactEmail(updated.contact_email);
+        localStorage.setItem('contactEmail', updated.contact_email);
+      }
     };
     window.addEventListener('sysaas_tenant_updated', handleTenantUpdated);
     return () => window.removeEventListener('sysaas_tenant_updated', handleTenantUpdated);

@@ -93,8 +93,11 @@ exports.createSale = async (req, res) => {
                 }
 
                 // Obtener días de garantía por defecto
-                const [settings] = await connection.query('SELECT setting_value FROM settings WHERE tenant_id = ? AND setting_key = "default_warranty_days"', [tenantId]);
-                const warrantyDays = settings.length > 0 ? parseInt(settings[0].setting_value) : 30;
+                const [settings] = await connection.query(
+                    'SELECT setting_value FROM settings WHERE (tenant_id = ? OR tenant_id IS NULL) AND setting_key = "default_warranty_days" ORDER BY tenant_id DESC LIMIT 1',
+                    [tenantId]
+                );
+                const warrantyDays = settings.length > 0 && settings[0].setting_value ? parseInt(settings[0].setting_value) : 30;
 
                 // Generar número de ticket de reparación con prefijo de sucursal
                 generatedRepairTicket = `${branchPrefix}-REP-${Date.now().toString().slice(-6)}`;

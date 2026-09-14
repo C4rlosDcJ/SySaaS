@@ -282,10 +282,13 @@ exports.create = async (req, res) => {
         }
 
         // Obtener garantía por defecto si no se especifica
-        let finalWarrantyDays = warranty_days;
-        if (!finalWarrantyDays) {
-            const [settings] = await db.query('SELECT setting_value FROM settings WHERE tenant_id = ? AND setting_key = "default_warranty_days"', [tenantId]);
-            finalWarrantyDays = settings.length > 0 ? parseInt(settings[0].setting_value) : 30;
+        let finalWarrantyDays = warranty_days ? parseInt(warranty_days) : null;
+        if (!finalWarrantyDays || isNaN(finalWarrantyDays)) {
+            const [settings] = await db.query(
+                'SELECT setting_value FROM settings WHERE (tenant_id = ? OR tenant_id IS NULL) AND setting_key = "default_warranty_days" ORDER BY tenant_id DESC LIMIT 1',
+                [tenantId]
+            );
+            finalWarrantyDays = settings.length > 0 && settings[0].setting_value ? parseInt(settings[0].setting_value) : 30;
         }
 
         // Si es cliente, usar su propio ID

@@ -9,11 +9,24 @@ exports.getAll = async (req, res) => {
             return res.json({});
         }
 
-        const [rows] = await db.query('SELECT * FROM settings WHERE tenant_id = ?', [tenantId]);
-        const settings = rows.reduce((acc, curr) => {
+        // Obtener configuraciones globales para fallback de valores por defecto
+        const [globalRows] = await db.query('SELECT setting_key, setting_value FROM settings WHERE tenant_id IS NULL');
+        const defaultSettings = globalRows.reduce((acc, curr) => {
             acc[curr.setting_key] = curr.setting_value;
             return acc;
         }, {});
+
+        const [rows] = await db.query('SELECT * FROM settings WHERE tenant_id = ?', [tenantId]);
+        const tenantSettings = rows.reduce((acc, curr) => {
+            acc[curr.setting_key] = curr.setting_value;
+            return acc;
+        }, {});
+
+        // Combinar: valores del tenant tienen precedencia sobre los valores globales por defecto
+        const settings = {
+            ...defaultSettings,
+            ...tenantSettings
+        };
 
         // Respaldo bidireccional y sincronización con la tabla tenants
         const [tenants] = await db.query('SELECT company_name, logo_url, tax_id, currency, tax_rate FROM tenants WHERE id = ?', [tenantId]);
@@ -134,7 +147,14 @@ exports.update = async (req, res) => {
 exports.getSettingValue = async (tenantId, key, defaultValue = null) => {
     try {
         const [rows] = await db.query('SELECT setting_value FROM settings WHERE tenant_id = ? AND setting_key = ?', [tenantId, key]);
-        if (rows.length > 0) return rows[0].setting_value;
+        if (rows.length > 0 && rows[0].setting_value !== null && rows[0].setting_value !== undefined) {
+            return rows[0].setting_value;
+        }
+        // Fallback a global
+        const [globalRows] = await db.query('SELECT setting_value FROM settings WHERE tenant_id IS NULL AND setting_key = ?', [key]);
+        if (globalRows.length > 0 && globalRows[0].setting_value !== null && globalRows[0].setting_value !== undefined) {
+            return globalRows[0].setting_value;
+        }
         return defaultValue;
     } catch (error) {
         return defaultValue;
