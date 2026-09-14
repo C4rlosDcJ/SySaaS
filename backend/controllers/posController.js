@@ -324,7 +324,7 @@ exports.createSale = async (req, res) => {
     } catch (error) {
         await connection.rollback();
         console.error('[POS] Error al crear venta:', error);
-        res.status(500).json({ message: 'Error al registrar venta.' });
+        res.status(500).json({ message: error.message || 'Error al registrar venta.' });
     } finally {
         connection.release();
     }
