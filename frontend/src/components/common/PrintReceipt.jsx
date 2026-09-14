@@ -13,6 +13,13 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
     const contactAddress = settings.business_address || tenant?.address || 'Dirección de la empresa';
     const defaultWarrantyDays = settings.default_warranty_days || tenant?.default_warranty_days || 30;
 
+    // Verificar si la venta incluye algún servicio o reparación aplicable para garantía
+    const hasServiceOrRepairWarranty = Boolean(
+        data.repair_ticket ||
+        data.repair_id ||
+        (Array.isArray(data.items) && data.items.some(item => item.repair_id || item.service_id || item.type === 'repair' || item.type === 'service'))
+    );
+
     const trackingCode = data.ticket_number || data.sale_number;
     const trackingUrl = `${window.location.origin}/rastrear?ticketId=${encodeURIComponent(trackingCode || '')}`;
     const qrImageUrl = trackingCode ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(trackingUrl)}&margin=0` : '';
@@ -286,9 +293,9 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                                             <p><span>Folio Reparación:</span> <span className="bold">{data.repair_ticket}</span></p>
                                             <p><span>Garantía Reparación:</span> <span className="bold">{data.repair_warranty_days || defaultWarrantyDays} días</span></p>
                                         </>
-                                    ) : (
-                                        <p><span>Garantía Aplicable:</span> <span className="bold">{defaultWarrantyDays} días</span></p>
-                                    )}
+                                    ) : (hasServiceOrRepairWarranty ? (
+                                        <p><span>Garantía Servicio:</span> <span className="bold">{data.repair_warranty_days || defaultWarrantyDays} días</span></p>
+                                    ) : null)}
                                 </div>
                             </div>
 
@@ -377,7 +384,6 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
 
                             <div className="receipt-footer-notes">
                                 <p>Conserve este ticket como comprobante de su compra.</p>
-                                <p>Cualquier cambio o devolución se realiza en los primeros 7 días naturales presentando este ticket impreso en buen estado.</p>
                                 <p className="bold" style={{ marginTop: '12px', fontSize: '10px' }}>
                                     {settings.ticket_footer_note || '¡MUCHAS GRACIAS POR SU COMPRA!'}
                                 </p>
