@@ -16,7 +16,7 @@ exports.getAll = async (req, res) => {
         }, {});
 
         // Respaldo bidireccional y sincronización con la tabla tenants
-        const [tenants] = await db.query('SELECT company_name, logo_url, tax_id, currency, tax_rate, phone, address FROM tenants WHERE id = ?', [tenantId]);
+        const [tenants] = await db.query('SELECT company_name, logo_url, tax_id, currency, tax_rate FROM tenants WHERE id = ?', [tenantId]);
         if (tenants.length > 0) {
             const tenant = tenants[0];
             // Si no está en settings pero sí en tenants, usar de tenants
@@ -34,12 +34,6 @@ exports.getAll = async (req, res) => {
             }
             if (settings.tax_rate === undefined && tenant.tax_rate !== undefined && tenant.tax_rate !== null) {
                 settings.tax_rate = String(tenant.tax_rate);
-            }
-            if (!settings.contact_phone && tenant.phone) {
-                settings.contact_phone = tenant.phone;
-            }
-            if (!settings.contact_address && tenant.address) {
-                settings.contact_address = tenant.address;
             }
 
             // Si está en settings pero no en tenants, asegurar consistencia en tenants
@@ -105,14 +99,6 @@ exports.update = async (req, res) => {
                 tenantParams.push(parsedTax);
             }
         }
-        if (settings.contact_phone !== undefined) {
-            tenantUpdates.push('phone = ?');
-            tenantParams.push(settings.contact_phone ? settings.contact_phone.trim() : null);
-        }
-        if (settings.contact_address !== undefined) {
-            tenantUpdates.push('address = ?');
-            tenantParams.push(settings.contact_address ? settings.contact_address.trim() : null);
-        }
         if (settings.accent_color !== undefined && settings.accent_color.trim() !== '') {
             tenantUpdates.push('primary_color = ?');
             tenantParams.push(settings.accent_color.trim());
@@ -126,7 +112,7 @@ exports.update = async (req, res) => {
         // Obtener el registro actualizado del tenant para devolverlo al cliente
         const [updatedTenants] = await db.query(
             `SELECT t.id, t.plan_id, t.company_name, t.slug, t.logo_url, t.primary_color, t.currency, 
-                    t.tax_rate, t.tax_id, t.phone, t.address, t.subscription_status, t.billing_cycle,
+                    t.tax_rate, t.tax_id, t.subscription_status, t.billing_cycle,
                     sp.name as plan_name, sp.slug as plan_slug, sp.features as plan_features
              FROM tenants t
              JOIN saas_plans sp ON t.plan_id = sp.id
