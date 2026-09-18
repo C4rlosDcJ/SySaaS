@@ -361,7 +361,7 @@ exports.getSuperAdminStats = async (req, res) => {
                 (SELECT COUNT(*) FROM branches) as total_branches,
                 (SELECT COUNT(*) FROM users) as total_users,
                 (SELECT COUNT(*) FROM repairs) as total_repairs,
-                (SELECT COUNT(*) FROM sales) as total_sales
+                (SELECT COUNT(*) FROM sales WHERE status = 'completed') as total_sales
         `);
 
         // Registro de empresas últimos 6 meses
@@ -651,8 +651,8 @@ exports.getTenantDetail = async (req, res) => {
             SELECT
                 (SELECT COUNT(*) FROM repairs WHERE tenant_id = ?) as total_repairs,
                 (SELECT COUNT(*) FROM repairs WHERE tenant_id = ? AND status = 'completed') as completed_repairs,
-                (SELECT COUNT(*) FROM sales WHERE tenant_id = ?) as total_sales,
-                (SELECT COALESCE(SUM(total), 0) FROM sales WHERE tenant_id = ?) as total_revenue,
+                (SELECT COUNT(*) FROM sales WHERE tenant_id = ? AND status = 'completed') as total_sales,
+                (SELECT COALESCE(SUM(total), 0) FROM sales WHERE tenant_id = ? AND status = 'completed') as total_revenue,
                 (SELECT COUNT(*) FROM users WHERE tenant_id = ?) as total_users
         `, [id, id, id, id, id]);
 

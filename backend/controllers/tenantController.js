@@ -582,7 +582,7 @@ exports.getMyTenant = async (req, res) => {
                 (SELECT COUNT(*) FROM branches WHERE tenant_id = t.id AND is_active = 1) as used_branches,
                 (SELECT COUNT(*) FROM users WHERE tenant_id = t.id AND role != 'client' AND is_active = 1) as used_users,
                 (SELECT COUNT(*) FROM repairs WHERE tenant_id = t.id AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) as used_repairs_month,
-                (SELECT COUNT(*) FROM sales WHERE tenant_id = t.id AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) as used_sales_month
+                (SELECT COUNT(*) FROM sales WHERE tenant_id = t.id AND status = 'completed' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) as used_sales_month
             FROM tenants t
             JOIN saas_plans sp ON t.plan_id = sp.id
             WHERE t.id = ?
@@ -850,7 +850,7 @@ exports.getGlobalAnalytics = async (req, res) => {
                 (SELECT COUNT(*) FROM repairs) as total_repairs,
                 (SELECT COUNT(*) FROM users WHERE role != 'superadmin') as total_users,
                 (SELECT COUNT(*) FROM branches) as total_branches,
-                (SELECT COUNT(*) FROM sales) as total_sales
+                (SELECT COUNT(*) FROM sales WHERE status = 'completed') as total_sales
         `);
 
         const mrr = parseFloat(mrrRows[0]?.mrr || 0);

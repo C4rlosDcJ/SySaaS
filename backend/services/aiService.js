@@ -528,7 +528,7 @@ REGLAS ESTRICTAS:
 
             const [[salesMonth]] = await db.query(
                 `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total FROM sales 
-                 WHERE tenant_id = ? AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())`,
+                 WHERE tenant_id = ? AND status = 'completed' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())`,
                 [userTenantId]
             );
             salesText = `${salesMonth.count} ventas registradas con un monto acumulado de $${salesMonth.total} MXN.`;
