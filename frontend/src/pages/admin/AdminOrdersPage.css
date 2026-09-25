@@ -51,9 +51,9 @@
 }
 
 .orders-stat-card .stat-icon-wrap {
-    width: 44px;
-    height: 44px;
-    border-radius: var(--radius-md);
+    width: auto;
+    height: auto;
+    border-radius: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -61,22 +61,18 @@
 }
 
 .orders-stat-card .stat-icon-wrap.pending {
-    background: var(--cool-amber-bg);
     color: var(--cool-amber);
 }
 
 .orders-stat-card .stat-icon-wrap.progress {
-    background: var(--cool-slate-blue-bg);
     color: var(--cool-slate-blue);
 }
 
 .orders-stat-card .stat-icon-wrap.ready {
-    background: var(--cool-teal-bg);
     color: var(--cool-teal);
 }
 
 .orders-stat-card .stat-icon-wrap.revenue {
-    background: var(--cool-cyan-bg);
     color: var(--cool-cyan);
 }
 

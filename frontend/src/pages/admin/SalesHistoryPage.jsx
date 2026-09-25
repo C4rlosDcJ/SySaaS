@@ -298,7 +298,7 @@ export default function SalesHistoryPage() {
             {/* Stats Cards */}
             <div className="sales-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
                 <div className="sales-stat-card">
-                    <div className="sales-stat-icon" style={{ background: 'var(--cool-teal-bg)', color: 'var(--cool-teal)' }}>
+                    <div className="sales-stat-icon" style={{ color: 'var(--cool-teal)' }}>
                         <DollarSign size={24} />
                     </div>
                     <div>
@@ -309,7 +309,7 @@ export default function SalesHistoryPage() {
                 </div>
 
                 <div className="sales-stat-card">
-                    <div className="sales-stat-icon" style={{ background: 'var(--cool-cyan-bg)', color: 'var(--cool-cyan)' }}>
+                    <div className="sales-stat-icon" style={{ color: 'var(--cool-cyan)' }}>
                         <TrendingUp size={24} />
                     </div>
                     <div>
@@ -320,7 +320,7 @@ export default function SalesHistoryPage() {
                 </div>
 
                 <div className="sales-stat-card">
-                    <div className="sales-stat-icon" style={{ background: 'var(--cool-slate-blue-bg)', color: 'var(--cool-slate-blue)' }}>
+                    <div className="sales-stat-icon" style={{ color: 'var(--cool-slate-blue)' }}>
                         <ShoppingBag size={24} />
                     </div>
                     <div>
@@ -331,7 +331,7 @@ export default function SalesHistoryPage() {
                 </div>
 
                 <div className="sales-stat-card">
-                    <div className="sales-stat-icon" style={{ background: 'var(--cool-amber-bg)', color: 'var(--cool-amber)' }}>
+                    <div className="sales-stat-icon" style={{ color: 'var(--cool-amber)' }}>
                         <Receipt size={24} />
                     </div>
                     <div>

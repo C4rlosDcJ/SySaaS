@@ -203,8 +203,8 @@ export default function SuperDashboard() {
                                 {formatCurrency(totalRevenue)}
                             </div>
                         </div>
-                        <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'var(--cool-teal-bg)', color: 'var(--cool-teal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <DollarSign size={20} />
+                        <div style={{ color: 'var(--cool-teal)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <DollarSign size={22} />
                         </div>
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -222,8 +222,8 @@ export default function SuperDashboard() {
                                 {totalTenants} <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--cool-teal)' }}>({activeTenants} activas)</span>
                             </div>
                         </div>
-                        <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'var(--cool-cyan-bg)', color: 'var(--cool-cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Building2 size={20} />
+                        <div style={{ color: 'var(--cool-cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Building2 size={22} />
                         </div>
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -241,8 +241,8 @@ export default function SuperDashboard() {
                                 {totalRepairs.toLocaleString('es-MX')}
                             </div>
                         </div>
-                        <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'var(--cool-amber-bg)', color: 'var(--cool-amber)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Wrench size={20} />
+                        <div style={{ color: 'var(--cool-amber)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Wrench size={22} />
                         </div>
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -260,8 +260,8 @@ export default function SuperDashboard() {
                                 {totalUsers.toLocaleString('es-MX')}
                             </div>
                         </div>
-                        <div style={{ width: '40px', height: '40px', borderRadius: 'var(--radius-md)', background: 'var(--cool-slate-blue-bg)', color: 'var(--cool-slate-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <Users size={20} />
+                        <div style={{ color: 'var(--cool-slate-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Users size={22} />
                         </div>
                     </div>
                     <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginTop: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>

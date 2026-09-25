@@ -171,8 +171,8 @@ export default function ClientDashboard() {
                     </div>
                 </div>
                 <div className="stat-card">
-                    <div className="stat-icon" style={{ background: 'rgba(16, 185, 129, 0.1)' }}>
-                        <DollarSign size={24} style={{ color: '#10b981' }} />
+                    <div className="stat-icon" style={{ color: 'var(--cool-teal)' }}>
+                        <DollarSign size={24} />
                     </div>
                     <div className="stat-info">
                         <span className="stat-value" style={{ fontSize: '18px' }}>

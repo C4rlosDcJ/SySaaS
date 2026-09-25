@@ -376,8 +376,8 @@ export default function AdminDashboard() {
                 {/* Ingresos Reparaciones */}
                 <div className="kpi-card">
                     <div className="kpi-header-row">
-                        <div className="kpi-icon" style={{ background: 'var(--cool-teal-bg)', color: 'var(--cool-teal)', border: 'none' }}>
-                            <DollarSign size={20} />
+                        <div className="kpi-icon" style={{ background: 'transparent', color: 'var(--cool-teal)', border: 'none', padding: 0 }}>
+                            <DollarSign size={22} />
                         </div>
                         {revenueChange && (
                             <span style={{ fontSize: '11px', fontWeight: 700, color: revenueChange.positive ? 'var(--cool-teal)' : 'var(--cool-rose)' }}>
@@ -397,8 +397,8 @@ export default function AdminDashboard() {
                 {/* Reparaciones en Proceso */}
                 <div className="kpi-card">
                     <div className="kpi-header-row">
-                        <div className="kpi-icon" style={{ background: 'var(--cool-cyan-bg)', color: 'var(--cool-cyan)', border: 'none' }}>
-                            <Wrench size={20} />
+                        <div className="kpi-icon" style={{ background: 'transparent', color: 'var(--cool-cyan)', border: 'none', padding: 0 }}>
+                            <Wrench size={22} />
                         </div>
                         <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', background: 'var(--color-bg-tertiary)', padding: '2px 6px', borderRadius: '4px' }}>
                             En Taller
@@ -416,8 +416,8 @@ export default function AdminDashboard() {
                 {/* Ventas POS del Mes */}
                 <div className="kpi-card">
                     <div className="kpi-header-row">
-                        <div className="kpi-icon" style={{ background: 'var(--cool-slate-blue-bg)', color: 'var(--cool-slate-blue)', border: 'none' }}>
-                            <Receipt size={20} />
+                        <div className="kpi-icon" style={{ background: 'transparent', color: 'var(--cool-slate-blue)', border: 'none', padding: 0 }}>
+                            <Receipt size={22} />
                         </div>
                         <span style={{ fontSize: '11px', color: 'var(--cool-teal)', fontWeight: 600 }}>
                             {salesStats?.today?.count || 0} hoy
@@ -435,8 +435,8 @@ export default function AdminDashboard() {
                 {/* Clientes Registrados */}
                 <div className="kpi-card">
                     <div className="kpi-header-row">
-                        <div className="kpi-icon" style={{ background: 'var(--cool-amber-bg)', color: 'var(--cool-amber)', border: 'none' }}>
-                            <Users size={20} />
+                        <div className="kpi-icon" style={{ background: 'transparent', color: 'var(--cool-amber)', border: 'none', padding: 0 }}>
+                            <Users size={22} />
                         </div>
                     </div>
                     <div className="kpi-info">

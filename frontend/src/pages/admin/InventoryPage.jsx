@@ -1023,7 +1023,7 @@ export default function InventoryPage() {
             {/* Stats */}
             <div className="inventory-stats">
                 <div className="inv-stat-card">
-                    <div className="inv-stat-icon" style={{ background: 'var(--cool-slate-blue-bg)', color: 'var(--cool-slate-blue)' }}>
+                    <div className="inv-stat-icon" style={{ color: 'var(--cool-slate-blue)' }}>
                         <Package size={22} />
                     </div>
                     <div>
@@ -1032,7 +1032,7 @@ export default function InventoryPage() {
                     </div>
                 </div>
                 <div className="inv-stat-card">
-                    <div className="inv-stat-icon" style={{ background: 'var(--cool-amber-bg)', color: 'var(--cool-amber)' }}>
+                    <div className="inv-stat-icon" style={{ color: 'var(--cool-amber)' }}>
                         <AlertTriangle size={22} />
                     </div>
                     <div>
@@ -1041,7 +1041,7 @@ export default function InventoryPage() {
                     </div>
                 </div>
                 <div className="inv-stat-card">
-                    <div className="inv-stat-icon" style={{ background: 'var(--cool-rose-bg)', color: 'var(--cool-rose)' }}>
+                    <div className="inv-stat-icon" style={{ color: 'var(--cool-rose)' }}>
                         <PackageX size={22} />
                     </div>
                     <div>
@@ -1050,7 +1050,7 @@ export default function InventoryPage() {
                     </div>
                 </div>
                 <div className="inv-stat-card">
-                    <div className="inv-stat-icon" style={{ background: 'var(--cool-teal-bg)', color: 'var(--cool-teal)' }}>
+                    <div className="inv-stat-icon" style={{ color: 'var(--cool-teal)' }}>
                         <DollarSign size={22} />
                     </div>
                     <div>

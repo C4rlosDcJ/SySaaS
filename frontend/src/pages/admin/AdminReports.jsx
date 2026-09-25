@@ -518,8 +518,8 @@ export default function AdminReports() {
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
                                         <span className="kpi-label">Ingresos Consolidados</span>
-                                        <div className="kpi-icon" style={{ background: 'var(--cool-cyan-bg)', color: 'var(--cool-cyan)', border: 'none' }}>
-                                            <DollarSign size={18} />
+                                        <div className="kpi-icon" style={{ color: 'var(--cool-cyan)', border: 'none', background: 'transparent', padding: 0 }}>
+                                            <DollarSign size={20} />
                                         </div>
                                     </div>
                                     <div className="kpi-value">{formatCurrency(kpis.total_revenue || 0)}</div>
@@ -534,8 +534,8 @@ export default function AdminReports() {
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
                                         <span className="kpi-label">Ventas Mostrador (POS)</span>
-                                        <div className="kpi-icon" style={{ background: 'var(--cool-slate-blue-bg)', color: 'var(--cool-slate-blue)', border: 'none' }}>
-                                            <ShoppingBag size={18} />
+                                        <div className="kpi-icon" style={{ color: 'var(--cool-slate-blue)', border: 'none', background: 'transparent', padding: 0 }}>
+                                            <ShoppingBag size={20} />
                                         </div>
                                     </div>
                                     <div className="kpi-value">{formatCurrency(kpis.pos_revenue || 0)}</div>
@@ -545,8 +545,8 @@ export default function AdminReports() {
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
                                         <span className="kpi-label">Facturación Taller</span>
-                                        <div className="kpi-icon" style={{ background: 'var(--cool-teal-bg)', color: 'var(--cool-teal)', border: 'none' }}>
-                                            <Wrench size={18} />
+                                        <div className="kpi-icon" style={{ color: 'var(--cool-teal)', border: 'none', background: 'transparent', padding: 0 }}>
+                                            <Wrench size={20} />
                                         </div>
                                     </div>
                                     <div className="kpi-value">{formatCurrency(kpis.repairs_revenue || 0)}</div>
@@ -556,8 +556,8 @@ export default function AdminReports() {
                                 <div className="kpi-card">
                                     <div className="kpi-card-header">
                                         <span className="kpi-label">Ticket Promedio (POS)</span>
-                                        <div className="kpi-icon" style={{ background: 'var(--cool-amber-bg)', color: 'var(--cool-amber)', border: 'none' }}>
-                                            <CreditCard size={18} />
+                                        <div className="kpi-icon" style={{ color: 'var(--cool-amber)', border: 'none', background: 'transparent', padding: 0 }}>
+                                            <CreditCard size={20} />
                                         </div>
                                     </div>
                                     <div className="kpi-value">{formatCurrency(kpis.avg_ticket || 0)}</div>

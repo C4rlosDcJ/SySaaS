@@ -143,33 +143,29 @@
 }
 
 .stat-icon-wrapper {
-    width: 44px;
-    height: 44px;
-    border-radius: var(--radius-md);
+    width: auto;
+    height: auto;
+    border-radius: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--color-bg-elevated);
+    background: transparent;
     color: var(--color-text-secondary);
 }
 
 .stat-card.spent .stat-icon-wrapper {
-    background: rgba(16, 185, 129, 0.08);
     color: #10b981;
 }
 
 .stat-card.total .stat-icon-wrapper {
-    background: rgba(59, 130, 246, 0.08);
     color: #3b82f6;
 }
 
 .stat-card.active .stat-icon-wrapper {
-    background: var(--cool-amber-bg);
     color: var(--cool-amber);
 }
 
 .stat-card.completed .stat-icon-wrapper {
-    background: rgba(139, 92, 246, 0.08);
     color: #8b5cf6;
 }
 
