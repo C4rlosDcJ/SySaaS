@@ -17,7 +17,15 @@ import {
     MessageSquare,
     ShoppingBag,
     Sparkles,
-    Zap
+    Zap,
+    Wrench,
+    Package,
+    BarChart3,
+    Users,
+    QrCode,
+    FileText,
+    Globe,
+    Truck
 } from 'lucide-react';
 import './LandingPage.css';
 
@@ -43,37 +51,73 @@ export default function LandingPage() {
             num: '01',
             icon: Building2,
             title: 'Arquitectura Multi-Tenant',
-            description: 'Aislamiento total de base de datos para cada empresa. Subdominio dedicado, inventarios y clientes 100% privados.'
+            description: 'Aislamiento total de base de datos para cada empresa. Subdominio dedicado, inventarios, staff y clientes 100% privados y seguros.'
         },
         {
             num: '02',
             icon: GitBranch,
-            title: 'Control Multi-Sucursal',
-            description: 'Administra todas tus sedes desde un solo panel. Traspasos de stock atómicos, staff y métricas en vivo.'
+            title: 'Control Multi-Sucursal & Traspasos',
+            description: 'Administra matriz y sucursales en red desde un panel central. Traspasos de mercancía y refacciones atómicos y sincronizados en vivo.'
         },
         {
             num: '03',
-            icon: Cpu,
-            title: 'Diagnósticos con IA & ML',
-            description: 'Modelos de machine learning que analizan fallas recurrentes, tiempos de reparación y piezas sugeridas.'
+            icon: Wrench,
+            title: 'Gestión Integral de Reparaciones',
+            description: 'Control de tickets por estado, asignación a técnicos, checklist de ingreso, diagnósticos, cotizaciones y firmas digitales del cliente.'
         },
         {
             num: '04',
-            icon: ShoppingBag,
-            title: 'Punto de Venta POS & Facturación',
-            description: 'Cobro ágil de tickets y accesorios. Compatible con lectores de código de barras e impresión térmica.'
+            icon: Package,
+            title: 'Control de Inventario & Refacciones',
+            description: 'Stock por sucursal, alertas automáticas de existencias bajas, números de serie, historial de movimientos y costos de reposición.'
         },
         {
             num: '05',
-            icon: CreditCard,
-            title: 'Suscripciones con Stripe',
-            description: 'Pasarela integrada con procesamiento automático de cobros recurrentes y control de cuotas SaaS.'
+            icon: ShoppingBag,
+            title: 'Punto de Venta POS & Facturación',
+            description: 'Cobro ágil de tickets, mano de obra y productos. Compatible con escáner de código de barras, cajón de dinero e impresión de tickets térmicos.'
         },
         {
             num: '06',
+            icon: Cpu,
+            title: 'Diagnósticos con Inteligencia Artificial & ML',
+            description: 'Asistente IA que analiza síntomas recurrentes de equipos, pronostica fallas, estima tiempos de trabajo y sugiere refacciones óptimas.'
+        },
+        {
+            num: '07',
+            icon: QrCode,
+            title: 'Rastreo Público para Clientes con QR',
+            description: 'Portal web transparente donde tus clientes consultan en tiempo real el progreso de su equipo escaneando el código QR de su comprobante.'
+        },
+        {
+            num: '08',
             icon: MessageSquare,
-            title: 'Avisos Automáticos por WhatsApp',
-            description: 'Notifica a tus clientes de manera instantánea cuando su orden cambie de estado con link de rastreo.'
+            title: 'Avisos Automáticos por WhatsApp & Correo',
+            description: 'Notificaciones automáticas a clientes cada vez que su orden cambia de estado (recibido, en proceso, listo para entrega o entregado).'
+        },
+        {
+            num: '09',
+            icon: Globe,
+            title: 'Catálogo E-Commerce & Pedidos Web',
+            description: 'Tienda pública en línea para mostrar refacciones y accesorios, recibir pedidos de clientes y gestionar envíos o recolección en tienda.'
+        },
+        {
+            num: '10',
+            icon: Truck,
+            title: 'Proveedores & Órdenes de Compra',
+            description: 'Registro de proveedores, control de cuentas por pagar, órdenes de compra y recepción de mercancía para reabastecer refacciones.'
+        },
+        {
+            num: '11',
+            icon: BarChart3,
+            title: 'Reportes Financieros & Analítica Predictiva',
+            description: 'Métricas de ingresos, márgenes de ganancia, productividad de técnicos por sucursal y proyecciones de facturación con Machine Learning.'
+        },
+        {
+            num: '12',
+            icon: Users,
+            title: 'Roles, Permisos & Auditoría de Seguridad',
+            description: 'Control de acceso granular (Administrador, Técnico, Cajero), registro histórico de auditoría de actividades y sesiones protegidas.'
         }
     ];
 
