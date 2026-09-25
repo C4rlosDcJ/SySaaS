@@ -133,8 +133,8 @@ export default function ClientPaymentsPage() {
             {/* KPI Summary Cards */}
             <div className="payments-stats-grid">
                 <div className="card payment-stat-card">
-                    <div className="stat-icon" style={{ background: 'rgba(59, 130, 246, 0.1)' }}>
-                        <Receipt size={22} style={{ color: '#3b82f6' }} />
+                    <div className="stat-icon" style={{ color: '#3b82f6', background: 'transparent' }}>
+                        <Receipt size={24} />
                     </div>
                     <div>
                         <div className="stat-label">Total Facturado</div>
@@ -144,8 +144,8 @@ export default function ClientPaymentsPage() {
                 </div>
 
                 <div className="card payment-stat-card">
-                    <div className="stat-icon" style={{ background: 'rgba(16, 185, 129, 0.1)' }}>
-                        <CheckCircle2 size={22} style={{ color: '#10b981' }} />
+                    <div className="stat-icon" style={{ color: '#10b981', background: 'transparent' }}>
+                        <CheckCircle2 size={24} />
                     </div>
                     <div>
                         <div className="stat-label">Total Pagado</div>
@@ -157,8 +157,8 @@ export default function ClientPaymentsPage() {
                 </div>
 
                 <div className="card payment-stat-card">
-                    <div className="stat-icon" style={{ background: stats.totalPending > 0 ? 'var(--cool-amber-bg)' : 'var(--color-bg-tertiary)' }}>
-                        <Clock size={22} style={{ color: stats.totalPending > 0 ? 'var(--cool-amber)' : 'var(--color-text-secondary)' }} />
+                    <div className="stat-icon" style={{ color: stats.totalPending > 0 ? 'var(--cool-amber)' : 'var(--color-text-secondary)', background: 'transparent' }}>
+                        <Clock size={24} />
                     </div>
                     <div>
                         <div className="stat-label">Saldo por Liquidar</div>

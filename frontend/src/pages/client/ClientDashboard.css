@@ -85,32 +85,28 @@
 }
 
 .stat-icon {
-    width: 52px;
-    height: 52px;
-    border-radius: var(--radius-md);
+    width: auto;
+    height: auto;
+    border-radius: 0;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
     font-size: 1.2rem;
+    background: transparent !important;
+    border: none !important;
 }
 
 .stat-icon.active {
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border);
-    color: var(--color-text-secondary);
+    color: var(--cool-cyan);
 }
 
 .stat-icon.completed {
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border);
-    color: var(--color-text-secondary);
+    color: var(--cool-teal);
 }
 
 .stat-icon.total {
-    background: var(--color-bg-elevated);
-    border: 1px solid var(--color-border);
-    color: var(--color-text-secondary);
+    color: var(--cool-slate-blue);
 }
 
 .stat-info {
