@@ -162,7 +162,7 @@ export default function BranchManagementPage() {
             {/* KPI Summary Cards */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px', marginBottom: '24px' }}>
                 <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px' }}>
-                    <div style={{ width: '42px', height: '42px', borderRadius: 'var(--radius-md)', background: 'var(--cool-cyan-bg)', color: 'var(--cool-cyan)', border: '1px solid var(--cool-cyan-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: 'var(--radius-md)', background: 'var(--cool-cyan-bg)', color: 'var(--cool-cyan)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Building2 size={20} />
                     </div>
                     <div>
@@ -174,7 +174,7 @@ export default function BranchManagementPage() {
                 </div>
 
                 <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px' }}>
-                    <div style={{ width: '42px', height: '42px', borderRadius: 'var(--radius-md)', background: 'var(--cool-slate-blue-bg)', color: 'var(--cool-slate-blue)', border: '1px solid var(--cool-slate-blue-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: 'var(--radius-md)', background: 'var(--cool-slate-blue-bg)', color: 'var(--cool-slate-blue)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Users size={20} />
                     </div>
                     <div>
@@ -184,7 +184,7 @@ export default function BranchManagementPage() {
                 </div>
 
                 <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px' }}>
-                    <div style={{ width: '42px', height: '42px', borderRadius: 'var(--radius-md)', background: 'var(--cool-teal-bg)', color: 'var(--cool-teal)', border: '1px solid var(--cool-teal-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: 'var(--radius-md)', background: 'var(--cool-teal-bg)', color: 'var(--cool-teal)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <Wrench size={20} />
                     </div>
                     <div>
@@ -194,7 +194,7 @@ export default function BranchManagementPage() {
                 </div>
 
                 <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '16px' }}>
-                    <div style={{ width: '42px', height: '42px', borderRadius: 'var(--radius-md)', background: 'var(--cool-amber-bg)', color: 'var(--cool-amber)', border: '1px solid var(--cool-amber-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <div style={{ width: '42px', height: '42px', borderRadius: 'var(--radius-md)', background: 'var(--cool-amber-bg)', color: 'var(--cool-amber)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <DollarSign size={20} />
                     </div>
                     <div>

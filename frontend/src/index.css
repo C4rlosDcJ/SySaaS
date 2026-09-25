@@ -39,23 +39,23 @@
   /* Executive Cool Palette — Global Tokens (Dark Theme) */
   --cool-cyan: #38bdf8;
   --cool-cyan-bg: rgba(56, 189, 248, 0.12);
-  --cool-cyan-border: rgba(56, 189, 248, 0.3);
+  --cool-cyan-border: transparent;
 
   --cool-slate-blue: #818cf8;
   --cool-slate-blue-bg: rgba(129, 140, 248, 0.12);
-  --cool-slate-blue-border: rgba(129, 140, 248, 0.3);
+  --cool-slate-blue-border: transparent;
 
   --cool-teal: #34d399;
   --cool-teal-bg: rgba(52, 211, 153, 0.12);
-  --cool-teal-border: rgba(52, 211, 153, 0.3);
+  --cool-teal-border: transparent;
 
   --cool-amber: #fbbf24;
   --cool-amber-bg: rgba(251, 191, 36, 0.12);
-  --cool-amber-border: rgba(251, 191, 36, 0.3);
+  --cool-amber-border: transparent;
 
   --cool-rose: #f87171;
   --cool-rose-bg: rgba(248, 113, 113, 0.12);
-  --cool-rose-border: rgba(248, 113, 113, 0.3);
+  --cool-rose-border: transparent;
 
   --cool-sky: #60a5fa;
   --cool-sky-bg: rgba(96, 165, 250, 0.12);
@@ -171,23 +171,23 @@
   /* Executive Cool Palette — Global Tokens (Light Theme) */
   --cool-cyan: #0284c7;
   --cool-cyan-bg: rgba(2, 132, 199, 0.08);
-  --cool-cyan-border: rgba(2, 132, 199, 0.25);
+  --cool-cyan-border: transparent;
 
   --cool-slate-blue: #4f46e5;
   --cool-slate-blue-bg: rgba(79, 70, 229, 0.08);
-  --cool-slate-blue-border: rgba(79, 70, 229, 0.25);
+  --cool-slate-blue-border: transparent;
 
   --cool-teal: #0d9488;
   --cool-teal-bg: rgba(13, 148, 136, 0.08);
-  --cool-teal-border: rgba(13, 148, 136, 0.25);
+  --cool-teal-border: transparent;
 
   --cool-amber: #b45309;
   --cool-amber-bg: rgba(180, 83, 9, 0.08);
-  --cool-amber-border: rgba(180, 83, 9, 0.25);
+  --cool-amber-border: transparent;
 
   --cool-rose: #dc2626;
   --cool-rose-bg: rgba(220, 38, 38, 0.08);
-  --cool-rose-border: rgba(220, 38, 38, 0.25);
+  --cool-rose-border: transparent;
 
   --cool-sky: #2563eb;
   --cool-sky-bg: rgba(37, 99, 235, 0.08);

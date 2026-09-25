@@ -63,25 +63,21 @@
 .orders-stat-card .stat-icon-wrap.pending {
     background: var(--cool-amber-bg);
     color: var(--cool-amber);
-    border: 1px solid var(--cool-amber-border);
 }
 
 .orders-stat-card .stat-icon-wrap.progress {
     background: var(--cool-slate-blue-bg);
     color: var(--cool-slate-blue);
-    border: 1px solid var(--cool-slate-blue-border);
 }
 
 .orders-stat-card .stat-icon-wrap.ready {
     background: var(--cool-teal-bg);
     color: var(--cool-teal);
-    border: 1px solid var(--cool-teal-border);
 }
 
 .orders-stat-card .stat-icon-wrap.revenue {
     background: var(--cool-cyan-bg);
     color: var(--cool-cyan);
-    border: 1px solid var(--cool-cyan-border);
 }
 
 .orders-stat-card .stat-info .stat-value {
