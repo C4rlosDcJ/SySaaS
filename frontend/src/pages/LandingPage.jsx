@@ -15,7 +15,9 @@ import {
     Check,
     CreditCard,
     MessageSquare,
-    ShoppingBag
+    ShoppingBag,
+    Sparkles,
+    Zap
 } from 'lucide-react';
 import './LandingPage.css';
 
@@ -179,7 +181,7 @@ export default function LandingPage() {
                 'Soporte prioritario'
             ],
             popular: true,
-            cta: 'Adquirir Plan Pro'
+            cta: 'Comenzar Prueba Gratis'
         },
         {
             name: 'Plan Enterprise',
@@ -201,7 +203,7 @@ export default function LandingPage() {
                 'Soporte 24/7 y Onboarding dedicado'
             ],
             popular: false,
-            cta: 'Comenzar Prueba'
+            cta: 'Comenzar Prueba Gratis'
         }
     ];
 
@@ -225,7 +227,7 @@ export default function LandingPage() {
                             ),
                             features: buildPlanFeaturesList(p),
                             popular: p.popular || p.features?.popular || p.slug === 'pro',
-                            cta: p.slug === 'basico' ? 'Comenzar Prueba' : p.slug === 'pro' ? 'Adquirir Plan Pro' : 'Comenzar Prueba'
+                            cta: 'Comenzar Prueba Gratis'
                         };
                     });
                     setPlans(mapped);
@@ -386,7 +388,7 @@ export default function LandingPage() {
                             <span>(03) SUSCRIPCIONES Y PLANES</span>
                         </span>
                         <h2 className="nothing-section-title">
-                            PLANES TRANSPARENTES SIN COSTOS OCULTOS
+                            COMIENZA HOY CON 30 DÍAS DE PRUEBA GRATIS
                         </h2>
 
                         {/* Selector Mensual / Anual */}
@@ -417,8 +419,10 @@ export default function LandingPage() {
                                     className={`nothing-pricing-card ${plan.popular ? 'popular' : ''}`}
                                 >
                                     {plan.popular && (
-                                        <div className="popular-glyph-badge pixel-font">
-                                            <span>RECOMENDADO</span>
+                                        <div className="plan-popular-ribbon-wrapper">
+                                            <div className="plan-popular-ribbon">
+                                                <span>MÁS POPULAR</span>
+                                            </div>
                                         </div>
                                     )}
 
@@ -428,14 +432,20 @@ export default function LandingPage() {
                                     </div>
 
                                     <div className="pricing-cost">
-                                        <span className="price-val">${price}</span>
-                                        <span className="price-unit">MXN /{billingCycle === 'yearly' ? 'año' : 'mes'}</span>
+                                        <div className="pricing-cost-main">
+                                            <span className="price-currency price-currency-struck">$</span>
+                                            <span className="price-val price-val-struck">{price}</span>
+                                            <span className="price-unit">MXN /{billingCycle === 'yearly' ? 'año' : 'mes'}</span>
+                                        </div>
+                                        <div className="pricing-trial-subtext">
+                                            <span className="trial-text-notice">Primer mes $0 MXN</span>
+                                        </div>
                                     </div>
 
                                     <ul className="plan-features-list">
                                         {plan.features.map((feat, idx) => (
                                             <li key={idx}>
-                                                <Check size={14} className="feature-check" />
+                                                <Check size={15} className="feature-check" />
                                                 <span>{feat}</span>
                                             </li>
                                         ))}

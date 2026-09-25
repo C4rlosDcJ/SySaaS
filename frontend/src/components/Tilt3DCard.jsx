@@ -54,7 +54,7 @@ export default function Tilt3DCard({ children, className = '', style = {} }) {
             }}
             className={`tilt-3d-card ${className}`}
         >
-            <div style={{ transform: isHovered ? 'translateZ(20px)' : 'translateZ(0px)', transition: 'transform 0.2s ease', width: '100%', height: '100%' }}>
+            <div className="tilt-3d-inner" style={{ transform: isHovered ? 'translateZ(20px)' : 'translateZ(0px)', transition: 'transform 0.2s ease', width: '100%', height: '100%' }}>
                 {children}
             </div>
         </motion.div>
