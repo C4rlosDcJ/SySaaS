@@ -668,35 +668,35 @@ exports.getSalesStats = async (req, res) => {
             ? req.query.client_date
             : null;
 
-        const todayCondition = clientDate ? 'DATE(created_at) = ?' : 'DATE(created_at) = CURDATE()';
-        const todayParams = clientDate ? [tenantId, ...branchParams.slice(1), clientDate] : branchParams;
-
         // Ventas de hoy
+        const todayCondition = clientDate ? 'AND DATE(created_at) = ?' : 'AND DATE(created_at) = CURDATE()';
+        const todayParams = clientDate ? [...branchParams, clientDate] : branchParams;
+
         const [todaySales] = await db.query(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
-             FROM sales WHERE ${todayCondition} AND status = 'completed' AND tenant_id = ? ${branchCondition}`,
+             FROM sales WHERE tenant_id = ? ${branchCondition} AND status = 'completed' ${todayCondition}`,
             todayParams
         );
 
         // Ventas de la semana
-        const weekCondition = clientDate ? 'YEARWEEK(created_at, 1) = YEARWEEK(?, 1)' : 'YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)';
-        const weekParams = clientDate ? [tenantId, ...branchParams.slice(1), clientDate] : branchParams;
+        const weekCondition = clientDate ? 'AND YEARWEEK(created_at, 1) = YEARWEEK(?, 1)' : 'AND YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)';
+        const weekParams = clientDate ? [...branchParams, clientDate] : branchParams;
 
         const [weekSales] = await db.query(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
-             FROM sales WHERE ${weekCondition} AND status = 'completed' AND tenant_id = ? ${branchCondition}`,
+             FROM sales WHERE tenant_id = ? ${branchCondition} AND status = 'completed' ${weekCondition}`,
             weekParams
         );
 
         // Ventas del mes
         const monthCondition = clientDate
-            ? 'YEAR(created_at) = YEAR(?) AND MONTH(created_at) = MONTH(?)'
-            : 'YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())';
-        const monthParams = clientDate ? [tenantId, ...branchParams.slice(1), clientDate, clientDate] : branchParams;
+            ? 'AND YEAR(created_at) = YEAR(?) AND MONTH(created_at) = MONTH(?)'
+            : 'AND YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())';
+        const monthParams = clientDate ? [...branchParams, clientDate, clientDate] : branchParams;
 
         const [monthSales] = await db.query(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
-             FROM sales WHERE ${monthCondition} AND status = 'completed' AND tenant_id = ? ${branchCondition}`,
+             FROM sales WHERE tenant_id = ? ${branchCondition} AND status = 'completed' ${monthCondition}`,
             monthParams
         );
 
