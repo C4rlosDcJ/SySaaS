@@ -116,7 +116,7 @@ exports.createSale = async (req, res) => {
                         problem_description, service_requested, service_id,
                         status, payment_status, total_cost, advance_payment,
                         warranty_days, warranty_expires, created_at, started_at, completed_at, delivered_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', 'paid', ?, ?, ?, DATE_ADD(NOW(), INTERVAL ? DAY), NOW(), NOW(), NOW(), NOW())
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', 'paid', ?, ?, ?, DATE_ADD(NOW(), INTERVAL ${warrantyDays} DAY), NOW(), NOW(), NOW(), NOW())
                 `, [
                     tenantId,
                     branchId,
@@ -129,7 +129,6 @@ exports.createSale = async (req, res) => {
                     serviceItem.service_id,
                     itemPrice,
                     itemPrice,
-                    warrantyDays,
                     warrantyDays
                 ]);
 
