@@ -127,7 +127,12 @@ export default function SalesHistoryPage() {
 
     const loadStats = async () => {
         try {
-            const data = await posService.getSalesStats();
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const clientDate = `${year}-${month}-${day}`;
+            const data = await posService.getSalesStats({ client_date: clientDate });
             setStats(data || {});
         } catch (err) {
             console.error('Error al cargar estadísticas de ventas:', err);

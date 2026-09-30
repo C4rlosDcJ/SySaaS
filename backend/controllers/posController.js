@@ -58,94 +58,6 @@ exports.createSale = async (req, res) => {
         const [branchInfo] = await connection.query('SELECT code FROM branches WHERE id = ?', [branchId]);
         const branchPrefix = branchInfo.length > 0 ? branchInfo[0].code : 'VTA';
 
-        if (!activeRepairId) {
-            // Buscar si hay algún ítem de tipo servicio del catálogo
-            const serviceItem = items.find(item => item.service_id);
-            if (serviceItem) {
-                // Obtener detalles de device_type y nombre del servicio
-                const [serviceDetails] = await connection.query(
-                    'SELECT device_type_id, name FROM services_catalog WHERE id = ? AND tenant_id = ?',
-                    [serviceItem.service_id, tenantId]
-                );
-
-                let deviceTypeId = null;
-                let serviceName = serviceItem.description;
-
-                if (serviceDetails.length > 0) {
-                    deviceTypeId = serviceDetails[0].device_type_id;
-                    if (!serviceName) {
-                        serviceName = serviceDetails[0].name;
-                    }
-                }
-
-                if (!deviceTypeId) {
-                    const [dtRows] = await connection.query('SELECT id FROM device_types WHERE name = "Otro" AND (tenant_id = ? OR tenant_id IS NULL) LIMIT 1', [tenantId]);
-                    deviceTypeId = dtRows.length > 0 ? dtRows[0].id : null;
-                }
-
-                // Obtener cliente por defecto para la sucursal
-                let finalCustomerId = customer_id;
-                if (!finalCustomerId) {
-                    const [custRows] = await connection.query(
-                        'SELECT id FROM users WHERE role = "client" AND tenant_id = ? AND branch_id = ? ORDER BY id ASC LIMIT 1',
-                        [tenantId, branchId]
-                    );
-                    if (custRows.length === 0) {
-                        await connection.rollback();
-                        return res.status(400).json({ message: 'Se necesita registrar al menos un cliente en esta sucursal antes de vender servicios.' });
-                    }
-                    finalCustomerId = custRows[0].id;
-                }
-
-                // Obtener días de garantía por defecto
-                const [settings] = await connection.query(
-                    'SELECT setting_value FROM settings WHERE (tenant_id = ? OR tenant_id IS NULL) AND setting_key = "default_warranty_days" ORDER BY tenant_id DESC LIMIT 1',
-                    [tenantId]
-                );
-                const warrantyDays = settings.length > 0 && settings[0].setting_value ? parseInt(settings[0].setting_value) : 30;
-
-                // Generar número de ticket de reparación con prefijo de sucursal
-                generatedRepairTicket = `${branchPrefix}-REP-${Date.now().toString().slice(-6)}`;
-
-                const itemPrice = serviceItem.unit_price * serviceItem.quantity - (serviceItem.discount || 0);
-
-                // Insertar registro de reparación del servicio
-                const [repairResult] = await connection.query(`
-                    INSERT INTO repairs (
-                        tenant_id, branch_id, ticket_number, customer_id, device_type_id, model,
-                        problem_description, service_requested, service_id,
-                        status, payment_status, total_cost, advance_payment,
-                        warranty_days, warranty_expires, created_at, started_at, completed_at, delivered_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'delivered', 'paid', ?, ?, ?, DATE_ADD(NOW(), INTERVAL ${warrantyDays} DAY), NOW(), NOW(), NOW(), NOW())
-                `, [
-                    tenantId,
-                    branchId,
-                    generatedRepairTicket,
-                    finalCustomerId,
-                    deviceTypeId,
-                    'Servicio en POS',
-                    'Servicio contratado y cobrado directamente en Punto de Venta',
-                    serviceName,
-                    serviceItem.service_id,
-                    itemPrice,
-                    itemPrice,
-                    warrantyDays
-                ]);
-
-                activeRepairId = repairResult.insertId;
-
-                // Insertar historial de estados
-                await connection.query(
-                    'INSERT INTO repair_status_history (repair_id, status, notes, changed_by) VALUES (?, "received", "Servicio contratado en POS", ?)',
-                    [activeRepairId, req.user.id]
-                );
-                await connection.query(
-                    'INSERT INTO repair_status_history (repair_id, status, notes, changed_by) VALUES (?, "delivered", "Servicio entregado y pagado en POS", ?)',
-                    [activeRepairId, req.user.id]
-                );
-            }
-        }
-
         const allPendingSaleIds = Array.isArray(pending_sale_ids) && pending_sale_ids.length > 0
             ? pending_sale_ids
             : (pending_sale_id ? [pending_sale_id] : []);
@@ -751,25 +663,41 @@ exports.getSalesStats = async (req, res) => {
         const branchCondition = branchId ? ' AND branch_id = ?' : '';
         const branchParams = branchId ? [tenantId, branchId] : [tenantId];
 
+        // Determinar fecha de hoy (usando client_date del frontend si se proporciona para respetar la zona horaria del usuario)
+        const clientDate = req.query.client_date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.client_date)
+            ? req.query.client_date
+            : null;
+
+        const todayCondition = clientDate ? 'DATE(created_at) = ?' : 'DATE(created_at) = CURDATE()';
+        const todayParams = clientDate ? [tenantId, ...branchParams.slice(1), clientDate] : branchParams;
+
         // Ventas de hoy
         const [todaySales] = await db.query(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
-             FROM sales WHERE DATE(created_at) = CURDATE() AND status = 'completed' AND tenant_id = ? ${branchCondition}`,
-            branchParams
+             FROM sales WHERE ${todayCondition} AND status = 'completed' AND tenant_id = ? ${branchCondition}`,
+            todayParams
         );
 
         // Ventas de la semana
+        const weekCondition = clientDate ? 'YEARWEEK(created_at, 1) = YEARWEEK(?, 1)' : 'YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)';
+        const weekParams = clientDate ? [tenantId, ...branchParams.slice(1), clientDate] : branchParams;
+
         const [weekSales] = await db.query(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
-             FROM sales WHERE YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1) AND status = 'completed' AND tenant_id = ? ${branchCondition}`,
-            branchParams
+             FROM sales WHERE ${weekCondition} AND status = 'completed' AND tenant_id = ? ${branchCondition}`,
+            weekParams
         );
 
         // Ventas del mes
+        const monthCondition = clientDate
+            ? 'YEAR(created_at) = YEAR(?) AND MONTH(created_at) = MONTH(?)'
+            : 'YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())';
+        const monthParams = clientDate ? [tenantId, ...branchParams.slice(1), clientDate, clientDate] : branchParams;
+
         const [monthSales] = await db.query(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
-             FROM sales WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) AND status = 'completed' AND tenant_id = ? ${branchCondition}`,
-            branchParams
+             FROM sales WHERE ${monthCondition} AND status = 'completed' AND tenant_id = ? ${branchCondition}`,
+            monthParams
         );
 
         // Ventas totales históricas

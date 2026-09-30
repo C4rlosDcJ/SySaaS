@@ -14,21 +14,23 @@ function TrackRepairPage() {
     const navigate = useNavigate();
     const { businessName, contactPhone: themeContactPhone } = useTheme();
     
-    const [ticketId, setTicketId] = useState(new URLSearchParams(location.search).get('ticketId') || '');
+    const queryTicket = new URLSearchParams(location.search).get('ticketId') || new URLSearchParams(location.search).get('ticket') || '';
+    const [ticketId, setTicketId] = useState(queryTicket);
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const handleSearch = async (e) => {
-        if (e) e.preventDefault();
-        if (!ticketId.trim()) return;
+    const handleSearch = async (e, codeToSearch = null) => {
+        if (e && e.preventDefault) e.preventDefault();
+        const code = (codeToSearch !== null ? codeToSearch : ticketId).trim();
+        if (!code) return;
 
         setLoading(true);
         setError('');
         setResult(null);
 
         try {
-            const data = await publicService.trackRepair(ticketId);
+            const data = await publicService.trackRepair(code);
             setResult(data);
         } catch (err) {
             setError(err.message || 'No encontramos ningún registro con ese código.');
@@ -38,11 +40,13 @@ function TrackRepairPage() {
     };
 
     useEffect(() => {
-        if (ticketId && !result && !loading && !error) {
-            handleSearch();
+        const param = new URLSearchParams(location.search).get('ticketId') || new URLSearchParams(location.search).get('ticket') || '';
+        if (param) {
+            setTicketId(param);
+            handleSearch(null, param);
         }
         // eslint-disable-next-line
-    }, []);
+    }, [location.search]);
 
 
     const translateStatus = (statusStr) => {
@@ -708,7 +712,7 @@ function TrackRepairPage() {
                             const effectivePhone = result?.contact_phone || themeContactPhone;
                             if (!effectivePhone) return null;
 
-                            const orderCode = isRepair ? (repair?.ticket_number || ticketId) : (sale?.sale_number || ticketId);
+                            const orderCode = isRepair ? (repair?.ticket_number || ticketId) : (result?.sale_number || ticketId);
                             const text = `Hola, tengo una consulta sobre mi orden #${orderCode}`;
                             const waUrl = buildWhatsAppUrl(effectivePhone, text);
                             if (!waUrl) return null;
