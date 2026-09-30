@@ -322,8 +322,14 @@ export const posService = {
         method: 'POST',
         body: JSON.stringify(data)
     }),
-    getSalesStats: () => fetchAPI('/pos/sales/stats'),
-    getStats: () => fetchAPI('/pos/sales/stats'),
+    getSalesStats: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return fetchAPI(`/pos/sales/stats${query ? `?${query}` : ''}`);
+    },
+    getStats: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return fetchAPI(`/pos/sales/stats${query ? `?${query}` : ''}`);
+    },
     getBillableRepairs: (params = {}) => {
         const query = new URLSearchParams(params).toString();
         return fetchAPI(`/pos/repairs/billable${query ? `?${query}` : ''}`);
