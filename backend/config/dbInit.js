@@ -398,6 +398,18 @@ async function dbInit() {
             console.error(`[DB-INIT] Error al verificar/alterar la tabla services_catalog para default_parts_cost:`, e.message);
         }
 
+        // 13.2. Asegurar columna model_name en services_catalog (modelo específico compatible)
+        console.log(`[DB-INIT] Verificando columna "model_name" en tabla "services_catalog"...`);
+        try {
+            const [modelCol] = await connection.query(`SHOW COLUMNS FROM services_catalog LIKE 'model_name'`);
+            if (modelCol.length === 0) {
+                await connection.query(`ALTER TABLE services_catalog ADD COLUMN model_name VARCHAR(150) NULL AFTER brand_id`);
+                console.log(`[DB-INIT] Columna model_name añadida a la tabla services_catalog.`);
+            }
+        } catch (e) {
+            console.error(`[DB-INIT] Error al verificar/alterar la tabla services_catalog para model_name:`, e.message);
+        }
+
         // 14. SaaS Multi-Tenant Migration
         console.log(`[DB-INIT] Verificando tablas SaaS multi-tenant...`);
         const [tenantsTable] = await connection.query(`SHOW TABLES LIKE 'tenants'`);
