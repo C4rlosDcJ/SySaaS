@@ -440,68 +440,92 @@
     }
 }
 
-/* ── Dictado por Voz y Autocompletado IA ── */
-.voice-dictate-btn {
-    display: inline-flex;
+/* ── Accesos Rápidos: Sugerencias de Modelo y Falla ── */
+.model-suggestions-bar {
+    display: flex;
     align-items: center;
-    gap: var(--sp-2);
-    padding: 6px 14px;
-    border-radius: var(--radius-full);
-    font-size: var(--font-xs);
+    gap: 8px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+}
+
+.model-suggestions-label {
+    font-size: 11px;
     font-weight: 600;
-    cursor: pointer;
+    color: var(--color-text-secondary);
+}
+
+.model-suggestions-list {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.model-pill {
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    font-size: 11px;
     background: var(--color-bg-elevated);
     border: 1px solid var(--color-border);
-    color: var(--color-text);
+    color: var(--color-text-secondary);
+    cursor: pointer;
     transition: all var(--transition-fast) ease;
 }
 
-.voice-dictate-btn:hover {
+.model-pill:hover {
     border-color: var(--color-primary);
-    background: var(--color-primary-muted);
-}
-
-.voice-dictate-btn.recording {
-    background: rgba(239, 68, 68, 0.15);
-    border-color: #ef4444;
-    color: #ef4444;
-    animation: voice-pulse 1.5s infinite;
-}
-
-@keyframes voice-pulse {
-    0% {
-        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
-    }
-    70% {
-        box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
-    }
-    100% {
-        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-    }
-}
-
-.voice-status-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--sp-2);
-    padding: 8px 12px;
-    border-radius: var(--radius-md);
-    background: rgba(239, 68, 68, 0.08);
-    border: 1px solid rgba(239, 68, 68, 0.25);
-    font-size: var(--font-xs);
-    color: #ef4444;
-    margin-top: var(--sp-2);
-}
-
-.voice-ai-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 11px;
     color: var(--color-primary);
     background: var(--color-primary-muted);
+}
+
+.model-pill.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-primary-contrast);
+}
+
+.preset-chips-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: var(--color-bg-elevated);
     border: 1px solid var(--color-border);
-    padding: 2px 8px;
-    border-radius: 12px;
+    border-radius: var(--radius-md);
+    padding: 8px 10px;
+}
+
+.preset-chips-title {
+    display: flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+}
+
+.preset-chips-scroll {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+}
+
+.preset-chip-btn {
+    white-space: nowrap;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--color-bg);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    cursor: pointer;
+    transition: all var(--transition-fast) ease;
+    flex-shrink: 0;
+}
+
+.preset-chip-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: var(--color-primary-muted);
 }
