@@ -27,20 +27,27 @@ function runPythonML(action, inputData) {
 exports.getSalesForecast = async (req, res) => {
     try {
         const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.query.branch_id ? parseInt(req.query.branch_id, 10) : null;
 
-        // Fuente única: tabla sales completadas (incluye tanto mostrador como taller cobrado en POS)
-        // No se suma repairs.total_cost porque cada reparación cobrada ya genera un registro en sales
+        let branchFilter = '';
+        const params = [tenantId];
+        if (branchId) {
+            branchFilter = 'AND branch_id = ?';
+            params.push(branchId);
+        }
+
+        // Fuente única: tabla sales completadas (incluye mostrador y taller cobrado en POS)
         const [salesRows] = await db.query(`
             SELECT date, SUM(amount) as amount
             FROM (
                 SELECT DATE(created_at) as date, SUM(total) as amount
                 FROM sales
-                WHERE tenant_id = ? AND status = 'completed' AND created_at >= DATE_SUB(CURDATE(), INTERVAL 365 DAY)
+                WHERE tenant_id = ? AND status = 'completed' ${branchFilter} AND created_at >= DATE_SUB(CURDATE(), INTERVAL 365 DAY)
                 GROUP BY DATE(created_at)
             ) combined
             GROUP BY date
             ORDER BY date ASC
-        `, [tenantId]);
+        `, params);
 
         if (salesRows.length === 0) {
             return res.json({
@@ -48,12 +55,16 @@ exports.getSalesForecast = async (req, res) => {
                 total_predicted_30d: 0,
                 daily_avg_predicted: 0,
                 forecast: [],
+                trend: 'neutral',
+                confidence: 0,
+                r2_score: 0,
+                model_type: 'Sin datos',
                 message: 'No hay suficiente historial de ventas finalizadas para entrenar el modelo de Machine Learning.'
             });
         }
 
         const formattedData = salesRows.map(row => ({
-            date: row.date.toISOString().split('T')[0],
+            date: row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date),
             amount: parseFloat(row.amount) || 0
         }));
 
@@ -65,23 +76,46 @@ exports.getSalesForecast = async (req, res) => {
     }
 };
 
-// Segmentación de Clientes con Algoritmo K-Means Clustering (RFM)
+// Segmentación de Clientes con Algoritmo K-Means Clustering y RFM
 exports.getCustomerSegmentation = async (req, res) => {
     try {
         const tenantId = req.tenantCtx.tenantId;
+        const branchId = req.query.branch_id ? parseInt(req.query.branch_id, 10) : null;
+
+        let branchFilterSales = '';
+        let branchFilterRepairs = '';
+        const params = [tenantId, tenantId, tenantId];
+
+        if (branchId) {
+            branchFilterSales = 'AND s.branch_id = ?';
+            branchFilterRepairs = 'AND r.branch_id = ?';
+            // Inyectar branchId a subqueries si se especifica
+        }
 
         const [customersData] = await db.query(`
             SELECT 
                 c.id,
                 CONCAT(c.first_name, ' ', COALESCE(c.last_name, '')) as name,
-                COALESCE(SUM(s.total), 0) as total_spent,
-                COUNT(s.id) as total_orders,
-                DATEDIFF(NOW(), COALESCE(MAX(s.created_at), c.created_at)) as recency_days
+                ROUND(COALESCE(s.sales_total, 0) + COALESCE(r.repairs_total, 0), 2) as total_spent,
+                COALESCE(s.sales_count, 0) + COALESCE(r.repairs_count, 0) as total_orders,
+                DATEDIFF(NOW(), COALESCE(GREATEST(COALESCE(s.last_sale, '1970-01-01'), COALESCE(r.last_repair, '1970-01-01')), c.created_at)) as recency_days
             FROM users c
-            LEFT JOIN sales s ON s.customer_id = c.id AND s.status = 'completed'
+            LEFT JOIN (
+                SELECT customer_id, SUM(total) as sales_total, COUNT(id) as sales_count, MAX(created_at) as last_sale
+                FROM sales
+                WHERE status = 'completed' AND tenant_id = ? ${branchId ? 'AND branch_id = ' + parseInt(branchId, 10) : ''}
+                GROUP BY customer_id
+            ) s ON s.customer_id = c.id
+            LEFT JOIN (
+                SELECT customer_id, SUM(total_cost) as repairs_total, COUNT(id) as repairs_count, MAX(created_at) as last_repair
+                FROM repairs
+                WHERE status NOT IN ('cancelled') AND tenant_id = ? ${branchId ? 'AND branch_id = ' + parseInt(branchId, 10) : ''}
+                GROUP BY customer_id
+            ) r ON r.customer_id = c.id
             WHERE c.role = 'client' AND c.tenant_id = ?
             GROUP BY c.id
-        `, [tenantId]);
+            ORDER BY total_spent DESC
+        `, params);
 
         if (customersData.length === 0) {
             return res.json({
@@ -91,7 +125,15 @@ exports.getCustomerSegmentation = async (req, res) => {
             });
         }
 
-        const mlResult = await runPythonML('segment_customers', customersData);
+        const formattedCustomers = customersData.map(c => ({
+            id: c.id,
+            name: (c.name || 'Cliente').trim(),
+            total_spent: parseFloat(c.total_spent) || 0,
+            total_orders: parseInt(c.total_orders, 10) || 0,
+            recency_days: Math.min(parseInt(c.recency_days, 10) || 0, 365)
+        }));
+
+        const mlResult = await runPythonML('segment_customers', formattedCustomers);
         res.json(mlResult);
     } catch (error) {
         console.error('[ANALYTICS] Error al ejecutar segmentación K-Means:', error);
