@@ -65,17 +65,18 @@ exports.getById = async (req, res) => {
 // Crear servicio (admin)
 exports.create = async (req, res) => {
     try {
-        const { name, description, device_type_id, base_price, estimated_time, barcode, brand_id } = req.body;
+        const { name, description, device_type_id, base_price, default_parts_cost, estimated_time, barcode, brand_id } = req.body;
         const tenantId = req.tenantCtx.tenantId;
         const finalPrice = (base_price === '' || base_price === undefined) ? 0 : base_price;
+        const finalPartsCost = (default_parts_cost === '' || default_parts_cost === undefined) ? 0 : default_parts_cost;
         
         // Generar código de barras automático si no se proporciona (12 dígitos numéricos con prefijo 9 para servicios)
         const finalBarcode = barcode || `9${Array.from({ length: 11 }, () => Math.floor(Math.random() * 10)).join('')}`;
 
         const [result] = await db.query(`
-      INSERT INTO services_catalog (tenant_id, name, description, device_type_id, base_price, estimated_time, barcode, brand_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `, [tenantId, name, description, device_type_id || null, finalPrice, estimated_time, finalBarcode, brand_id || null]);
+      INSERT INTO services_catalog (tenant_id, name, description, device_type_id, base_price, default_parts_cost, estimated_time, barcode, brand_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [tenantId, name, description, device_type_id || null, finalPrice, finalPartsCost, estimated_time, finalBarcode, brand_id || null]);
 
         res.status(201).json({
             message: 'Servicio creado exitosamente.',
@@ -91,9 +92,10 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, description, device_type_id, base_price, estimated_time, is_active, barcode, brand_id } = req.body;
+        const { name, description, device_type_id, base_price, default_parts_cost, estimated_time, is_active, barcode, brand_id } = req.body;
         const tenantId = req.tenantCtx.tenantId;
         const finalPrice = (base_price === '' || base_price === undefined) ? 0 : base_price;
+        const finalPartsCost = (default_parts_cost === '' || default_parts_cost === undefined) ? 0 : default_parts_cost;
 
         const [result] = await db.query(`
       UPDATE services_catalog SET
@@ -101,12 +103,13 @@ exports.update = async (req, res) => {
         description = COALESCE(?, description),
         device_type_id = ?,
         base_price = COALESCE(?, base_price),
+        default_parts_cost = COALESCE(?, default_parts_cost),
         estimated_time = COALESCE(?, estimated_time),
         is_active = COALESCE(?, is_active),
         barcode = COALESCE(?, barcode),
         brand_id = ?
       WHERE id = ? AND tenant_id = ?
-    `, [name, description, device_type_id, finalPrice, estimated_time, is_active, barcode, brand_id || null, id, tenantId]);
+    `, [name, description, device_type_id, finalPrice, finalPartsCost, estimated_time, is_active, barcode, brand_id || null, id, tenantId]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({ message: 'Servicio no encontrado o no pertenece a tu empresa.' });

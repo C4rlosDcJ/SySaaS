@@ -65,6 +65,10 @@ const defaultAnalytics = {
         total_revenue: 0,
         pos_revenue: 0,
         repairs_revenue: 0,
+        total_egress: 0,
+        total_parts_cost: 0,
+        net_profit: 0,
+        profit_margin: 0,
         sales_count: 0,
         repairs_count: 0,
         avg_ticket: 0,
@@ -649,11 +653,36 @@ export default function AdminReports() {
                                             );
                                         })()}
 
-                                        <div style={{ marginTop: '12px', padding: '12px', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
-                                            <div style={{ fontSize: '12px', color: 'var(--color-text-secondary)', marginBottom: '4px' }}>Descuentos Totales Concedidos:</div>
-                                            <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--color-text)' }}>
-                                                {formatCurrency(kpis.discounts_total || 0)}
+                                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '12px' }}>
+                                            <div style={{ padding: '10px 12px', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                                                <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '3px' }}>Costo Piezas / Refacciones:</div>
+                                                <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--color-warning, #f59e0b)' }}>
+                                                    {formatCurrency(kpis.total_parts_cost || 0)}
+                                                </div>
                                             </div>
+                                            <div style={{ padding: '10px 12px', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' }}>
+                                                <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginBottom: '3px' }}>Ganancia Neta Estimada:</div>
+                                                <div style={{ fontSize: '15px', fontWeight: 700, color: (kpis.net_profit ?? 0) >= 0 ? 'var(--color-success, #10b981)' : 'var(--color-danger, #ef4444)' }}>
+                                                    {formatCurrency(kpis.net_profit ?? ((kpis.total_revenue || 0) - (kpis.total_egress || 0)))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div style={{ marginTop: '8px', padding: '10px 12px', background: 'var(--color-bg-tertiary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <div>
+                                                <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Descuentos Concedidos:</div>
+                                                <div style={{ fontSize: '14px', fontWeight: 700, color: 'var(--color-text)' }}>
+                                                    {formatCurrency(kpis.discounts_total || 0)}
+                                                </div>
+                                            </div>
+                                            {kpis.profit_margin !== undefined && (
+                                                <div style={{ textAlign: 'right' }}>
+                                                    <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>Margen Operativo:</div>
+                                                    <span className="badge-neutral" style={{ fontWeight: 700, color: kpis.profit_margin >= 0 ? 'var(--color-success, #10b981)' : 'var(--color-danger, #ef4444)' }}>
+                                                        {kpis.profit_margin}%
+                                                    </span>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

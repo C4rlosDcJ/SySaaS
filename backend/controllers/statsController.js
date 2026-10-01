@@ -838,6 +838,9 @@ exports.getEnterpriseAnalytics = async (req, res) => {
             SELECT 
                 COUNT(*) as repairs_count,
                 COALESCE(SUM(r.total_cost), 0) as repairs_revenue,
+                COALESCE(SUM(r.parts_cost), 0) as total_parts_cost,
+                COALESCE(SUM(r.diagnosis_cost), 0) as total_diagnosis_cost,
+                COALESCE(SUM(r.labor_cost), 0) as total_labor_cost,
                 COUNT(CASE WHEN r.status = 'delivered' THEN 1 END) as delivered_count
             FROM repairs r
             WHERE r.tenant_id = ? AND r.status != 'cancelled' ${branchFilterRepairs} ${dateConditionRepairs}
@@ -864,7 +867,10 @@ exports.getEnterpriseAnalytics = async (req, res) => {
         const currentTotalRevenue = currentPosRevenue + currentTallerRevenue;
         const prevTotalRevenue = parseFloat(prevPeriodSales[0]?.revenue || 0);
         const revenueGrowth = prevTotalRevenue > 0 ? ((currentTotalRevenue - prevTotalRevenue) / prevTotalRevenue) * 100 : null;
-        const totalEgress = parseFloat(purchaseEgress[0]?.total_egress || 0);
+        const totalPurchaseEgress = parseFloat(purchaseEgress[0]?.total_egress || 0);
+        const totalPartsCost = parseFloat(repairsMetrics[0]?.total_parts_cost || 0);
+        const totalEgress = totalPurchaseEgress + totalPartsCost;
+        const netProfit = currentTotalRevenue - totalEgress;
 
         // 4. Top 10 Productos Más Vendidos
         const [topProducts] = await db.query(`
@@ -994,7 +1000,11 @@ exports.getEnterpriseAnalytics = async (req, res) => {
                 taller_revenue: currentTallerRevenue,
                 repairs_revenue: currentTallerRevenue,
                 total_egress: totalEgress,
-                operating_balance: currentTotalRevenue - totalEgress,
+                total_parts_cost: totalPartsCost,
+                purchase_egress: totalPurchaseEgress,
+                operating_balance: netProfit,
+                net_profit: netProfit,
+                profit_margin: currentTotalRevenue > 0 ? parseFloat(((netProfit / currentTotalRevenue) * 100).toFixed(1)) : 0,
                 po_count: parseInt(purchaseEgress[0]?.po_count || 0, 10),
                 sales_count: parseInt(posSales[0]?.sales_count || 0, 10),
                 repairs_count: parseInt(repairsMetrics[0]?.repairs_count || 0, 10),

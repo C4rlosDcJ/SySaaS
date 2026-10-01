@@ -420,6 +420,11 @@ export default function AdminServices() {
                                                 <p className="service-desc">{item.description || 'Sin descripción detallada disponible.'}</p>
                                                 <div className="service-meta-row">
                                                     <span className="service-price">{servicesCatalog.formatCurrency(item.base_price)}</span>
+                                                    {parseFloat(item.default_parts_cost) > 0 && (
+                                                        <span style={{ fontSize: '11px', color: 'var(--color-warning)', background: 'var(--color-bg-tertiary)', padding: '2px 6px', borderRadius: '4px', border: '1px solid var(--color-border)' }}>
+                                                            Refacción: {servicesCatalog.formatCurrency(item.default_parts_cost)}
+                                                        </span>
+                                                    )}
                                                     <div className="service-time">
                                                         <Clock size={12} />
                                                         <span>{item.estimated_time || 'Bajo consulta'}</span>
@@ -551,7 +556,7 @@ export default function AdminServices() {
                                         <label>Descripción del Servicio</label>
                                         <textarea name="description" className="input" rows="3" value={formData.description || ''} onChange={handleChange} placeholder="Detalla el alcance del servicio..."></textarea>
                                     </div>
-                                    <div className="form-row mt-sm" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--sp-3)' }}>
+                                    <div className="form-row mt-sm" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--sp-3)' }}>
                                         <div className="input-group">
                                             <label>Tipo de Equipo compatible</label>
                                             <select name="device_type_id" className="select" value={formData.device_type_id || ''} onChange={handleChange}>
@@ -570,9 +575,18 @@ export default function AdminServices() {
                                                 ))}
                                             </select>
                                         </div>
+                                    </div>
+                                    <div className="form-row mt-sm" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--sp-3)' }}>
                                         <div className="input-group">
-                                            <label>Precio Base ($ MXN)</label>
-                                            <input type="number" name="base_price" className="input" value={formData.base_price || ''} onChange={handleChange} placeholder="0.00" />
+                                            <label>Precio Cobrado al Cliente ($ MXN) *</label>
+                                            <input type="number" step="0.01" name="base_price" className="input" value={formData.base_price || ''} onChange={handleChange} placeholder="0.00" />
+                                        </div>
+                                        <div className="input-group">
+                                            <label>Costo de Pieza / Gasto / Refacción ($ MXN)</label>
+                                            <input type="number" step="0.01" name="default_parts_cost" className="input" value={formData.default_parts_cost || ''} onChange={handleChange} placeholder="0.00 (opcional)" />
+                                            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
+                                                Se sumará a gastos de la reparación para calcular ganancia neta.
+                                            </span>
                                         </div>
                                     </div>
                                     <div className="form-row mt-sm">
