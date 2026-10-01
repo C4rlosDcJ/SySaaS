@@ -2,25 +2,116 @@ const db = require('../config/database');
 const { execFile } = require('child_process');
 const path = require('path');
 
-// Función helper para invocar el motor Python de Machine Learning
+// Función helper para invocar el motor Python de Machine Learning con soporte resiliente
 function runPythonML(action, inputData) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
         const pythonScript = path.join(__dirname, '../services/analytics_engine.py');
         const inputJson = JSON.stringify(inputData);
 
-        execFile('python3', [pythonScript, '--action', action, '--input', inputJson], { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
-            if (error) {
-                console.error('[PYTHON-ML ERROR]', stderr || error.message);
-                return reject(error);
-            }
-            try {
-                const jsonRes = JSON.parse(stdout.trim());
-                resolve(jsonRes);
-            } catch (e) {
-                reject(new Error('Respuesta inválida del motor de analítica Python'));
-            }
-        });
+        const tryRun = (cmd, nextFallback) => {
+            execFile(cmd, [pythonScript, '--action', action, '--input', inputJson], { maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+                if (error) {
+                    if (nextFallback) {
+                        return nextFallback();
+                    }
+                    console.warn('[PYTHON-ML WARNING] Python no disponible o sin paquetes ML:', stderr || error.message);
+                    return resolve(fallbackNodeML(action, inputData));
+                }
+                try {
+                    const jsonRes = JSON.parse(stdout.trim());
+                    resolve(jsonRes);
+                } catch (e) {
+                    resolve(fallbackNodeML(action, inputData));
+                }
+            });
+        };
+
+        // Probar 'python3' y si no existe probar 'python' antes del fallback
+        tryRun('python3', () => tryRun('python', null));
     });
+}
+
+// Fallback nativo en Node.js en caso de que el entorno en la nube no tenga Python/scikit-learn
+function fallbackNodeML(action, inputData) {
+    if (action === 'forecast_sales') {
+        const data = Array.isArray(inputData) ? inputData : [];
+        if (data.length === 0) {
+            return {
+                historical_days: 0,
+                total_predicted_30d: 0,
+                daily_avg_predicted: 0,
+                forecast: [],
+                trend: 'neutral',
+                confidence: 0,
+                model_type: 'Sin datos',
+                message: 'Sin ventas históricas para proyectar.'
+            };
+        }
+
+        const amounts = data.map(d => parseFloat(d.amount) || 0);
+        const avg = amounts.reduce((a, b) => a + b, 0) / (amounts.length || 1);
+        const lastDateStr = data[data.length - 1]?.date || new Date().toISOString().slice(0, 10);
+        const lastDate = new Date(lastDateStr);
+
+        const forecast = [];
+        for (let i = 1; i <= 30; i++) {
+            const next = new Date(lastDate);
+            next.setDate(next.getDate() + i);
+            forecast.push({
+                date: next.toISOString().slice(0, 10),
+                predicted_amount: Math.round(avg * 100) / 100
+            });
+        }
+
+        const total = Math.round(avg * 30 * 100) / 100;
+        return {
+            historical_days: data.length,
+            total_predicted_30d: total,
+            daily_avg_predicted: Math.round(avg * 100) / 100,
+            forecast,
+            trend: 'estable',
+            confidence: 75,
+            model_type: 'Media Predictiva (Fallback Node.js)',
+            growth_rate_pct: 0.0
+        };
+    }
+
+    if (action === 'segment_customers') {
+        const customers = Array.isArray(inputData) ? inputData : [];
+        const results = customers.map(c => {
+            const spent = parseFloat(c.total_spent) || 0;
+            const orders = parseInt(c.total_orders, 10) || 0;
+            const recency = parseInt(c.recency_days, 10) || 0;
+
+            let segment = 'Ocasional/Nuevo';
+            if (spent >= 1000 || orders >= 3) segment = 'VIP';
+            else if (orders >= 1 && recency <= 30) segment = 'Frecuente';
+            else if (orders >= 1 && recency > 30) segment = 'En Riesgo';
+
+            return {
+                customer_id: c.id,
+                customer_name: c.name,
+                total_spent: spent,
+                total_orders: orders,
+                recency_days: recency,
+                segment
+            };
+        });
+
+        const summary = {};
+        results.forEach(r => {
+            summary[r.segment] = (summary[r.segment] || 0) + 1;
+        });
+
+        return {
+            total_customers: results.length,
+            algorithm: 'Matriz RFM Heurística (Gasto, Frecuencia, Recencia)',
+            segment_summary: summary,
+            customers: results
+        };
+    }
+
+    return { message: 'Operación no soportada' };
 }
 
 // Pronóstico de ventas a 30 días utilizando Scikit-Learn

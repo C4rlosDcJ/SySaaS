@@ -4,8 +4,9 @@
   "description": "API Backend para Sistema de Gestión de Reparaciones SySaaS",
   "main": "server.js",
   "scripts": {
-    "start": "nodemon server.js",
+    "start": "node server.js",
     "dev": "nodemon server.js",
+    "build": "pip3 install -r requirements.txt || pip install -r requirements.txt",
     "seed": "node ../database/seed_full_demo.js",
     "clean:test-data": "node scripts/clean_test_data.js",
     "test": "echo \"Error: no test specified\" && exit 1"
