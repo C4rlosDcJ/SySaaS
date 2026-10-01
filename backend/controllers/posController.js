@@ -1,11 +1,59 @@
 const db = require('../config/database');
 
-// Generar número de venta prefixado
-const generateSaleNumber = (branchCode = 'VTA') => {
-    const date = new Date();
-    const y = date.getFullYear().toString().slice(-2);
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
+// Obtener zona horaria del cliente o empresa
+const resolveClientTz = (req) => {
+    return req?.headers?.['x-timezone'] || req?.tenantCtx?.tenant?.timezone || 'America/Mexico_City';
+};
+
+// Obtener offset horario (+HH:MM o -HH:MM) para SQL CONVERT_TZ
+const resolveClientOffset = (req) => {
+    const rawOffset = req?.headers?.['x-timezone-offset'] || req?.query?.tz_offset;
+    if (rawOffset && /^[+-]\d{2}:\d{2}$/.test(rawOffset)) {
+        return rawOffset;
+    }
+    const tz = resolveClientTz(req);
+    try {
+        const d = new Date();
+        const str = d.toLocaleString('en-US', { timeZone: tz, timeZoneName: 'longOffset' });
+        const match = str.match(/GMT([+-]\d{1,2}):?(\d{2})?/i);
+        if (match) {
+            const sign = match[1].startsWith('-') ? '-' : '+';
+            const hh = String(Math.abs(parseInt(match[1].replace('+', ''), 10))).padStart(2, '0');
+            const mm = match[2] || '00';
+            return `${sign}${hh}:${mm}`;
+        }
+    } catch (e) {
+        // Fallback default para México / CST
+    }
+    return '-06:00';
+};
+
+// Obtener fecha YYYY-MM-DD local del cliente
+const getLocalTodayDate = (req) => {
+    if (req?.query?.client_date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.client_date)) {
+        return req.query.client_date;
+    }
+    const tz = resolveClientTz(req);
+    try {
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: (tz && !/^[+-]\d{2}:\d{2}$/.test(tz)) ? tz : 'America/Mexico_City',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+        return formatter.format(new Date());
+    } catch (e) {
+        return new Date().toISOString().slice(0, 10);
+    }
+};
+
+// Generar número de venta prefixado respetando la zona horaria del cliente
+const generateSaleNumber = (branchCode = 'VTA', req = null) => {
+    const todayStr = getLocalTodayDate(req); // 'YYYY-MM-DD'
+    const parts = todayStr.split('-');
+    const y = parts[0].slice(-2);
+    const m = parts[1];
+    const d = parts[2];
     const rand = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     return `${branchCode}-${y}${m}${d}-${rand}`;
 };
@@ -115,7 +163,7 @@ exports.createSale = async (req, res) => {
                 }
             }
         } else {
-            saleNumber = generateSaleNumber(branchPrefix);
+            saleNumber = generateSaleNumber(branchPrefix, req);
 
             // Insertar cabecera de venta nueva
             const [saleResult] = await connection.query(
@@ -292,13 +340,15 @@ exports.getSales = async (req, res) => {
             params.push(term, term, term, term, term, term, term);
         }
 
+        const clientOffset = resolveClientOffset(req);
+
         if (date_from) {
-            query += ' AND DATE(s.created_at) >= ?';
-            params.push(date_from);
+            query += ' AND DATE(CONVERT_TZ(s.created_at, "+00:00", ?)) >= ?';
+            params.push(clientOffset, date_from);
         }
         if (date_to) {
-            query += ' AND DATE(s.created_at) <= ?';
-            params.push(date_to);
+            query += ' AND DATE(CONVERT_TZ(s.created_at, "+00:00", ?)) <= ?';
+            params.push(clientOffset, date_to);
         }
         if (payment_method) {
             query += ' AND s.payment_method = ?';
@@ -663,14 +713,12 @@ exports.getSalesStats = async (req, res) => {
         const branchCondition = branchId ? ' AND branch_id = ?' : '';
         const branchParams = branchId ? [tenantId, branchId] : [tenantId];
 
-        // Determinar fecha de hoy (usando client_date del frontend si se proporciona para respetar la zona horaria del usuario)
-        const clientDate = req.query.client_date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.client_date)
-            ? req.query.client_date
-            : null;
+        const clientOffset = resolveClientOffset(req);
+        const clientDate = getLocalTodayDate(req);
 
-        // Ventas de hoy
-        const todayCondition = clientDate ? 'AND DATE(created_at) = ?' : 'AND DATE(created_at) = CURDATE()';
-        const todayParams = clientDate ? [...branchParams, clientDate] : branchParams;
+        // Ventas de hoy (usando CONVERT_TZ con offset de zona horaria del cliente)
+        const todayCondition = 'AND DATE(CONVERT_TZ(created_at, "+00:00", ?)) = ?';
+        const todayParams = [...branchParams, clientOffset, clientDate];
 
         const [todaySales] = await db.query(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
@@ -679,8 +727,8 @@ exports.getSalesStats = async (req, res) => {
         );
 
         // Ventas de la semana
-        const weekCondition = clientDate ? 'AND YEARWEEK(created_at, 1) = YEARWEEK(?, 1)' : 'AND YEARWEEK(created_at, 1) = YEARWEEK(CURDATE(), 1)';
-        const weekParams = clientDate ? [...branchParams, clientDate] : branchParams;
+        const weekCondition = 'AND YEARWEEK(CONVERT_TZ(created_at, "+00:00", ?), 1) = YEARWEEK(?, 1)';
+        const weekParams = [...branchParams, clientOffset, clientDate];
 
         const [weekSales] = await db.query(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
@@ -689,10 +737,8 @@ exports.getSalesStats = async (req, res) => {
         );
 
         // Ventas del mes
-        const monthCondition = clientDate
-            ? 'AND YEAR(created_at) = YEAR(?) AND MONTH(created_at) = MONTH(?)'
-            : 'AND YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())';
-        const monthParams = clientDate ? [...branchParams, clientDate, clientDate] : branchParams;
+        const monthCondition = 'AND YEAR(CONVERT_TZ(created_at, "+00:00", ?)) = YEAR(?) AND MONTH(CONVERT_TZ(created_at, "+00:00", ?)) = MONTH(?)';
+        const monthParams = [...branchParams, clientOffset, clientDate, clientOffset, clientDate];
 
         const [monthSales] = await db.query(
             `SELECT COUNT(*) as count, COALESCE(SUM(total), 0) as total
@@ -707,20 +753,20 @@ exports.getSalesStats = async (req, res) => {
             branchParams
         );
 
-        // Ventas por día (últimos 30 días)
+        // Ventas por día (últimos 30 días locales)
         const [dailySales] = await db.query(
-            `SELECT DATE(created_at) as date, COUNT(*) as count, SUM(total) as total
-             FROM sales WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY) AND status = 'completed' AND tenant_id = ? ${branchCondition}
-             GROUP BY DATE(created_at) ORDER BY date ASC`,
-            branchParams
+            `SELECT DATE(CONVERT_TZ(created_at, "+00:00", ?)) as date, COUNT(*) as count, SUM(total) as total
+             FROM sales WHERE CONVERT_TZ(created_at, "+00:00", ?) >= DATE_SUB(?, INTERVAL 30 DAY) AND status = 'completed' AND tenant_id = ? ${branchCondition}
+             GROUP BY DATE(CONVERT_TZ(created_at, "+00:00", ?)) ORDER BY date ASC`,
+            [clientOffset, clientOffset, clientDate, ...branchParams, clientOffset]
         );
 
         // Ventas por método de pago (mes actual)
         const [byPaymentMethod] = await db.query(
             `SELECT payment_method, COUNT(*) as count, SUM(total) as total
-             FROM sales WHERE YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE()) AND status = 'completed' AND tenant_id = ? ${branchCondition}
+             FROM sales WHERE YEAR(CONVERT_TZ(created_at, "+00:00", ?)) = YEAR(?) AND MONTH(CONVERT_TZ(created_at, "+00:00", ?)) = MONTH(?) AND status = 'completed' AND tenant_id = ? ${branchCondition}
              GROUP BY payment_method`,
-            branchParams
+            [clientOffset, clientDate, clientOffset, clientDate, ...branchParams]
         );
 
         // Productos más vendidos (mes actual, excluyendo ítems devueltos)
@@ -728,11 +774,11 @@ exports.getSalesStats = async (req, res) => {
             `SELECT si.description, SUM(si.quantity) as total_qty, SUM(si.total) as total_revenue
              FROM sale_items si
              JOIN sales s ON si.sale_id = s.id
-             WHERE YEAR(s.created_at) = YEAR(CURDATE()) AND MONTH(s.created_at) = MONTH(CURDATE()) AND s.status = 'completed' AND s.tenant_id = ? ${branchCondition.replace('branch_id', 's.branch_id')}
+             WHERE YEAR(CONVERT_TZ(s.created_at, "+00:00", ?)) = YEAR(?) AND MONTH(CONVERT_TZ(s.created_at, "+00:00", ?)) = MONTH(?) AND s.status = 'completed' AND s.tenant_id = ? ${branchCondition.replace('branch_id', 's.branch_id')}
              AND (si.is_returned = 0 OR si.is_returned IS NULL)
              GROUP BY si.description
              ORDER BY total_qty DESC LIMIT 10`,
-            branchParams
+            [clientOffset, clientDate, clientOffset, clientDate, ...branchParams]
         );
 
         const monthTotal = parseFloat(monthSales[0]?.total || 0);
