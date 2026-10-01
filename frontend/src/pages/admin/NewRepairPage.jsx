@@ -13,7 +13,8 @@ import { formatCurrency } from '../../utils/constants';
 import {
     Save, X, User, Smartphone, Wrench, ClipboardCheck,
     DollarSign, Search, ChevronRight, CheckCircle2,
-    Image as ImageIcon, Plus, Trash2, Camera, UploadCloud, RotateCcw
+    Image as ImageIcon, Plus, Trash2, Camera, UploadCloud, RotateCcw,
+    Mic, MicOff, Sparkles
 } from 'lucide-react';
 import CameraCaptureModal from '../../components/CameraCaptureModal';
 import './NewRepairPage.css';
@@ -48,6 +49,12 @@ export default function NewRepairPage() {
     const [serviceSearch, setServiceSearch] = useState('');
     const [showServiceDropdown, setShowServiceDropdown] = useState(false);
     const [showMobileCosts, setShowMobileCosts] = useState(false);
+
+    // Dictado por voz (Speech Recognition)
+    const [isListening, setIsListening] = useState(false);
+    const [voiceTranscript, setVoiceTranscript] = useState('');
+    const [voiceFeedback, setVoiceFeedback] = useState('');
+    const recognitionRef = useRef(null);
 
     const [formData, setFormData] = useState({
         customer_id: '',
@@ -421,6 +428,198 @@ export default function NewRepairPage() {
         });
     };
 
+    // Inteligencia para extraer datos estructurados a partir del dictado hablado
+    const parseSpokenText = (transcript) => {
+        const text = transcript.toLowerCase();
+        const detected = [];
+
+        setFormData(prev => {
+            const updated = { ...prev };
+
+            // 1. Detectar tipo de equipo
+            if (deviceTypes.length > 0) {
+                for (const dt of deviceTypes) {
+                    if (text.includes(dt.name.toLowerCase())) {
+                        updated.device_type_id = dt.id.toString();
+                        detected.push(`Tipo: ${dt.name}`);
+                        break;
+                    }
+                }
+            }
+            if (!updated.device_type_id) {
+                if (text.includes('teléfono') || text.includes('celular') || text.includes('iphone') || text.includes('smartphone')) {
+                    const phoneType = deviceTypes.find(t => t.name.toLowerCase().includes('celular') || t.name.toLowerCase().includes('teléfono') || t.name.toLowerCase().includes('smartphone'));
+                    if (phoneType) {
+                        updated.device_type_id = phoneType.id.toString();
+                        detected.push(`Tipo: ${phoneType.name}`);
+                    }
+                } else if (text.includes('laptop') || text.includes('computadora') || text.includes('macbook') || text.includes('pc')) {
+                    const laptopType = deviceTypes.find(t => t.name.toLowerCase().includes('laptop') || t.name.toLowerCase().includes('computadora'));
+                    if (laptopType) {
+                        updated.device_type_id = laptopType.id.toString();
+                        detected.push(`Tipo: ${laptopType.name}`);
+                    }
+                }
+            }
+
+            // 2. Detectar marca
+            if (brands.length > 0) {
+                for (const b of brands) {
+                    if (text.includes(b.name.toLowerCase())) {
+                        updated.brand_id = b.id.toString();
+                        detected.push(`Marca: ${b.name}`);
+                        break;
+                    }
+                }
+            }
+
+            // 3. Detectar modelo común (ej: iPhone 13 Pro, Galaxy S21, Moto G20, Redmi Note 11, etc.)
+            const modelRegex = /(?:iphone|samsung|galaxy|moto|motorola|xiaomi|redmi|poco|huawei|oppo|macbook|dell|hp|lenovo)\s+([a-z0-9\s+]+?)(?=\s+(?:con|falla|no|pantalla|cambio|bateria|centro|color|bloqueo|clave|patron|de|para|$))/i;
+            const modelMatch = transcript.match(modelRegex);
+            if (modelMatch && modelMatch[0]) {
+                const detectedModel = modelMatch[0].trim();
+                if (detectedModel.length > 3) {
+                    updated.model = detectedModel.charAt(0).toUpperCase() + detectedModel.slice(1);
+                    detected.push(`Modelo: ${updated.model}`);
+                }
+            }
+
+            // 4. Detectar color (negro, blanco, azul, rojo, plata, gris, verde, rosa, morado, etc.)
+            const colors = ['negro', 'blanco', 'azul', 'rojo', 'plata', 'silver', 'gris', 'space gray', 'verde', 'rosa', 'morado', 'dorado', 'oro'];
+            for (const col of colors) {
+                if (text.includes(col)) {
+                    updated.color = col.charAt(0).toUpperCase() + col.slice(1);
+                    detected.push(`Color: ${updated.color}`);
+                    break;
+                }
+            }
+
+            // 5. Detectar contraseña o pin ("clave 1234", "pin 1234", "contraseña 1234", "patron en L")
+            const passMatch = text.match(/(?:contraseña|clave|pin|codigo|patrón|patron)\s+(?:es\s+)?([a-z0-9]+)/i);
+            if (passMatch && passMatch[1]) {
+                updated.device_password = passMatch[1];
+                detected.push(`Clave: ${passMatch[1]}`);
+            }
+
+            // 6. Detectar servicio compatible dentro del catálogo
+            if (allCatalogServices.length > 0) {
+                let matchedService = null;
+                for (const s of allCatalogServices) {
+                    const sName = s.name.toLowerCase();
+                    if (text.includes(sName)) {
+                        matchedService = s;
+                        break;
+                    }
+                }
+
+                // Si no coincide exacto, buscar términos comunes como pantalla, batería, centro de carga, mantenimiento
+                if (!matchedService) {
+                    if (text.includes('pantalla') || text.includes('display') || text.includes('estrellada') || text.includes('touch')) {
+                        matchedService = allCatalogServices.find(s => s.name.toLowerCase().includes('pantalla') || s.name.toLowerCase().includes('display'));
+                    } else if (text.includes('bateria') || text.includes('batería') || text.includes('pila')) {
+                        matchedService = allCatalogServices.find(s => s.name.toLowerCase().includes('bateria') || s.name.toLowerCase().includes('batería'));
+                    } else if (text.includes('carga') || text.includes('centro de carga') || text.includes('puerto')) {
+                        matchedService = allCatalogServices.find(s => s.name.toLowerCase().includes('carga'));
+                    } else if (text.includes('mantenimiento') || text.includes('limpieza') || text.includes('formateo')) {
+                        matchedService = allCatalogServices.find(s => s.name.toLowerCase().includes('mantenimiento') || s.name.toLowerCase().includes('formateo'));
+                    }
+                }
+
+                if (matchedService) {
+                    updated.service_id = matchedService.id.toString();
+                    updated.service_requested = matchedService.name;
+                    updated.labor_cost = parseFloat(matchedService.base_price) || 0;
+                    if (matchedService.default_parts_cost > 0) {
+                        updated.parts_cost = parseFloat(matchedService.default_parts_cost);
+                    }
+                    if (matchedService.device_type_id && !updated.device_type_id) {
+                        updated.device_type_id = matchedService.device_type_id.toString();
+                    }
+                    if (matchedService.brand_id && !updated.brand_id) {
+                        updated.brand_id = matchedService.brand_id.toString();
+                    }
+                    setServiceSearch(`${matchedService.name} - ${formatCurrency(matchedService.base_price)}`);
+                    detected.push(`Servicio: ${matchedService.name}`);
+                }
+            }
+
+            // 7. Extraer la falla o descripción
+            if (!updated.problem_description.trim()) {
+                updated.problem_description = transcript.trim();
+            } else {
+                updated.problem_description = `${updated.problem_description} | ${transcript.trim()}`;
+            }
+
+            return updated;
+        });
+
+        if (detected.length > 0) {
+            setVoiceFeedback(`Auto-completado con éxito: ${detected.join(', ')}`);
+        } else {
+            setVoiceFeedback('Texto dictado agregado a la falla reportada');
+        }
+    };
+
+    // Iniciar o detener reconocimiento de voz
+    const toggleVoiceRecognition = () => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+            alert('Tu navegador no soporta reconocimiento de voz. Te recomendamos usar Google Chrome o Microsoft Edge.');
+            return;
+        }
+
+        if (isListening) {
+            if (recognitionRef.current) {
+                recognitionRef.current.stop();
+            }
+            setIsListening(false);
+            return;
+        }
+
+        try {
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'es-MX';
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.maxAlternatives = 1;
+
+            recognition.onstart = () => {
+                setIsListening(true);
+                setVoiceTranscript('');
+                setVoiceFeedback('Escuchando... Di por ejemplo: "iPhone 13 Pro color azul cambio de pantalla clave 1234 no da imagen"');
+            };
+
+            recognition.onresult = (event) => {
+                const currentTranscript = event.results[0][0].transcript;
+                setVoiceTranscript(currentTranscript);
+                parseSpokenText(currentTranscript);
+            };
+
+            recognition.onerror = (event) => {
+                console.warn('Speech recognition error:', event.error);
+                setIsListening(false);
+                if (event.error === 'not-allowed') {
+                    setVoiceFeedback('Permiso de micrófono denegado. Permite el acceso para dictar.');
+                } else if (event.error === 'no-speech') {
+                    setVoiceFeedback('No se detectó audio. Intenta de nuevo.');
+                } else {
+                    setVoiceFeedback(`Error de reconocimiento: ${event.error}`);
+                }
+            };
+
+            recognition.onend = () => {
+                setIsListening(false);
+            };
+
+            recognitionRef.current = recognition;
+            recognition.start();
+        } catch (err) {
+            console.error('Error starting speech recognition:', err);
+            setIsListening(false);
+            setVoiceFeedback('No se pudo inicializar el micrófono');
+        }
+    };
+
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
         if (type === 'checkbox' && name.startsWith('check_')) {
@@ -591,15 +790,52 @@ export default function NewRepairPage() {
 
                     {/* SECCIÓN RÁPIDA: SERVICIO PRECONFIGURADO */}
                     <section className="form-card quick-service-banner">
-                        <div className="form-card-header" style={{ marginBottom: 'var(--sp-3)', paddingBottom: 'var(--sp-2)' }}>
-                            <Wrench size={20} className="icon-primary" />
-                            <div style={{ flex: 1 }}>
-                                <h2>Selección Rápida de Servicio (Auto-completado)</h2>
-                                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: 0 }}>
-                                    Selecciona o busca un servicio para rellenar automáticamente tipo de equipo, marca, costos de mano de obra y refacción.
-                                </p>
+                        <div className="form-card-header" style={{ marginBottom: 'var(--sp-3)', paddingBottom: 'var(--sp-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
+                                <Wrench size={20} className="icon-primary" />
+                                <div>
+                                    <h2 style={{ margin: 0 }}>Selección Rápida de Servicio (Auto-completado)</h2>
+                                    <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: 0 }}>
+                                        Selecciona un servicio o dicta por voz para autollenar todos los campos del equipo y presupuesto.
+                                    </p>
+                                </div>
                             </div>
+
+                            {/* Botón de Dictado por Voz con Micrófono */}
+                            <button
+                                type="button"
+                                className={`voice-dictate-btn ${isListening ? 'recording' : ''}`}
+                                onClick={toggleVoiceRecognition}
+                                title={isListening ? "Detener dictado" : "Dictar datos de la reparación por micrófono"}
+                            >
+                                {isListening ? (
+                                    <>
+                                        <MicOff size={16} />
+                                        <span>Detener Dictado</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Mic size={16} />
+                                        <span>Dictar Reparación</span>
+                                    </>
+                                )}
+                            </button>
                         </div>
+
+                        {/* Barra de estado o feedback de dictado por voz */}
+                        {(isListening || voiceFeedback) && (
+                            <div className="voice-status-bar" style={{ marginBottom: 'var(--sp-3)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Sparkles size={15} />
+                                    <span>{voiceFeedback}</span>
+                                </div>
+                                {voiceTranscript && (
+                                    <span style={{ fontSize: '11px', opacity: 0.85, fontStyle: 'italic' }}>
+                                        "{voiceTranscript}"
+                                    </span>
+                                )}
+                            </div>
+                        )}
 
                         <div className="service-search-container" style={{ position: 'relative' }}>
                             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -630,7 +866,22 @@ export default function NewRepairPage() {
                             </div>
 
                             {showServiceDropdown && (
-                                <div className="search-results" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: '240px', overflowY: 'auto', marginTop: '4px' }}>
+                                <div
+                                    className="search-results"
+                                    style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        left: 0,
+                                        right: 0,
+                                        zIndex: 999,
+                                        maxHeight: '260px',
+                                        overflowY: 'auto',
+                                        marginTop: '6px',
+                                        backgroundColor: 'var(--color-bg)',
+                                        border: '1px solid var(--color-border-strong)',
+                                        boxShadow: '0 18px 40px rgba(0, 0, 0, 0.45)'
+                                    }}
+                                >
                                     {allCatalogServices.filter(s => 
                                         !serviceSearch || 
                                         s.name.toLowerCase().includes(serviceSearch.split(' - ')[0].toLowerCase()) ||
@@ -886,8 +1137,20 @@ export default function NewRepairPage() {
                         </div>
 
                         <div className="form-group mb-md">
-                            <label>Falla Reportada / Descripción de Solicitud *</label>
-                            <textarea name="problem_description" className="input" rows="3" value={formData.problem_description} onChange={handleChange} required placeholder="Lo que el cliente reporta que falla..."></textarea>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                <label style={{ margin: 0 }}>Falla Reportada / Descripción de Solicitud *</label>
+                                <button
+                                    type="button"
+                                    className={`btn btn-ghost btn-sm ${isListening ? 'text-error' : 'text-primary'}`}
+                                    onClick={toggleVoiceRecognition}
+                                    style={{ fontSize: '12px', padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                    title="Dictar por voz"
+                                >
+                                    {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+                                    <span>{isListening ? 'Detener Micrófono' : 'Dictar por Voz'}</span>
+                                </button>
+                            </div>
+                            <textarea name="problem_description" className="input" rows="3" value={formData.problem_description} onChange={handleChange} required placeholder="Lo que el cliente reporta que falla... (o pulsa Dictar por Voz)"></textarea>
                         </div>
                         
                         <div className="form-grid">
