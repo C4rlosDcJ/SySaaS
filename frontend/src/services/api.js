@@ -17,6 +17,19 @@ export const getImageUrl = (path) => {
 async function fetchAPI(endpoint, options = {}) {
     const token = localStorage.getItem('token');
     const activeBranchId = localStorage.getItem('activeBranchId');
+    let clientTz = 'America/Mexico_City';
+    let clientOffset = '-06:00';
+    try {
+        clientTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/Mexico_City';
+        const offsetMin = new Date().getTimezoneOffset();
+        const sign = offsetMin <= 0 ? '+' : '-';
+        const abs = Math.abs(offsetMin);
+        const hours = String(Math.floor(abs / 60)).padStart(2, '0');
+        const mins = String(abs % 60).padStart(2, '0');
+        clientOffset = `${sign}${hours}:${mins}`;
+    } catch (e) {
+        // Fallback default
+    }
 
     const config = {
         ...options,
@@ -24,6 +37,8 @@ async function fetchAPI(endpoint, options = {}) {
             'Content-Type': 'application/json',
             ...(token && { Authorization: `Bearer ${token}` }),
             ...(activeBranchId && { 'X-Branch-ID': activeBranchId }),
+            'X-Timezone': clientTz,
+            'X-Timezone-Offset': clientOffset,
             ...options.headers,
         },
     };

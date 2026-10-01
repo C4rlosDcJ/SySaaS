@@ -1,5 +1,45 @@
 const db = require('../config/database');
 
+// Obtener offset horario (+HH:MM o -HH:MM) para SQL CONVERT_TZ
+const resolveClientOffset = (req) => {
+    const rawOffset = req?.headers?.['x-timezone-offset'] || req?.query?.tz_offset;
+    if (rawOffset && /^[+-]\d{2}:\d{2}$/.test(rawOffset)) {
+        return rawOffset;
+    }
+    const tz = req?.headers?.['x-timezone'] || req?.tenantCtx?.tenant?.timezone || 'America/Mexico_City';
+    try {
+        const d = new Date();
+        const str = d.toLocaleString('en-US', { timeZone: tz, timeZoneName: 'longOffset' });
+        const match = str.match(/GMT([+-]\d{1,2}):?(\d{2})?/i);
+        if (match) {
+            const sign = match[1].startsWith('-') ? '-' : '+';
+            const hh = String(Math.abs(parseInt(match[1].replace('+', ''), 10))).padStart(2, '0');
+            const mm = match[2] || '00';
+            return `${sign}${hh}:${mm}`;
+        }
+    } catch (e) {}
+    return '-06:00';
+};
+
+// Obtener fecha YYYY-MM-DD local del cliente
+const getLocalTodayDate = (req) => {
+    if (req?.query?.client_date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.client_date)) {
+        return req.query.client_date;
+    }
+    const tz = req?.headers?.['x-timezone'] || req?.tenantCtx?.tenant?.timezone || 'America/Mexico_City';
+    try {
+        const formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: (tz && !/^[+-]\d{2}:\d{2}$/.test(tz)) ? tz : 'America/Mexico_City',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+        return formatter.format(new Date());
+    } catch (e) {
+        return new Date().toISOString().slice(0, 10);
+    }
+};
+
 // Obtener estadísticas del dashboard (SaaS & Multi-Branch Scoped)
 exports.getDashboard = async (req, res) => {
     try {
@@ -706,11 +746,14 @@ exports.getEnterpriseAnalytics = async (req, res) => {
         let prevDateConditionSales = '';
         let prevDateConditionRepairs = '';
 
+        const clientOffset = resolveClientOffset(req);
+        const clientDate = getLocalTodayDate(req);
+
         if (period === 'today') {
-            dateConditionSales = "AND DATE(s.created_at) = CURDATE()";
-            dateConditionRepairs = "AND DATE(r.created_at) = CURDATE()";
-            prevDateConditionSales = "AND DATE(s.created_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)";
-            prevDateConditionRepairs = "AND DATE(r.created_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY)";
+            dateConditionSales = `AND DATE(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) = '${clientDate}'`;
+            dateConditionRepairs = `AND DATE(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) = '${clientDate}'`;
+            prevDateConditionSales = `AND DATE(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) = DATE_SUB('${clientDate}', INTERVAL 1 DAY)`;
+            prevDateConditionRepairs = `AND DATE(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) = DATE_SUB('${clientDate}', INTERVAL 1 DAY)`;
         } else if (period === '7d') {
             dateConditionSales = "AND s.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
             dateConditionRepairs = "AND r.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";

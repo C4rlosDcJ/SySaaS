@@ -70,25 +70,33 @@ export default function SalesHistoryPage() {
         loadStats();
     }, [page, dateFrom, dateTo, paymentMethod, statusFilter, itemsPerPage]);
 
+    // Helper para formatear fecha local en YYYY-MM-DD
+    const formatLocalDate = (dateObj) => {
+        const y = dateObj.getFullYear();
+        const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const d = String(dateObj.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    };
+
     // Handle Quick Date Presets
     const handlePresetChange = (preset) => {
         setDatePreset(preset);
         setPage(1);
         const now = new Date();
         if (preset === 'today') {
-            const todayStr = now.toISOString().slice(0, 10);
+            const todayStr = formatLocalDate(now);
             setDateFrom(todayStr);
             setDateTo(todayStr);
         } else if (preset === 'week') {
             const dayOfWeek = now.getDay() || 7;
             const monday = new Date(now);
             monday.setDate(now.getDate() - (dayOfWeek - 1));
-            setDateFrom(monday.toISOString().slice(0, 10));
-            setDateTo(now.toISOString().slice(0, 10));
+            setDateFrom(formatLocalDate(monday));
+            setDateTo(formatLocalDate(now));
         } else if (preset === 'month') {
             const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-            setDateFrom(firstDay.toISOString().slice(0, 10));
-            setDateTo(now.toISOString().slice(0, 10));
+            setDateFrom(formatLocalDate(firstDay));
+            setDateTo(formatLocalDate(now));
         } else if (preset === 'all') {
             setDateFrom('');
             setDateTo('');
