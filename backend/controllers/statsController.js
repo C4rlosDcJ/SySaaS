@@ -72,30 +72,43 @@ exports.getDashboard = async (req, res) => {
           GROUP BY status
         `, params);
 
-        // Ingresos este mes:
+        const clientOffset = resolveClientOffset(req);
+        const clientDate = getLocalTodayDate(req); // 'YYYY-MM-DD' en hora local del cliente
+
+        // Ingresos este mes (usando mes y año según la zona horaria del cliente):
         // - Ingresos Taller: ventas POS vinculadas a reparaciones (repair_id NOT NULL)
         // - Ingresos Mostrador: ventas POS sin reparación (repair_id IS NULL)
         // Esto evita contar dos veces una reparación (una en repairs.total_cost y otra en sales.total)
         const [thisMonth] = await db.query(`
           SELECT 
-            (SELECT COUNT(*) FROM repairs ${baseWhere} AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE()) AND status != 'cancelled') as count,
+            (SELECT COUNT(*) FROM repairs ${baseWhere} AND MONTH(CONVERT_TZ(created_at, '+00:00', ?)) = MONTH(?) AND YEAR(CONVERT_TZ(created_at, '+00:00', ?)) = YEAR(?) AND status != 'cancelled') as count,
             (
-              (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NOT NULL AND status = 'completed' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) +
-              (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NULL AND status = 'completed' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE()))
+              (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NOT NULL AND status = 'completed' AND MONTH(CONVERT_TZ(created_at, '+00:00', ?)) = MONTH(?) AND YEAR(CONVERT_TZ(created_at, '+00:00', ?)) = YEAR(?)) +
+              (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NULL AND status = 'completed' AND MONTH(CONVERT_TZ(created_at, '+00:00', ?)) = MONTH(?) AND YEAR(CONVERT_TZ(created_at, '+00:00', ?)) = YEAR(?))
             ) as revenue,
-            (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NOT NULL AND status = 'completed' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) as taller_revenue,
-            (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NULL AND status = 'completed' AND MONTH(created_at) = MONTH(CURRENT_DATE()) AND YEAR(created_at) = YEAR(CURRENT_DATE())) as pos_revenue
-        `, [...params, ...params, ...params, ...params, ...params]);
+            (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NOT NULL AND status = 'completed' AND MONTH(CONVERT_TZ(created_at, '+00:00', ?)) = MONTH(?) AND YEAR(CONVERT_TZ(created_at, '+00:00', ?)) = YEAR(?)) as taller_revenue,
+            (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NULL AND status = 'completed' AND MONTH(CONVERT_TZ(created_at, '+00:00', ?)) = MONTH(?) AND YEAR(CONVERT_TZ(created_at, '+00:00', ?)) = YEAR(?)) as pos_revenue
+        `, [
+          ...params, clientOffset, clientDate, clientOffset, clientDate,
+          ...params, clientOffset, clientDate, clientOffset, clientDate,
+          ...params, clientOffset, clientDate, clientOffset, clientDate,
+          ...params, clientOffset, clientDate, clientOffset, clientDate,
+          ...params, clientOffset, clientDate, clientOffset, clientDate
+        ]);
 
-        // Ingresos mes anterior (misma lógica, sin duplicar)
+        // Ingresos mes anterior (calculado restando 1 mes a la fecha local del cliente)
         const [lastMonth] = await db.query(`
           SELECT 
-            (SELECT COUNT(*) FROM repairs ${baseWhere} AND MONTH(created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND status != 'cancelled') as count,
+            (SELECT COUNT(*) FROM repairs ${baseWhere} AND MONTH(CONVERT_TZ(created_at, '+00:00', ?)) = MONTH(DATE_SUB(?, INTERVAL 1 MONTH)) AND YEAR(CONVERT_TZ(created_at, '+00:00', ?)) = YEAR(DATE_SUB(?, INTERVAL 1 MONTH)) AND status != 'cancelled') as count,
             (
-              (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NOT NULL AND status = 'completed' AND MONTH(created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))) +
-              (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NULL AND status = 'completed' AND MONTH(created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)))
+              (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NOT NULL AND status = 'completed' AND MONTH(CONVERT_TZ(created_at, '+00:00', ?)) = MONTH(DATE_SUB(?, INTERVAL 1 MONTH)) AND YEAR(CONVERT_TZ(created_at, '+00:00', ?)) = YEAR(DATE_SUB(?, INTERVAL 1 MONTH))) +
+              (SELECT COALESCE(SUM(total), 0) FROM sales ${baseWhere} AND repair_id IS NULL AND status = 'completed' AND MONTH(CONVERT_TZ(created_at, '+00:00', ?)) = MONTH(DATE_SUB(?, INTERVAL 1 MONTH)) AND YEAR(CONVERT_TZ(created_at, '+00:00', ?)) = YEAR(DATE_SUB(?, INTERVAL 1 MONTH)))
             ) as revenue
-        `, [...params, ...params, ...params]);
+        `, [
+          ...params, clientOffset, clientDate, clientOffset, clientDate,
+          ...params, clientOffset, clientDate, clientOffset, clientDate,
+          ...params, clientOffset, clientDate, clientOffset, clientDate
+        ]);
 
         // Total de clientes
         let custWhere = 'WHERE role = "client" AND tenant_id = ?';
@@ -127,9 +140,8 @@ exports.getDashboard = async (req, res) => {
           LIMIT 10
         `, params);
 
-        // Ingresos por mes (últimos 12 meses)
+        // Ingresos por mes (últimos 12 meses locales)
         // Fuente única: tabla sales completadas, separadas por tipo (taller vs mostrador)
-        // Esto evita la duplicidad de contar repairs.total_cost + sales.total para la misma operación
         const [monthlyRevenue] = await db.query(`
           SELECT 
             month,
@@ -139,28 +151,31 @@ exports.getDashboard = async (req, res) => {
             SUM(pos_revenue) as pos_revenue
           FROM (
             SELECT 
-              DATE_FORMAT(created_at, '%Y-%m') as month,
+              DATE_FORMAT(CONVERT_TZ(created_at, '+00:00', ?), '%Y-%m') as month,
               COALESCE(SUM(CASE WHEN repair_id IS NOT NULL THEN total ELSE 0 END), 0) as taller_revenue,
               COALESCE(SUM(CASE WHEN repair_id IS NULL THEN total ELSE 0 END), 0) as pos_revenue,
               0 as repairs_count
             FROM sales
-            ${baseWhere} AND status = 'completed' AND created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH)
-            GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+            ${baseWhere} AND status = 'completed' AND CONVERT_TZ(created_at, '+00:00', ?) >= DATE_SUB(?, INTERVAL 12 MONTH)
+            GROUP BY DATE_FORMAT(CONVERT_TZ(created_at, '+00:00', ?), '%Y-%m')
 
             UNION ALL
 
             SELECT 
-              DATE_FORMAT(created_at, '%Y-%m') as month,
+              DATE_FORMAT(CONVERT_TZ(created_at, '+00:00', ?), '%Y-%m') as month,
               0 as taller_revenue,
               0 as pos_revenue,
               COUNT(*) as repairs_count
             FROM repairs
-            ${baseWhere} AND status != 'cancelled' AND created_at >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH)
-            GROUP BY DATE_FORMAT(created_at, '%Y-%m')
+            ${baseWhere} AND status != 'cancelled' AND CONVERT_TZ(created_at, '+00:00', ?) >= DATE_SUB(?, INTERVAL 12 MONTH)
+            GROUP BY DATE_FORMAT(CONVERT_TZ(created_at, '+00:00', ?), '%Y-%m')
           ) combined
           GROUP BY month
           ORDER BY month ASC
-        `, [...params, ...params]);
+        `, [
+          clientOffset, ...params, clientOffset, clientDate, clientOffset,
+          clientOffset, ...params, clientOffset, clientDate, clientOffset
+        ]);
 
         // Servicios más solicitados
         const [topServices] = await db.query(`
