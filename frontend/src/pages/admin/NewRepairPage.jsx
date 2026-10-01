@@ -744,7 +744,7 @@ export default function NewRepairPage() {
                             <Smartphone size={20} className="icon-primary" />
                             <h2>Detalles del Equipo</h2>
                         </div>
-                        <div className="form-grid">
+                        <div className="form-grid-3">
                             <div className="form-group">
                                 <label>Tipo de Equipo *</label>
                                 <select name="device_type_id" className="select" value={formData.device_type_id} onChange={handleDeviceTypeChange} required>
@@ -789,27 +789,27 @@ export default function NewRepairPage() {
                             </div>
                             <div className="form-group">
                                 <label>Color</label>
-                                <input type="text" name="color" className="input" value={formData.color} onChange={handleChange} />
+                                <input type="text" name="color" className="input" value={formData.color} onChange={handleChange} placeholder="Ej: Negro, Azul..." />
                             </div>
                             <div className="form-group">
                                 <label>Capacidad (GB)</label>
-                                <input type="text" name="storage_capacity" className="input" value={formData.storage_capacity} onChange={handleChange} />
+                                <input type="text" name="storage_capacity" className="input" value={formData.storage_capacity} onChange={handleChange} placeholder="Ej: 128GB" />
                             </div>
                             <div className="form-group">
                                 <label>IMEI / No. Serie</label>
-                                <input type="text" name="imei" className="input" value={formData.imei} onChange={handleChange} />
+                                <input type="text" name="imei" className="input" value={formData.imei} onChange={handleChange} placeholder="15 dígitos / Serie" />
                             </div>
-                            <div className="form-group col-span-full">
-                                <label>Contraseña / Patrón de Desbloqueo</label>
-                                <input type="text" name="device_password" className="input" value={formData.device_password} onChange={handleChange} placeholder="Para pruebas de calidad..." />
+                            <div className="form-group">
+                                <label>Contraseña / Patrón</label>
+                                <input type="text" name="device_password" className="input" value={formData.device_password} onChange={handleChange} placeholder="PIN o patrón..." />
                             </div>
                             <div className="form-group">
                                 <label>Estado Batería</label>
-                                <input type="text" name="battery_health" className="input" value={formData.battery_health} onChange={handleChange} placeholder="Ej: 85% o 'Mantenimiento'" />
+                                <input type="text" name="battery_health" className="input" value={formData.battery_health} onChange={handleChange} placeholder="Ej: 85%" />
                             </div>
                             <div className="form-group">
                                 <label>Cuenta / iCloud</label>
-                                <input type="text" name="account_status" className="input" value={formData.account_status} onChange={handleChange} placeholder="Libre, Bloqueada, etc." />
+                                <input type="text" name="account_status" className="input" value={formData.account_status} onChange={handleChange} placeholder="Libre, Bloqueada..." />
                             </div>
                             <div className="form-group col-span-full">
                                 <label>Estado de Pantalla</label>
@@ -843,31 +843,35 @@ export default function NewRepairPage() {
                                 <span>Llenar Estado Estándar</span>
                             </button>
                         </div>
-                        <div className="form-group mb-md">
-                            <label>Condición Física General (1-5)</label>
-                            <div className="rating-selector">
-                                {[1, 2, 3, 4, 5].map(v => (
-                                    <button
-                                        key={v} type="button"
-                                        className={`rating-btn ${formData.physical_condition === v ? 'active' : ''}`}
-                                        onClick={() => setFormData(prev => ({ ...prev, physical_condition: v }))}
-                                    >
-                                        {v}
-                                    </button>
-                                ))}
+                        <div className="form-grid" style={{ marginBottom: 'var(--sp-2)' }}>
+                            <div className="form-group">
+                                <label>Condición Física General (1-5)</label>
+                                <div className="rating-selector">
+                                    {[1, 2, 3, 4, 5].map(v => (
+                                        <button
+                                            key={v} type="button"
+                                            className={`rating-btn ${formData.physical_condition === v ? 'active' : ''}`}
+                                            onClick={() => setFormData(prev => ({ ...prev, physical_condition: v }))}
+                                        >
+                                            {v}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="form-group">
+                                <label>Accesorios Recibidos</label>
+                                <input type="text" name="accessories_received" className="input" value={formData.accessories_received} onChange={handleChange} placeholder="Funda, cargador, sim card..." />
                             </div>
                         </div>
-                        <div className="form-group mb-md">
-                            <label>Accesorios Recibidos</label>
-                            <input type="text" name="accessories_received" className="input" value={formData.accessories_received} onChange={handleChange} placeholder="Funda, cargador, sim card..." />
-                        </div>
-                        <div className="form-group mb-md">
-                            <label>Daños Físicos o Estéticos Existentes</label>
-                            <textarea name="existing_damage" className="input" rows="2" value={formData.existing_damage} onChange={handleChange} placeholder="Describa rayones, golpes, etc..."></textarea>
-                        </div>
-                        <div className="form-group mb-md">
-                            <label>Observaciones Técnicas Adicionales</label>
-                            <textarea name="technical_observations" className="input" rows="2" value={formData.technical_observations} onChange={handleChange} placeholder="Notas internas para el técnico..."></textarea>
+                        <div className="form-grid" style={{ marginBottom: 'var(--sp-2)' }}>
+                            <div className="form-group">
+                                <label>Daños Físicos o Estéticos Existentes</label>
+                                <textarea name="existing_damage" className="input" rows="2" value={formData.existing_damage} onChange={handleChange} placeholder="Rayones, golpes previos..."></textarea>
+                            </div>
+                            <div className="form-group">
+                                <label>Observaciones Técnicas Adicionales</label>
+                                <textarea name="technical_observations" className="input" rows="2" value={formData.technical_observations} onChange={handleChange} placeholder="Notas internas para el técnico..."></textarea>
+                            </div>
                         </div>
                         
                         <div className="form-group">
@@ -1012,7 +1016,7 @@ export default function NewRepairPage() {
                             ></textarea>
                         </div>
                         
-                        <div className="form-grid">
+                        <div className="form-grid-4">
                             <div className="form-group">
                                 <label>Técnico Asignado</label>
                                 <select name="technician_id" className="select" value={formData.technician_id} onChange={handleChange}>
@@ -1028,7 +1032,7 @@ export default function NewRepairPage() {
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label>Entrega Estimada (Fecha y Hora)</label>
+                                <label>Entrega Estimada</label>
                                 <input type="datetime-local" name="estimated_delivery" className="input" value={formData.estimated_delivery} onChange={handleChange} />
                             </div>
                             <div className="form-group">
