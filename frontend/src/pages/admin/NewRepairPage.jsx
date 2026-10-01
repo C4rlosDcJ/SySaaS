@@ -598,12 +598,14 @@ export default function NewRepairPage() {
             recognition.onerror = (event) => {
                 console.warn('Speech recognition error:', event.error);
                 setIsListening(false);
-                if (event.error === 'not-allowed') {
-                    setVoiceFeedback('Permiso de micrófono denegado. Permite el acceso para dictar.');
+                if (event.error === 'network') {
+                    setVoiceFeedback('Error de conexión con el servicio de voz del navegador. Revisa tu conexión a internet o verifica los permisos de Google Speech en tu navegador.');
+                } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+                    setVoiceFeedback('Permiso de micrófono denegado. Permite el acceso al micrófono en la barra de direcciones del navegador.');
                 } else if (event.error === 'no-speech') {
-                    setVoiceFeedback('No se detectó audio. Intenta de nuevo.');
+                    setVoiceFeedback('No se detectó voz. Vuelve a pulsar el micrófono y habla cerca.');
                 } else {
-                    setVoiceFeedback(`Error de reconocimiento: ${event.error}`);
+                    setVoiceFeedback(`Error de reconocimiento (${event.error}). Intenta nuevamente.`);
                 }
             };
 
