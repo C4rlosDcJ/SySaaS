@@ -494,11 +494,12 @@ export default function NewRepairPage() {
     };
 
     const calculateTotal = () => {
-        const { diagnosis_cost, labor_cost, parts_cost, discount } = formData;
-        return (parseFloat(diagnosis_cost) || 0) +
-            (parseFloat(labor_cost) || 0) +
-            (parseFloat(parts_cost) || 0) -
-            (parseFloat(discount) || 0);
+        const { diagnosis_cost, labor_cost, discount } = formData;
+        // El precio cobrado al cliente (labor_cost / precio base del servicio) ya es el precio final.
+        // El costo de refacciones/gastos no se suma al precio del cliente, sino que se deduce internamente de la ganancia.
+        return Math.max(0, (parseFloat(diagnosis_cost) || 0) +
+            (parseFloat(labor_cost) || 0) -
+            (parseFloat(discount) || 0));
     };
 
     return (
@@ -938,7 +939,7 @@ export default function NewRepairPage() {
                                 </div>
                             </div>
                             <div className="cost-row input-mode">
-                                <label>Mano de obra (Ganancia)</label>
+                                <label>Precio Servicio / Mano de Obra</label>
                                 <div className="input-with-icon">
                                     <span>$</span>
                                     <input type="number" name="labor_cost" className="input input-sm text-right" value={formData.labor_cost} onChange={handleChange} />
@@ -946,8 +947,8 @@ export default function NewRepairPage() {
                             </div>
                             <div className="cost-row input-mode">
                                 <div>
-                                    <label>Refacciones / Gastos</label>
-                                    <span style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-muted)' }}>Costo de pieza o insumo</span>
+                                    <label>Costo de Pieza / Insumo</label>
+                                    <span style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-muted)' }}>Gasto interno (se descuenta del cobro)</span>
                                 </div>
                                 <div className="input-with-icon">
                                     <span>$</span>
@@ -963,16 +964,20 @@ export default function NewRepairPage() {
                             </div>
                         </div>
 
-                        {/* Indicador de Desglose Ganancia vs Costo */}
+                        {/* Indicador de Desglose Ganancia Neta Real vs Costo de Insumo */}
                         <div style={{ marginTop: '12px', padding: '10px', borderRadius: '8px', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', fontSize: '12px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                                <span style={{ color: 'var(--color-text-muted)' }}>Costo Pieza (Gasto):</span>
-                                <span style={{ color: 'var(--color-warning)', fontWeight: 600 }}>{formatCurrency(formData.parts_cost || 0)}</span>
+                                <span style={{ color: 'var(--color-text-muted)' }}>Precio Final al Cliente:</span>
+                                <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>{formatCurrency(calculateTotal())}</span>
                             </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                <span style={{ color: 'var(--color-text-muted)' }}>Ganancia Estimada:</span>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <span style={{ color: 'var(--color-text-muted)' }}>Costo Refacción / Gasto (-):</span>
+                                <span style={{ color: 'var(--color-warning)', fontWeight: 600 }}>-{formatCurrency(formData.parts_cost || 0)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '4px', borderTop: '1px dashed var(--color-border)' }}>
+                                <span style={{ color: 'var(--color-text-muted)', fontWeight: 600 }}>Ganancia Neta Real:</span>
                                 <span style={{ color: 'var(--color-success)', fontWeight: 700 }}>
-                                    {formatCurrency((parseFloat(formData.labor_cost) || 0) + (parseFloat(formData.diagnosis_cost) || 0) - (parseFloat(formData.discount) || 0))}
+                                    {formatCurrency(calculateTotal() - (parseFloat(formData.parts_cost) || 0))}
                                 </span>
                             </div>
                         </div>
@@ -980,7 +985,7 @@ export default function NewRepairPage() {
                         <div className="costs-divider"></div>
                         
                         <div className="cost-row total-row">
-                            <span>Total Cotizado</span>
+                            <span>Total a Cobrar al Cliente</span>
                             <strong>{formatCurrency(calculateTotal())}</strong>
                         </div>
 

@@ -304,9 +304,9 @@ exports.create = async (req, res) => {
 
         const ticketNumber = generateTicketNumber(branchPrefix);
 
-        // Calcular total
-        const total = (parseFloat(diagnosis_cost) || 0) + (parseFloat(labor_cost) || 0) +
-            (parseFloat(parts_cost) || 0) - (parseFloat(discount) || 0);
+        // Calcular total cobrado al cliente (el precio del servicio/mano de obra + diagnostico - descuento ya es el precio final)
+        // El costo de refaccion (parts_cost) se descuenta de las ganancias internamente
+        const total = Math.max(0, (parseFloat(diagnosis_cost) || 0) + (parseFloat(labor_cost) || 0) - (parseFloat(discount) || 0));
 
         const [result] = await db.query(`
       INSERT INTO repairs (
@@ -390,16 +390,13 @@ exports.update = async (req, res) => {
             return res.status(404).json({ message: 'Reparación no encontrada.' });
         }
 
-        // Recalcular total si hay cambios en costos
-        if (updates.diagnosis_cost !== undefined || updates.labor_cost !== undefined ||
-            updates.parts_cost !== undefined || updates.discount !== undefined) {
-
+        // Recalcular total si hay cambios en costos (el precio final al cliente es diagnostico + mano de obra - descuento)
+        if (updates.diagnosis_cost !== undefined || updates.labor_cost !== undefined || updates.discount !== undefined) {
             const diag = updates.diagnosis_cost !== undefined ? parseFloat(updates.diagnosis_cost) : parseFloat(existing[0].diagnosis_cost);
             const labor = updates.labor_cost !== undefined ? parseFloat(updates.labor_cost) : parseFloat(existing[0].labor_cost);
-            const parts = updates.parts_cost !== undefined ? parseFloat(updates.parts_cost) : parseFloat(existing[0].parts_cost);
             const disc = updates.discount !== undefined ? parseFloat(updates.discount) : parseFloat(existing[0].discount);
 
-            updates.total_cost = (diag || 0) + (labor || 0) + (parts || 0) - (disc || 0);
+            updates.total_cost = Math.max(0, (diag || 0) + (labor || 0) - (disc || 0));
         }
 
         // Construir query dinámico
