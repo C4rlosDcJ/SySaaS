@@ -104,18 +104,24 @@ export default function NewRepairPage() {
         return () => document.removeEventListener('click', closeDropdown);
     }, []);
 
+    const [allCatalogServices, setAllCatalogServices] = useState([]);
+
     const fetchInitialData = async () => {
         try {
-            const [types, brandsData, settingsData, staff] = await Promise.all([
+            const [types, brandsData, settingsData, staff, allServs] = await Promise.all([
                 servicesCatalog.getDeviceTypes(),
                 servicesCatalog.getBrands(),
                 settingsService.getAll(),
-                userService.getTechnicians()
+                userService.getTechnicians(),
+                servicesCatalog.getAll({ active_only: 'true' })
             ]);
             setDeviceTypes(types || []);
             setBrands(brandsData || []);
             setTechnicians(staff || []);
             setSettings(settingsData || {});
+            setAllCatalogServices(allServs || []);
+            setServices(allServs || []);
+
             const defWarranty = settingsData?.default_warranty_days || tenant?.default_warranty_days;
             if (defWarranty) {
                 const parsedDays = parseInt(defWarranty, 10);
@@ -263,67 +269,46 @@ export default function NewRepairPage() {
         setCustomers([]);
     };
 
-    const handleDeviceTypeChange = async (e) => {
+    const handleDeviceTypeChange = (e) => {
         const typeId = e.target.value;
         setFormData(prev => ({ ...prev, device_type_id: typeId, service_id: '' }));
         setSelectedService(null);
         setServiceSearch('');
         setShowServiceDropdown(false);
-
-        if (typeId) {
-            try {
-                const data = await servicesCatalog.getAll();
-                // Filtrar inicialmente por tipo de dispositivo
-                const filtered = data.filter(s => !s.device_type_id || s.device_type_id === parseInt(typeId));
-                setServices(filtered);
-            } catch (error) {
-                console.error('Error fetching services:', error);
-            }
-        } else {
-            setServices([]);
-        }
     };
 
-    // Efecto para volver a filtrar o recargar servicios cuando cambie la marca en el formulario
+    // Filtrar servicios compatibles según tipo y marca si están seleccionados
     useEffect(() => {
+        if (!allCatalogServices.length) return;
+
+        let filtered = [...allCatalogServices];
+
         if (formData.device_type_id) {
-            const loadAndFilterServices = async () => {
-                try {
-                    const data = await servicesCatalog.getAll();
-                    let filtered = data.filter(s => !s.device_type_id || s.device_type_id === parseInt(formData.device_type_id));
-                    
-                    // Si hay una marca seleccionada
-                    if (formData.brand_id && formData.brand_id !== 'other') {
-                        const selectedBrandObj = brands.find(b => b.id.toString() === formData.brand_id.toString());
-                        if (selectedBrandObj) {
-                            const brandNameLower = selectedBrandObj.name.toLowerCase();
-                            // Filtrar servicios que mencionen la marca o que sean generales para esa categoría
-                            filtered = filtered.filter(s => {
-                                const serviceNameLower = s.name.toLowerCase();
-                                const serviceDescLower = (s.description || '').toLowerCase();
-                                return serviceNameLower.includes(brandNameLower) || 
-                                       serviceDescLower.includes(brandNameLower) ||
-                                       // Permitir también servicios genéricos que no especifican marcas de competidores
-                                       (!serviceNameLower.includes('iphone') && 
-                                        !serviceNameLower.includes('samsung') && 
-                                        !serviceNameLower.includes('motorola') && 
-                                        !serviceNameLower.includes('huawei') && 
-                                        !serviceNameLower.includes('xiaomi') && 
-                                        !serviceNameLower.includes('oppo'));
-                            });
-                        }
-                    }
-                    setServices(filtered);
-                } catch (error) {
-                    console.error('Error filtering services by brand:', error);
-                }
-            };
-            loadAndFilterServices();
-        } else {
-            setServices([]);
+            filtered = filtered.filter(s => !s.device_type_id || s.device_type_id.toString() === formData.device_type_id.toString());
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData.brand_id, formData.device_type_id, brands]);
+
+        if (formData.brand_id && formData.brand_id !== 'other') {
+            const selectedBrandObj = brands.find(b => b.id.toString() === formData.brand_id.toString());
+            if (selectedBrandObj) {
+                const brandNameLower = selectedBrandObj.name.toLowerCase();
+                filtered = filtered.filter(s => {
+                    if (s.brand_id && s.brand_id.toString() === formData.brand_id.toString()) return true;
+                    const serviceNameLower = s.name.toLowerCase();
+                    const serviceDescLower = (s.description || '').toLowerCase();
+                    return serviceNameLower.includes(brandNameLower) || 
+                           serviceDescLower.includes(brandNameLower) ||
+                           (!serviceNameLower.includes('iphone') && 
+                            !serviceNameLower.includes('samsung') && 
+                            !serviceNameLower.includes('motorola') && 
+                            !serviceNameLower.includes('huawei') && 
+                            !serviceNameLower.includes('xiaomi') && 
+                            !serviceNameLower.includes('oppo'));
+                });
+            }
+        }
+
+        setServices(filtered);
+    }, [formData.brand_id, formData.device_type_id, brands, allCatalogServices]);
 
     const handleImageSelect = (e) => {
         const files = Array.from(e.target.files);
@@ -352,17 +337,88 @@ export default function NewRepairPage() {
         });
     };
 
+    // Función inteligente para calcular fecha/hora estimada a partir de texto de tiempo (ej. '2 horas', '1 dia')
+    const calculateSuggestedDelivery = (timeStr) => {
+        if (!timeStr) return '';
+        const now = new Date();
+        const lower = timeStr.toLowerCase().trim();
+        
+        let hoursToAdd = 0;
+        const matchHours = lower.match(/(\d+)\s*(?:hora|hr|h)/i);
+        const matchDays = lower.match(/(\d+)\s*(?:d[ií]a|day|d)/i);
+        
+        if (matchDays) {
+            hoursToAdd = parseInt(matchDays[1], 10) * 24;
+        } else if (matchHours) {
+            hoursToAdd = parseInt(matchHours[1], 10);
+        } else if (lower.includes('inmediato') || lower.includes('express')) {
+            hoursToAdd = 1;
+        }
+
+        if (hoursToAdd > 0) {
+            now.setHours(now.getHours() + hoursToAdd);
+            // Formatear para input type="datetime-local" (YYYY-MM-DDTHH:mm)
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+        return '';
+    };
+
     const selectService = (service) => {
         setSelectedService(service);
         setServiceSearch(service ? `${service.name} - ${formatCurrency(service.base_price)}` : '');
         setShowServiceDropdown(false);
 
-        setFormData(prev => ({
-            ...prev,
-            service_id: service ? service.id.toString() : '',
-            service_requested: service?.name || '',
-            labor_cost: service?.base_price || 0
-        }));
+        if (!service) {
+            setFormData(prev => ({
+                ...prev,
+                service_id: '',
+                service_requested: '',
+                labor_cost: 0
+            }));
+            return;
+        }
+
+        const labor = parseFloat(service.base_price) || 0;
+        const parts = parseFloat(service.default_parts_cost) || 0;
+        const suggestedDelivery = calculateSuggestedDelivery(service.estimated_time);
+
+        setFormData(prev => {
+            const updated = {
+                ...prev,
+                service_id: service.id.toString(),
+                service_requested: service.name,
+                labor_cost: labor,
+                // Si el servicio incluye costo predeterminado de refaccion/pieza, se asigna automaticamente
+                parts_cost: parts > 0 ? parts : prev.parts_cost
+            };
+
+            // Auto-completar tipo de equipo si el servicio tiene uno asignado
+            if (service.device_type_id && (!prev.device_type_id || prev.device_type_id.toString() !== service.device_type_id.toString())) {
+                updated.device_type_id = service.device_type_id.toString();
+            }
+
+            // Auto-completar marca si el servicio tiene marca específica
+            if (service.brand_id && (!prev.brand_id || prev.brand_id.toString() !== service.brand_id.toString())) {
+                updated.brand_id = service.brand_id.toString();
+            }
+
+            // Auto-completar falla/descripción si está vacía
+            if (!prev.problem_description.trim()) {
+                updated.problem_description = service.description || service.name;
+            }
+
+            // Auto-sugerir entrega estimada si está vacía y se pudo calcular
+            if (!prev.estimated_delivery && suggestedDelivery) {
+                updated.estimated_delivery = suggestedDelivery;
+            }
+
+            return updated;
+        });
     };
 
     const handleChange = (e) => {
@@ -532,6 +588,98 @@ export default function NewRepairPage() {
                         )}
                     </section>
 
+                    {/* SECCIÓN RÁPIDA: SERVICIO PRECONFIGURADO */}
+                    <section className="form-card quick-service-banner">
+                        <div className="form-card-header" style={{ marginBottom: 'var(--sp-3)', paddingBottom: 'var(--sp-2)' }}>
+                            <Wrench size={20} className="icon-primary" />
+                            <div style={{ flex: 1 }}>
+                                <h2>Selección Rápida de Servicio (Auto-completado)</h2>
+                                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: 0 }}>
+                                    Selecciona o busca un servicio para rellenar automáticamente tipo de equipo, marca, costos de mano de obra y refacción.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="service-search-container" style={{ position: 'relative' }}>
+                            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                <Search size={18} style={{ position: 'absolute', left: '12px', color: 'var(--color-text-muted)' }} />
+                                <input
+                                    type="text"
+                                    className="input"
+                                    style={{ paddingLeft: '38px', height: '42px', fontWeight: 500 }}
+                                    placeholder="Buscar servicio base (ej: Pantalla iPhone, Centro de Carga, Mantenimiento...)"
+                                    value={serviceSearch}
+                                    onChange={(e) => {
+                                        setServiceSearch(e.target.value);
+                                        setShowServiceDropdown(true);
+                                    }}
+                                    onFocus={() => setShowServiceDropdown(true)}
+                                />
+                                {formData.service_id && (
+                                    <button
+                                        type="button"
+                                        onClick={() => selectService(null)}
+                                        className="btn btn-ghost btn-sm"
+                                        style={{ position: 'absolute', right: '8px', padding: '4px 8px', fontSize: '12px' }}
+                                        title="Quitar servicio seleccionado"
+                                    >
+                                        Limpiar
+                                    </button>
+                                )}
+                            </div>
+
+                            {showServiceDropdown && (
+                                <div className="search-results" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: '240px', overflowY: 'auto', marginTop: '4px' }}>
+                                    {allCatalogServices.filter(s => 
+                                        !serviceSearch || 
+                                        s.name.toLowerCase().includes(serviceSearch.split(' - ')[0].toLowerCase()) ||
+                                        (s.device_type_name && s.device_type_name.toLowerCase().includes(serviceSearch.toLowerCase())) ||
+                                        (s.brand_name && s.brand_name.toLowerCase().includes(serviceSearch.toLowerCase()))
+                                    ).length === 0 ? (
+                                        <div style={{ padding: '12px', fontSize: '13px', color: 'var(--color-text-muted)', background: 'var(--color-bg-elevated)', textAlign: 'center' }}>
+                                            No se encontraron servicios en el catálogo
+                                        </div>
+                                    ) : (
+                                        allCatalogServices.filter(s => 
+                                            !serviceSearch || 
+                                            s.name.toLowerCase().includes(serviceSearch.split(' - ')[0].toLowerCase()) ||
+                                            (s.device_type_name && s.device_type_name.toLowerCase().includes(serviceSearch.toLowerCase())) ||
+                                            (s.brand_name && s.brand_name.toLowerCase().includes(serviceSearch.toLowerCase()))
+                                        ).map(s => {
+                                            const partsCost = parseFloat(s.default_parts_cost) || 0;
+                                            return (
+                                                <button
+                                                    key={s.id}
+                                                    type="button"
+                                                    className="search-item"
+                                                    onClick={() => selectService(s)}
+                                                    style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px' }}
+                                                >
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left' }}>
+                                                        <strong style={{ fontSize: '13px' }}>{s.name}</strong>
+                                                        <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
+                                                            {s.device_type_name ? s.device_type_name : 'General'} {s.brand_name ? `• ${s.brand_name}` : ''} {s.estimated_time ? `• Est: ${s.estimated_time}` : ''}
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                                                        <span style={{ fontSize: '13px', color: 'var(--color-primary)', fontWeight: 700 }}>
+                                                            {formatCurrency(s.base_price)}
+                                                        </span>
+                                                        {partsCost > 0 && (
+                                                            <span style={{ fontSize: '10px', color: 'var(--color-warning)', background: 'rgba(234, 179, 8, 0.1)', padding: '1px 6px', borderRadius: '4px', border: '1px solid rgba(234, 179, 8, 0.3)' }}>
+                                                                Refacción: {formatCurrency(partsCost)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </section>
+
                     {/* SECCIÓN 2: DISPOSITIVO */}
                     <section className="form-card">
                         <div className="form-card-header">
@@ -629,7 +777,43 @@ export default function NewRepairPage() {
                         </div>
                         
                         <div className="form-group">
-                            <label>Checklist Funcional Inicial</label>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                <label style={{ margin: 0 }}>Checklist Funcional Inicial</label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost btn-sm"
+                                        style={{ fontSize: '11px', padding: '2px 8px' }}
+                                        onClick={() => {
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                function_checklist: Object.keys(prev.function_checklist).reduce((acc, k) => {
+                                                    acc[k] = true;
+                                                    return acc;
+                                                }, {})
+                                            }));
+                                        }}
+                                    >
+                                        Marcar Todo OK
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost btn-sm"
+                                        style={{ fontSize: '11px', padding: '2px 8px', color: 'var(--color-text-muted)' }}
+                                        onClick={() => {
+                                            setFormData(prev => ({
+                                                ...prev,
+                                                function_checklist: Object.keys(prev.function_checklist).reduce((acc, k) => {
+                                                    acc[k] = false;
+                                                    return acc;
+                                                }, {})
+                                            }));
+                                        }}
+                                    >
+                                        Desmarcar Todo
+                                    </button>
+                                </div>
+                            </div>
                             <div className="checklist-grid">
                                 {Object.entries(formData.function_checklist).map(([key, value]) => (
                                     <label key={key} className={`checklist-item ${value ? 'checked' : ''}`}>
@@ -688,48 +872,16 @@ export default function NewRepairPage() {
                             <h2>Detalle del Servicio</h2>
                         </div>
                         
-                        <div className="form-group mb-md service-search-container" style={{ position: 'relative' }}>
-                            <label>Servicio Base</label>
-                            <div style={{ position: 'relative' }}>
-                                <input
-                                    type="text"
-                                    className="input"
-                                    placeholder={formData.device_type_id ? "Buscar servicio por nombre..." : "Selecciona primero un tipo de equipo..."}
-                                    value={serviceSearch}
-                                    onChange={(e) => {
-                                        setServiceSearch(e.target.value);
-                                        setShowServiceDropdown(true);
-                                    }}
-                                    onFocus={() => setShowServiceDropdown(true)}
-                                    disabled={!formData.device_type_id}
-                                />
-                                {showServiceDropdown && formData.device_type_id && (
-                                    <div className="search-results" style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100, maxHeight: '200px', overflowY: 'auto' }}>
-                                        {services.filter(s => 
-                                            !serviceSearch || s.name.toLowerCase().includes(serviceSearch.split(' - ')[0].toLowerCase())
-                                        ).length === 0 ? (
-                                            <div style={{ padding: '10px', fontSize: '12px', color: 'var(--color-text-muted)', background: 'var(--color-bg-elevated)' }}>
-                                                No se encontraron servicios compatibles
-                                            </div>
-                                        ) : (
-                                            services.filter(s => 
-                                                !serviceSearch || s.name.toLowerCase().includes(serviceSearch.split(' - ')[0].toLowerCase())
-                                            ).map(s => (
-                                                <button
-                                                    key={s.id}
-                                                    type="button"
-                                                    className="search-item"
-                                                    onClick={() => selectService(s)}
-                                                    style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                                                >
-                                                    <strong>{s.name}</strong>
-                                                    <span style={{ fontSize: '11px', color: 'var(--color-primary)', fontWeight: 700 }}>{formatCurrency(s.base_price)}</span>
-                                                </button>
-                                            ))
-                                        )}
-                                    </div>
-                                )}
-                            </div>
+                        <div className="form-group mb-md">
+                            <label>Nombre del Servicio / Trabajo Realizado *</label>
+                            <input
+                                type="text"
+                                name="service_requested"
+                                className="input"
+                                placeholder="Ej: Cambio de Pantalla OLED, Reballing..."
+                                value={formData.service_requested}
+                                onChange={handleChange}
+                            />
                         </div>
 
                         <div className="form-group mb-md">
@@ -786,14 +938,17 @@ export default function NewRepairPage() {
                                 </div>
                             </div>
                             <div className="cost-row input-mode">
-                                <label>Mano de obra</label>
+                                <label>Mano de obra (Ganancia)</label>
                                 <div className="input-with-icon">
                                     <span>$</span>
                                     <input type="number" name="labor_cost" className="input input-sm text-right" value={formData.labor_cost} onChange={handleChange} />
                                 </div>
                             </div>
                             <div className="cost-row input-mode">
-                                <label>Refacciones</label>
+                                <div>
+                                    <label>Refacciones / Gastos</label>
+                                    <span style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-muted)' }}>Costo de pieza o insumo</span>
+                                </div>
                                 <div className="input-with-icon">
                                     <span>$</span>
                                     <input type="number" name="parts_cost" className="input input-sm text-right" value={formData.parts_cost} onChange={handleChange} />
@@ -805,6 +960,20 @@ export default function NewRepairPage() {
                                     <span>-$</span>
                                     <input type="number" name="discount" className="input input-sm text-right" value={formData.discount} onChange={handleChange} />
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* Indicador de Desglose Ganancia vs Costo */}
+                        <div style={{ marginTop: '12px', padding: '10px', borderRadius: '8px', background: 'var(--color-bg-elevated)', border: '1px solid var(--color-border)', fontSize: '12px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                <span style={{ color: 'var(--color-text-muted)' }}>Costo Pieza (Gasto):</span>
+                                <span style={{ color: 'var(--color-warning)', fontWeight: 600 }}>{formatCurrency(formData.parts_cost || 0)}</span>
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                <span style={{ color: 'var(--color-text-muted)' }}>Ganancia Estimada:</span>
+                                <span style={{ color: 'var(--color-success)', fontWeight: 700 }}>
+                                    {formatCurrency((parseFloat(formData.labor_cost) || 0) + (parseFloat(formData.diagnosis_cost) || 0) - (parseFloat(formData.discount) || 0))}
+                                </span>
                             </div>
                         </div>
 

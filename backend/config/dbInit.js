@@ -386,6 +386,18 @@ async function dbInit() {
             console.error(`[DB-INIT] Error al verificar/alterar la tabla services_catalog para brand_id:`, e.message);
         }
 
+        // 13.1. Asegurar columna default_parts_cost en services_catalog (costo estimado de piezas/refacciones/gastos)
+        console.log(`[DB-INIT] Verificando columna "default_parts_cost" en tabla "services_catalog"...`);
+        try {
+            const [partsCostCol] = await connection.query(`SHOW COLUMNS FROM services_catalog LIKE 'default_parts_cost'`);
+            if (partsCostCol.length === 0) {
+                await connection.query(`ALTER TABLE services_catalog ADD COLUMN default_parts_cost DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER base_price`);
+                console.log(`[DB-INIT] Columna default_parts_cost añadida a la tabla services_catalog.`);
+            }
+        } catch (e) {
+            console.error(`[DB-INIT] Error al verificar/alterar la tabla services_catalog para default_parts_cost:`, e.message);
+        }
+
         // 14. SaaS Multi-Tenant Migration
         console.log(`[DB-INIT] Verificando tablas SaaS multi-tenant...`);
         const [tenantsTable] = await connection.query(`SHOW TABLES LIKE 'tenants'`);

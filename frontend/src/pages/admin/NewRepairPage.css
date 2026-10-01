@@ -32,6 +32,12 @@
     box-shadow: var(--shadow-sm);
 }
 
+.quick-service-banner {
+    border: 1px solid var(--color-border-strong);
+    background: linear-gradient(to bottom, var(--color-bg-elevated), var(--color-bg-card));
+    position: relative;
+}
+
 .form-card-header {
     display: flex;
     align-items: center;
