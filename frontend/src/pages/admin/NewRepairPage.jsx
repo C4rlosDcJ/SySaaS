@@ -14,7 +14,7 @@ import {
     Save, X, User, Smartphone, Wrench, ClipboardCheck,
     DollarSign, Search, ChevronRight, CheckCircle2,
     Image as ImageIcon, Plus, Trash2, Camera, UploadCloud, RotateCcw,
-    Mic, MicOff, Sparkles
+    Zap, Tag
 } from 'lucide-react';
 import CameraCaptureModal from '../../components/CameraCaptureModal';
 import './NewRepairPage.css';
@@ -49,12 +49,6 @@ export default function NewRepairPage() {
     const [serviceSearch, setServiceSearch] = useState('');
     const [showServiceDropdown, setShowServiceDropdown] = useState(false);
     const [showMobileCosts, setShowMobileCosts] = useState(false);
-
-    // Dictado por voz (Speech Recognition)
-    const [isListening, setIsListening] = useState(false);
-    const [voiceTranscript, setVoiceTranscript] = useState('');
-    const [voiceFeedback, setVoiceFeedback] = useState('');
-    const recognitionRef = useRef(null);
 
     const [formData, setFormData] = useState({
         customer_id: '',
@@ -428,198 +422,45 @@ export default function NewRepairPage() {
         });
     };
 
-    // Inteligencia para extraer datos estructurados a partir del dictado hablado
-    const parseSpokenText = (transcript) => {
-        const text = transcript.toLowerCase();
-        const detected = [];
+    const COMMON_FAILURES = [
+        'Pantalla estrellada / Sin imagen',
+        'No carga / Falso contacto',
+        'Batería inflada / Se descarga rápido',
+        'Mojado / Daño por líquido',
+        'Se calienta y se apaga',
+        'No enciende / Muerto',
+        'Tapa trasera rota',
+        'Cámara no enfoca / Dañada',
+        'Bocina / Auricular sin sonido',
+        'Mantenimiento / Limpieza interna'
+    ];
 
-        setFormData(prev => {
-            const updated = { ...prev };
-
-            // 1. Detectar tipo de equipo
-            if (deviceTypes.length > 0) {
-                for (const dt of deviceTypes) {
-                    if (text.includes(dt.name.toLowerCase())) {
-                        updated.device_type_id = dt.id.toString();
-                        detected.push(`Tipo: ${dt.name}`);
-                        break;
-                    }
-                }
-            }
-            if (!updated.device_type_id) {
-                if (text.includes('teléfono') || text.includes('celular') || text.includes('iphone') || text.includes('smartphone')) {
-                    const phoneType = deviceTypes.find(t => t.name.toLowerCase().includes('celular') || t.name.toLowerCase().includes('teléfono') || t.name.toLowerCase().includes('smartphone'));
-                    if (phoneType) {
-                        updated.device_type_id = phoneType.id.toString();
-                        detected.push(`Tipo: ${phoneType.name}`);
-                    }
-                } else if (text.includes('laptop') || text.includes('computadora') || text.includes('macbook') || text.includes('pc')) {
-                    const laptopType = deviceTypes.find(t => t.name.toLowerCase().includes('laptop') || t.name.toLowerCase().includes('computadora'));
-                    if (laptopType) {
-                        updated.device_type_id = laptopType.id.toString();
-                        detected.push(`Tipo: ${laptopType.name}`);
-                    }
-                }
-            }
-
-            // 2. Detectar marca
-            if (brands.length > 0) {
-                for (const b of brands) {
-                    if (text.includes(b.name.toLowerCase())) {
-                        updated.brand_id = b.id.toString();
-                        detected.push(`Marca: ${b.name}`);
-                        break;
-                    }
-                }
-            }
-
-            // 3. Detectar modelo común (ej: iPhone 13 Pro, Galaxy S21, Moto G20, Redmi Note 11, etc.)
-            const modelRegex = /(?:iphone|samsung|galaxy|moto|motorola|xiaomi|redmi|poco|huawei|oppo|macbook|dell|hp|lenovo)\s+([a-z0-9\s+]+?)(?=\s+(?:con|falla|no|pantalla|cambio|bateria|centro|color|bloqueo|clave|patron|de|para|$))/i;
-            const modelMatch = transcript.match(modelRegex);
-            if (modelMatch && modelMatch[0]) {
-                const detectedModel = modelMatch[0].trim();
-                if (detectedModel.length > 3) {
-                    updated.model = detectedModel.charAt(0).toUpperCase() + detectedModel.slice(1);
-                    detected.push(`Modelo: ${updated.model}`);
-                }
-            }
-
-            // 4. Detectar color (negro, blanco, azul, rojo, plata, gris, verde, rosa, morado, etc.)
-            const colors = ['negro', 'blanco', 'azul', 'rojo', 'plata', 'silver', 'gris', 'space gray', 'verde', 'rosa', 'morado', 'dorado', 'oro'];
-            for (const col of colors) {
-                if (text.includes(col)) {
-                    updated.color = col.charAt(0).toUpperCase() + col.slice(1);
-                    detected.push(`Color: ${updated.color}`);
-                    break;
-                }
-            }
-
-            // 5. Detectar contraseña o pin ("clave 1234", "pin 1234", "contraseña 1234", "patron en L")
-            const passMatch = text.match(/(?:contraseña|clave|pin|codigo|patrón|patron)\s+(?:es\s+)?([a-z0-9]+)/i);
-            if (passMatch && passMatch[1]) {
-                updated.device_password = passMatch[1];
-                detected.push(`Clave: ${passMatch[1]}`);
-            }
-
-            // 6. Detectar servicio compatible dentro del catálogo
-            if (allCatalogServices.length > 0) {
-                let matchedService = null;
-                for (const s of allCatalogServices) {
-                    const sName = s.name.toLowerCase();
-                    if (text.includes(sName)) {
-                        matchedService = s;
-                        break;
-                    }
-                }
-
-                // Si no coincide exacto, buscar términos comunes como pantalla, batería, centro de carga, mantenimiento
-                if (!matchedService) {
-                    if (text.includes('pantalla') || text.includes('display') || text.includes('estrellada') || text.includes('touch')) {
-                        matchedService = allCatalogServices.find(s => s.name.toLowerCase().includes('pantalla') || s.name.toLowerCase().includes('display'));
-                    } else if (text.includes('bateria') || text.includes('batería') || text.includes('pila')) {
-                        matchedService = allCatalogServices.find(s => s.name.toLowerCase().includes('bateria') || s.name.toLowerCase().includes('batería'));
-                    } else if (text.includes('carga') || text.includes('centro de carga') || text.includes('puerto')) {
-                        matchedService = allCatalogServices.find(s => s.name.toLowerCase().includes('carga'));
-                    } else if (text.includes('mantenimiento') || text.includes('limpieza') || text.includes('formateo')) {
-                        matchedService = allCatalogServices.find(s => s.name.toLowerCase().includes('mantenimiento') || s.name.toLowerCase().includes('formateo'));
-                    }
-                }
-
-                if (matchedService) {
-                    updated.service_id = matchedService.id.toString();
-                    updated.service_requested = matchedService.name;
-                    updated.labor_cost = parseFloat(matchedService.base_price) || 0;
-                    if (matchedService.default_parts_cost > 0) {
-                        updated.parts_cost = parseFloat(matchedService.default_parts_cost);
-                    }
-                    if (matchedService.device_type_id && !updated.device_type_id) {
-                        updated.device_type_id = matchedService.device_type_id.toString();
-                    }
-                    if (matchedService.brand_id && !updated.brand_id) {
-                        updated.brand_id = matchedService.brand_id.toString();
-                    }
-                    setServiceSearch(`${matchedService.name} - ${formatCurrency(matchedService.base_price)}`);
-                    detected.push(`Servicio: ${matchedService.name}`);
-                }
-            }
-
-            // 7. Extraer la falla o descripción
-            if (!updated.problem_description.trim()) {
-                updated.problem_description = transcript.trim();
-            } else {
-                updated.problem_description = `${updated.problem_description} | ${transcript.trim()}`;
-            }
-
-            return updated;
-        });
-
-        if (detected.length > 0) {
-            setVoiceFeedback(`Auto-completado con éxito: ${detected.join(', ')}`);
-        } else {
-            setVoiceFeedback('Texto dictado agregado a la falla reportada');
-        }
+    const handleApplyFailurePreset = (presetText) => {
+        setFormData(prev => ({
+            ...prev,
+            problem_description: prev.problem_description
+                ? `${prev.problem_description}, ${presetText}`
+                : presetText
+        }));
     };
 
-    // Iniciar o detener reconocimiento de voz
-    const toggleVoiceRecognition = () => {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            alert('Tu navegador no soporta reconocimiento de voz. Te recomendamos usar Google Chrome o Microsoft Edge.');
-            return;
+    const COMMON_MODELS_BY_BRAND = {
+        'apple': ['iPhone 11', 'iPhone 12', 'iPhone 13', 'iPhone 13 Pro', 'iPhone 14', 'iPhone 14 Pro Max', 'iPhone 15', 'iPhone 15 Pro'],
+        'samsung': ['Galaxy A14', 'Galaxy A34', 'Galaxy A54', 'Galaxy S21', 'Galaxy S22', 'Galaxy S23 Ultra', 'Galaxy S24'],
+        'motorola': ['Moto G22', 'Moto G32', 'Moto G52', 'Moto G60', 'Moto G84', 'Edge 40'],
+        'xiaomi': ['Redmi Note 11', 'Redmi Note 12', 'Redmi Note 13', 'Redmi 12C', 'Poco X5 Pro'],
+        'oppo': ['Oppo A17', 'Oppo A57', 'Oppo Reno 7', 'Oppo Reno 10']
+    };
+
+    const getModelSuggestions = () => {
+        if (!formData.brand_id || formData.brand_id === 'other') return [];
+        const brandObj = brands.find(b => b.id.toString() === formData.brand_id.toString());
+        if (!brandObj) return [];
+        const brandKey = brandObj.name.toLowerCase();
+        for (const [k, models] of Object.entries(COMMON_MODELS_BY_BRAND)) {
+            if (brandKey.includes(k)) return models;
         }
-
-        if (isListening) {
-            if (recognitionRef.current) {
-                recognitionRef.current.stop();
-            }
-            setIsListening(false);
-            return;
-        }
-
-        try {
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'es-MX';
-            recognition.continuous = false;
-            recognition.interimResults = false;
-            recognition.maxAlternatives = 1;
-
-            recognition.onstart = () => {
-                setIsListening(true);
-                setVoiceTranscript('');
-                setVoiceFeedback('Escuchando... Di por ejemplo: "iPhone 13 Pro color azul cambio de pantalla clave 1234 no da imagen"');
-            };
-
-            recognition.onresult = (event) => {
-                const currentTranscript = event.results[0][0].transcript;
-                setVoiceTranscript(currentTranscript);
-                parseSpokenText(currentTranscript);
-            };
-
-            recognition.onerror = (event) => {
-                console.warn('Speech recognition error:', event.error);
-                setIsListening(false);
-                if (event.error === 'network') {
-                    setVoiceFeedback('Error de conexión con el servicio de voz del navegador. Revisa tu conexión a internet o verifica los permisos de Google Speech en tu navegador.');
-                } else if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-                    setVoiceFeedback('Permiso de micrófono denegado. Permite el acceso al micrófono en la barra de direcciones del navegador.');
-                } else if (event.error === 'no-speech') {
-                    setVoiceFeedback('No se detectó voz. Vuelve a pulsar el micrófono y habla cerca.');
-                } else {
-                    setVoiceFeedback(`Error de reconocimiento (${event.error}). Intenta nuevamente.`);
-                }
-            };
-
-            recognition.onend = () => {
-                setIsListening(false);
-            };
-
-            recognitionRef.current = recognition;
-            recognition.start();
-        } catch (err) {
-            console.error('Error starting speech recognition:', err);
-            setIsListening(false);
-            setVoiceFeedback('No se pudo inicializar el micrófono');
-        }
+        return [];
     };
 
     const handleChange = (e) => {
@@ -792,52 +633,15 @@ export default function NewRepairPage() {
 
                     {/* SECCIÓN RÁPIDA: SERVICIO PRECONFIGURADO */}
                     <section className="form-card quick-service-banner">
-                        <div className="form-card-header" style={{ marginBottom: 'var(--sp-3)', paddingBottom: 'var(--sp-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)' }}>
-                                <Wrench size={20} className="icon-primary" />
-                                <div>
-                                    <h2 style={{ margin: 0 }}>Selección Rápida de Servicio (Auto-completado)</h2>
-                                    <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: 0 }}>
-                                        Selecciona un servicio o dicta por voz para autollenar todos los campos del equipo y presupuesto.
-                                    </p>
-                                </div>
+                        <div className="form-card-header" style={{ marginBottom: 'var(--sp-3)', paddingBottom: 'var(--sp-2)' }}>
+                            <Wrench size={20} className="icon-primary" />
+                            <div>
+                                <h2 style={{ margin: 0 }}>Selección Rápida de Servicio (Auto-completado)</h2>
+                                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)', margin: 0 }}>
+                                    Selecciona o busca un servicio para rellenar automáticamente tipo de equipo, marca, costos de mano de obra y refacción.
+                                </p>
                             </div>
-
-                            {/* Botón de Dictado por Voz con Micrófono */}
-                            <button
-                                type="button"
-                                className={`voice-dictate-btn ${isListening ? 'recording' : ''}`}
-                                onClick={toggleVoiceRecognition}
-                                title={isListening ? "Detener dictado" : "Dictar datos de la reparación por micrófono"}
-                            >
-                                {isListening ? (
-                                    <>
-                                        <MicOff size={16} />
-                                        <span>Detener Dictado</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Mic size={16} />
-                                        <span>Dictar Reparación</span>
-                                    </>
-                                )}
-                            </button>
                         </div>
-
-                        {/* Barra de estado o feedback de dictado por voz */}
-                        {(isListening || voiceFeedback) && (
-                            <div className="voice-status-bar" style={{ marginBottom: 'var(--sp-3)' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                    <Sparkles size={15} />
-                                    <span>{voiceFeedback}</span>
-                                </div>
-                                {voiceTranscript && (
-                                    <span style={{ fontSize: '11px', opacity: 0.85, fontStyle: 'italic' }}>
-                                        "{voiceTranscript}"
-                                    </span>
-                                )}
-                            </div>
-                        )}
 
                         <div className="service-search-container" style={{ position: 'relative' }}>
                             <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
@@ -964,7 +768,24 @@ export default function NewRepairPage() {
                             )}
                             <div className="form-group">
                                 <label>Modelo *</label>
-                                <input type="text" name="model" className="input" value={formData.model} onChange={handleChange} required />
+                                <input type="text" name="model" className="input" value={formData.model} onChange={handleChange} required placeholder="Ej: iPhone 13, Galaxy A54..." />
+                                {getModelSuggestions().length > 0 && (
+                                    <div className="model-suggestions-bar">
+                                        <span className="model-suggestions-label">Frecuentes:</span>
+                                        <div className="model-suggestions-list">
+                                            {getModelSuggestions().map((m) => (
+                                                <button
+                                                    key={m}
+                                                    type="button"
+                                                    className={`model-pill ${formData.model === m ? 'active' : ''}`}
+                                                    onClick={() => setFormData(prev => ({ ...prev, model: m }))}
+                                                >
+                                                    {m}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                             <div className="form-group">
                                 <label>Color</label>
@@ -999,9 +820,28 @@ export default function NewRepairPage() {
 
                     {/* SECCIÓN 3: INSPECCIÓN */}
                     <section className="form-card">
-                        <div className="form-card-header">
-                            <ClipboardCheck size={20} className="icon-primary" />
-                            <h2>Inspección de Entrada</h2>
+                        <div className="form-card-header" style={{ justifyContent: 'space-between' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <ClipboardCheck size={20} className="icon-primary" />
+                                <h2>Inspección de Entrada</h2>
+                            </div>
+                            <button
+                                type="button"
+                                className="btn btn-ghost btn-sm text-primary"
+                                style={{ fontSize: '11px', padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                onClick={() => {
+                                    setFormData(prev => ({
+                                        ...prev,
+                                        physical_condition: 5,
+                                        accessories_received: 'Ninguno / Solo equipo',
+                                        existing_damage: 'Desgaste normal de uso, sin golpes graves'
+                                    }));
+                                }}
+                                title="Rellena rápidamente estado 5/5, sin accesorios y desgaste normal"
+                            >
+                                <Zap size={13} />
+                                <span>Llenar Estado Estándar</span>
+                            </button>
                         </div>
                         <div className="form-group mb-md">
                             <label>Condición Física General (1-5)</label>
@@ -1139,20 +979,37 @@ export default function NewRepairPage() {
                         </div>
 
                         <div className="form-group mb-md">
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                <label style={{ margin: 0 }}>Falla Reportada / Descripción de Solicitud *</label>
-                                <button
-                                    type="button"
-                                    className={`btn btn-ghost btn-sm ${isListening ? 'text-error' : 'text-primary'}`}
-                                    onClick={toggleVoiceRecognition}
-                                    style={{ fontSize: '12px', padding: '2px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}
-                                    title="Dictar por voz"
-                                >
-                                    {isListening ? <MicOff size={14} /> : <Mic size={14} />}
-                                    <span>{isListening ? 'Detener Micrófono' : 'Dictar por Voz'}</span>
-                                </button>
+                            <label style={{ marginBottom: '6px', display: 'block' }}>Falla Reportada / Descripción de Solicitud *</label>
+                            
+                            {/* Chips de Fallas Frecuentes para selección rápida */}
+                            <div className="preset-chips-container mb-xs">
+                                <span className="preset-chips-title">
+                                    <Tag size={12} className="mr-xs" /> Fallas frecuentes:
+                                </span>
+                                <div className="preset-chips-scroll">
+                                    {COMMON_FAILURES.map((failure) => (
+                                        <button
+                                            key={failure}
+                                            type="button"
+                                            className="preset-chip-btn"
+                                            onClick={() => handleApplyFailurePreset(failure)}
+                                            title="Clic para agregar a la descripción"
+                                        >
+                                            + {failure}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                            <textarea name="problem_description" className="input" rows="3" value={formData.problem_description} onChange={handleChange} required placeholder="Lo que el cliente reporta que falla... (o pulsa Dictar por Voz)"></textarea>
+
+                            <textarea
+                                name="problem_description"
+                                className="input"
+                                rows="3"
+                                value={formData.problem_description}
+                                onChange={handleChange}
+                                required
+                                placeholder="Describe el problema reportado o haz clic en los accesos rápidos de arriba..."
+                            ></textarea>
                         </div>
                         
                         <div className="form-grid">
