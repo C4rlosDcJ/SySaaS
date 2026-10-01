@@ -770,34 +770,36 @@ exports.getEnterpriseAnalytics = async (req, res) => {
             prevDateConditionSales = `AND DATE(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) = DATE_SUB('${clientDate}', INTERVAL 1 DAY)`;
             prevDateConditionRepairs = `AND DATE(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) = DATE_SUB('${clientDate}', INTERVAL 1 DAY)`;
         } else if (period === '7d') {
-            dateConditionSales = "AND s.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
-            dateConditionRepairs = "AND r.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
-            prevDateConditionSales = "AND s.created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) AND s.created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)";
-            prevDateConditionRepairs = "AND r.created_at >= DATE_SUB(NOW(), INTERVAL 14 DAY) AND r.created_at < DATE_SUB(NOW(), INTERVAL 7 DAY)";
+            dateConditionSales = `AND DATE(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) >= DATE_SUB('${clientDate}', INTERVAL 6 DAY) AND DATE(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) <= '${clientDate}'`;
+            dateConditionRepairs = `AND DATE(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) >= DATE_SUB('${clientDate}', INTERVAL 6 DAY) AND DATE(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) <= '${clientDate}'`;
+            prevDateConditionSales = `AND DATE(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) >= DATE_SUB('${clientDate}', INTERVAL 13 DAY) AND DATE(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) < DATE_SUB('${clientDate}', INTERVAL 6 DAY)`;
+            prevDateConditionRepairs = `AND DATE(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) >= DATE_SUB('${clientDate}', INTERVAL 13 DAY) AND DATE(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) < DATE_SUB('${clientDate}', INTERVAL 6 DAY)`;
         } else if (period === '30d') {
-            dateConditionSales = "AND s.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
-            dateConditionRepairs = "AND r.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
-            prevDateConditionSales = "AND s.created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY) AND s.created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)";
-            prevDateConditionRepairs = "AND r.created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY) AND r.created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)";
+            dateConditionSales = `AND DATE(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) >= DATE_SUB('${clientDate}', INTERVAL 29 DAY) AND DATE(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) <= '${clientDate}'`;
+            dateConditionRepairs = `AND DATE(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) >= DATE_SUB('${clientDate}', INTERVAL 29 DAY) AND DATE(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) <= '${clientDate}'`;
+            prevDateConditionSales = `AND DATE(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) >= DATE_SUB('${clientDate}', INTERVAL 59 DAY) AND DATE(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) < DATE_SUB('${clientDate}', INTERVAL 29 DAY)`;
+            prevDateConditionRepairs = `AND DATE(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) >= DATE_SUB('${clientDate}', INTERVAL 59 DAY) AND DATE(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) < DATE_SUB('${clientDate}', INTERVAL 29 DAY)`;
         } else if (period === 'last_month') {
-            dateConditionSales = "AND MONTH(s.created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(s.created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))";
-            dateConditionRepairs = "AND MONTH(r.created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(r.created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))";
-            prevDateConditionSales = "AND MONTH(s.created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 2 MONTH)) AND YEAR(s.created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 2 MONTH))";
-            prevDateConditionRepairs = "AND MONTH(r.created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 2 MONTH)) AND YEAR(r.created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 2 MONTH))";
+            dateConditionSales = `AND MONTH(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) = MONTH(DATE_SUB('${clientDate}', INTERVAL 1 MONTH)) AND YEAR(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) = YEAR(DATE_SUB('${clientDate}', INTERVAL 1 MONTH))`;
+            dateConditionRepairs = `AND MONTH(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) = MONTH(DATE_SUB('${clientDate}', INTERVAL 1 MONTH)) AND YEAR(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) = YEAR(DATE_SUB('${clientDate}', INTERVAL 1 MONTH))`;
+            prevDateConditionSales = `AND MONTH(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) = MONTH(DATE_SUB('${clientDate}', INTERVAL 2 MONTH)) AND YEAR(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) = YEAR(DATE_SUB('${clientDate}', INTERVAL 2 MONTH))`;
+            prevDateConditionRepairs = `AND MONTH(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) = MONTH(DATE_SUB('${clientDate}', INTERVAL 2 MONTH)) AND YEAR(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) = YEAR(DATE_SUB('${clientDate}', INTERVAL 2 MONTH))`;
         } else if (period === 'year') {
-            dateConditionSales = "AND YEAR(s.created_at) = YEAR(CURDATE())";
-            dateConditionRepairs = "AND YEAR(r.created_at) = YEAR(CURDATE())";
-            prevDateConditionSales = "AND YEAR(s.created_at) = YEAR(CURDATE()) - 1";
-            prevDateConditionRepairs = "AND YEAR(r.created_at) = YEAR(CURDATE()) - 1";
+            dateConditionSales = `AND YEAR(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) = YEAR('${clientDate}')`;
+            dateConditionRepairs = `AND YEAR(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) = YEAR('${clientDate}')`;
+            prevDateConditionSales = `AND YEAR(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) = YEAR('${clientDate}') - 1`;
+            prevDateConditionRepairs = `AND YEAR(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) = YEAR('${clientDate}') - 1`;
         } else if (period === 'custom' && startDate && endDate) {
-            dateConditionSales = `AND DATE(s.created_at) BETWEEN '${startDate}' AND '${endDate}'`;
-            dateConditionRepairs = `AND DATE(r.created_at) BETWEEN '${startDate}' AND '${endDate}'`;
+            const safeStart = /^\d{4}-\d{2}-\d{2}$/.test(startDate) ? startDate : clientDate;
+            const safeEnd = /^\d{4}-\d{2}-\d{2}$/.test(endDate) ? endDate : clientDate;
+            dateConditionSales = `AND DATE(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) BETWEEN '${safeStart}' AND '${safeEnd}'`;
+            dateConditionRepairs = `AND DATE(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) BETWEEN '${safeStart}' AND '${safeEnd}'`;
         } else {
             // this_month (default)
-            dateConditionSales = "AND MONTH(s.created_at) = MONTH(CURDATE()) AND YEAR(s.created_at) = YEAR(CURDATE())";
-            dateConditionRepairs = "AND MONTH(r.created_at) = MONTH(CURDATE()) AND YEAR(r.created_at) = YEAR(CURDATE())";
-            prevDateConditionSales = "AND MONTH(s.created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(s.created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))";
-            prevDateConditionRepairs = "AND MONTH(r.created_at) = MONTH(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH)) AND YEAR(r.created_at) = YEAR(DATE_SUB(CURRENT_DATE(), INTERVAL 1 MONTH))";
+            dateConditionSales = `AND MONTH(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) = MONTH('${clientDate}') AND YEAR(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) = YEAR('${clientDate}')`;
+            dateConditionRepairs = `AND MONTH(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) = MONTH('${clientDate}') AND YEAR(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) = YEAR('${clientDate}')`;
+            prevDateConditionSales = `AND MONTH(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) = MONTH(DATE_SUB('${clientDate}', INTERVAL 1 MONTH)) AND YEAR(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}')) = YEAR(DATE_SUB('${clientDate}', INTERVAL 1 MONTH))`;
+            prevDateConditionRepairs = `AND MONTH(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) = MONTH(DATE_SUB('${clientDate}', INTERVAL 1 MONTH)) AND YEAR(CONVERT_TZ(r.created_at, '+00:00', '${clientOffset}')) = YEAR(DATE_SUB('${clientDate}', INTERVAL 1 MONTH))`;
         }
 
         // Filtro de sucursal
@@ -905,12 +907,12 @@ exports.getEnterpriseAnalytics = async (req, res) => {
                 SUM(pos_revenue + taller_revenue) as total_revenue
             FROM (
                 SELECT 
-                    DATE_FORMAT(s.created_at, '%Y-%m-%d') as period_date,
+                    DATE_FORMAT(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}'), '%Y-%m-%d') as period_date,
                     SUM(CASE WHEN s.repair_id IS NULL THEN s.total ELSE 0 END) as pos_revenue,
                     SUM(CASE WHEN s.repair_id IS NOT NULL THEN s.total ELSE 0 END) as taller_revenue
                 FROM sales s
                 WHERE s.tenant_id = ? AND s.status = 'completed' ${branchFilterSales} ${dateConditionSales}
-                GROUP BY DATE_FORMAT(s.created_at, '%Y-%m-%d')
+                GROUP BY DATE_FORMAT(CONVERT_TZ(s.created_at, '+00:00', '${clientOffset}'), '%Y-%m-%d')
             ) unified
             GROUP BY period_date
             ORDER BY period_date ASC
