@@ -14,9 +14,10 @@ import {
     Save, X, User, Smartphone, Wrench, ClipboardCheck,
     DollarSign, Search, ChevronRight, CheckCircle2,
     Image as ImageIcon, Plus, Trash2, Camera, UploadCloud, RotateCcw,
-    Zap, Tag
+    Zap, Tag, Grid
 } from 'lucide-react';
 import CameraCaptureModal from '../../components/CameraCaptureModal';
+import PatternLockModal from '../../components/PatternLockModal';
 import './NewRepairPage.css';
 
 export default function NewRepairPage() {
@@ -38,6 +39,7 @@ export default function NewRepairPage() {
     const [selectedImages, setSelectedImages] = useState([]);
     const [imagePreviews, setImagePreviews] = useState([]);
     const [showCameraModal, setShowCameraModal] = useState(false);
+    const [showPatternModal, setShowPatternModal] = useState(false);
     
     // Checkbox explicitly needed to submit if there are conditions
     const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -49,6 +51,24 @@ export default function NewRepairPage() {
     const [serviceSearch, setServiceSearch] = useState('');
     const [showServiceDropdown, setShowServiceDropdown] = useState(false);
     const [showMobileCosts, setShowMobileCosts] = useState(false);
+
+    const CHECKLIST_LABELS = {
+        power: 'Encendido',
+        display: 'Pantalla',
+        touch: 'Táctil',
+        cameras: 'Cámaras',
+        audio: 'Bocinas / Altavoz',
+        wifi: 'Wi-Fi',
+        charging: 'Centro Carga',
+        buttons: 'Botones Volumen / Power',
+        biometrics: 'Face ID / Huella',
+        microphone: 'Micrófono',
+        signal: 'Señal / SIM',
+        bluetooth: 'Bluetooth',
+        proximity: 'Sensor Prox.',
+        flash: 'Flash / Linterna',
+        vibration: 'Vibración'
+    };
 
     const [formData, setFormData] = useState({
         customer_id: '',
@@ -88,7 +108,14 @@ export default function NewRepairPage() {
             audio: true,
             wifi: true,
             charging: true,
-            buttons: true
+            buttons: true,
+            biometrics: true,
+            microphone: true,
+            signal: true,
+            bluetooth: true,
+            proximity: true,
+            flash: true,
+            vibration: true
         }
     });
 
@@ -807,8 +834,50 @@ export default function NewRepairPage() {
                                 <input type="text" name="imei" className="input" value={formData.imei} onChange={handleChange} placeholder="15 dígitos / Serie" />
                             </div>
                             <div className="form-group">
-                                <label>Contraseña / Patrón</label>
-                                <input type="text" name="device_password" className="input" value={formData.device_password} onChange={handleChange} placeholder="PIN o patrón..." />
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                    <label style={{ margin: 0 }}>Contraseña / Patrón</label>
+                                    <button
+                                        type="button"
+                                        className="btn btn-ghost btn-sm text-primary"
+                                        style={{ fontSize: '11px', padding: '1px 6px', display: 'flex', alignItems: 'center', gap: '3px', height: 'auto', minHeight: 'unset' }}
+                                        onClick={() => setShowPatternModal(true)}
+                                        title="Dibujar patrón de desbloqueo Android"
+                                    >
+                                        <Grid size={13} />
+                                        <span>Traza Patrón</span>
+                                    </button>
+                                </div>
+                                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                                    <input
+                                        type="text"
+                                        name="device_password"
+                                        className="input"
+                                        value={formData.device_password}
+                                        onChange={handleChange}
+                                        placeholder="PIN o patrón..."
+                                        style={{ paddingRight: formData.device_password ? '32px' : '10px' }}
+                                    />
+                                    {formData.device_password && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setFormData(prev => ({ ...prev, device_password: '' }))}
+                                            style={{
+                                                position: 'absolute',
+                                                right: '8px',
+                                                background: 'none',
+                                                border: 'none',
+                                                color: 'var(--color-text-muted)',
+                                                cursor: 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                padding: '2px'
+                                            }}
+                                            title="Limpiar"
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             <div className="form-group">
                                 <label>Estado Batería</label>
@@ -926,7 +995,7 @@ export default function NewRepairPage() {
                                         <div className="checklist-box">
                                             {value && <CheckCircle2 size={16} />}
                                         </div>
-                                        <span className="capitalize">{key === 'display' ? 'pantalla' : key}</span>
+                                        <span>{CHECKLIST_LABELS[key] || key}</span>
                                     </label>
                                 ))}
                             </div>
@@ -1201,6 +1270,16 @@ export default function NewRepairPage() {
                     multiple={true}
                 />
             )}
+
+            {/* Modal de Patrón de Desbloqueo */}
+            <PatternLockModal
+                isOpen={showPatternModal}
+                onClose={() => setShowPatternModal(false)}
+                onSave={(savedPattern) => {
+                    setFormData(prev => ({ ...prev, device_password: savedPattern }));
+                }}
+                initialPattern={formData.device_password}
+            />
         </div>
     );
 }
