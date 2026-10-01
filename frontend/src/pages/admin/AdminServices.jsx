@@ -224,6 +224,7 @@ export default function AdminServices() {
                 description: '',
                 device_type_id: '',
                 brand_id: '',
+                model_name: '',
                 base_price: '',
                 estimated_time: '',
                 is_active: true
@@ -433,6 +434,8 @@ export default function AdminServices() {
                                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--sp-2)' }}>
                                                     <span className="text-muted" style={{ fontSize: '10px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                                         <Smartphone size={10} /> {typeName}
+                                                        {item.brand_name && ` • ${item.brand_name}`}
+                                                        {item.model_name && ` • ${item.model_name}`}
                                                     </span>
                                                     <div className="service-card-actions">
                                                         {item.barcode && (
@@ -556,7 +559,7 @@ export default function AdminServices() {
                                         <label>Descripción del Servicio</label>
                                         <textarea name="description" className="input" rows="3" value={formData.description || ''} onChange={handleChange} placeholder="Detalla el alcance del servicio..."></textarea>
                                     </div>
-                                    <div className="form-row mt-sm" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--sp-3)' }}>
+                                    <div className="form-row mt-sm" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--sp-3)' }}>
                                         <div className="input-group">
                                             <label>Tipo de Equipo compatible</label>
                                             <select name="device_type_id" className="select" value={formData.device_type_id || ''} onChange={handleChange}>
@@ -574,6 +577,17 @@ export default function AdminServices() {
                                                     <option key={b.id} value={b.id}>{b.name}</option>
                                                 ))}
                                             </select>
+                                        </div>
+                                        <div className="input-group">
+                                            <label>Modelo compatible</label>
+                                            <input
+                                                type="text"
+                                                name="model_name"
+                                                className="input"
+                                                value={formData.model_name || ''}
+                                                onChange={handleChange}
+                                                placeholder="Ej: iPhone 13, A54..."
+                                            />
                                         </div>
                                     </div>
                                     <div className="form-row mt-sm" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--sp-3)' }}>

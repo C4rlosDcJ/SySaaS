@@ -408,6 +408,11 @@ export default function NewRepairPage() {
                 updated.brand_id = service.brand_id.toString();
             }
 
+            // Auto-completar modelo si el servicio tiene modelo configurado
+            if (service.model_name && (!prev.model || !prev.model.trim())) {
+                updated.model = service.model_name;
+            }
+
             // Auto-completar falla/descripción si está vacía
             if (!prev.problem_description.trim()) {
                 updated.problem_description = service.description || service.name;
@@ -692,7 +697,8 @@ export default function NewRepairPage() {
                                         !serviceSearch || 
                                         s.name.toLowerCase().includes(serviceSearch.split(' - ')[0].toLowerCase()) ||
                                         (s.device_type_name && s.device_type_name.toLowerCase().includes(serviceSearch.toLowerCase())) ||
-                                        (s.brand_name && s.brand_name.toLowerCase().includes(serviceSearch.toLowerCase()))
+                                        (s.brand_name && s.brand_name.toLowerCase().includes(serviceSearch.toLowerCase())) ||
+                                        (s.model_name && s.model_name.toLowerCase().includes(serviceSearch.toLowerCase()))
                                     ).length === 0 ? (
                                         <div style={{ padding: '12px', fontSize: '13px', color: 'var(--color-text-muted)', background: 'var(--color-bg-elevated)', textAlign: 'center' }}>
                                             No se encontraron servicios en el catálogo
@@ -702,7 +708,8 @@ export default function NewRepairPage() {
                                             !serviceSearch || 
                                             s.name.toLowerCase().includes(serviceSearch.split(' - ')[0].toLowerCase()) ||
                                             (s.device_type_name && s.device_type_name.toLowerCase().includes(serviceSearch.toLowerCase())) ||
-                                            (s.brand_name && s.brand_name.toLowerCase().includes(serviceSearch.toLowerCase()))
+                                            (s.brand_name && s.brand_name.toLowerCase().includes(serviceSearch.toLowerCase())) ||
+                                            (s.model_name && s.model_name.toLowerCase().includes(serviceSearch.toLowerCase()))
                                         ).map(s => {
                                             const partsCost = parseFloat(s.default_parts_cost) || 0;
                                             return (
@@ -716,7 +723,7 @@ export default function NewRepairPage() {
                                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left' }}>
                                                         <strong style={{ fontSize: '13px' }}>{s.name}</strong>
                                                         <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>
-                                                            {s.device_type_name ? s.device_type_name : 'General'} {s.brand_name ? `• ${s.brand_name}` : ''} {s.estimated_time ? `• Est: ${s.estimated_time}` : ''}
+                                                            {s.device_type_name ? s.device_type_name : 'General'} {s.brand_name ? `• ${s.brand_name}` : ''} {s.model_name ? `• ${s.model_name}` : ''} {s.estimated_time ? `• Est: ${s.estimated_time}` : ''}
                                                         </span>
                                                     </div>
                                                     <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
