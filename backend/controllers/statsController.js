@@ -219,13 +219,44 @@ exports.getDashboard = async (req, res) => {
             revenue: parseFloat(lastMonth[0]?.revenue || 0)
         };
 
-        const formattedMonthlyRevenue = monthlyRevenue.map(mr => ({
-            month: mr.month,
-            revenue: parseFloat(mr.revenue || 0),
-            taller_revenue: parseFloat(mr.taller_revenue || 0),
-            pos_revenue: parseFloat(mr.pos_revenue || 0),
-            repairs_count: parseInt(mr.repairs_count || 0, 10)
-        }));
+        // Asegurar que formattedMonthlyRevenue contenga todos los meses continuos de los últimos 12 meses
+        const allMonthsMap = new Map();
+        try {
+            const [clientYearStr, clientMonthStr] = (clientDate || '').split('-');
+            const curY = parseInt(clientYearStr, 10) || new Date().getFullYear();
+            const curM = parseInt(clientMonthStr, 10) || (new Date().getMonth() + 1);
+
+            // Generar los últimos 12 meses en orden cronológico (de hace 11 meses hasta el mes actual)
+            for (let i = 11; i >= 0; i--) {
+                const d = new Date(curY, curM - 1 - i, 1);
+                const yyyy = d.getFullYear();
+                const mm = String(d.getMonth() + 1).padStart(2, '0');
+                const mKey = `${yyyy}-${mm}`;
+                allMonthsMap.set(mKey, {
+                    month: mKey,
+                    revenue: 0,
+                    taller_revenue: 0,
+                    pos_revenue: 0,
+                    repairs_count: 0
+                });
+            }
+        } catch (e) {
+            console.error('[STATS] Error generando meses continuos:', e);
+        }
+
+        monthlyRevenue.forEach(mr => {
+            if (mr.month) {
+                allMonthsMap.set(mr.month, {
+                    month: mr.month,
+                    revenue: parseFloat(mr.revenue || 0),
+                    taller_revenue: parseFloat(mr.taller_revenue || 0),
+                    pos_revenue: parseFloat(mr.pos_revenue || 0),
+                    repairs_count: parseInt(mr.repairs_count || 0, 10)
+                });
+            }
+        });
+
+        const formattedMonthlyRevenue = Array.from(allMonthsMap.values()).sort((a, b) => a.month.localeCompare(b.month));
 
         const formattedTopServices = topServices.map(ts => ({
             name: ts.name,

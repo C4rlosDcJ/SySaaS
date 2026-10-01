@@ -9,7 +9,8 @@ import {
 import {
     DollarSign, Wrench, Users, TrendingUp, Award,
     RefreshCw, ArrowUpRight, ArrowDownRight, Cpu, Sparkles, UserCheck,
-    ShoppingBag, CreditCard, Download, Printer, Store, Filter, Calendar
+    ShoppingBag, CreditCard, Download, Printer, Store, Filter, Calendar,
+    ShieldCheck, Activity, Target, Zap, ChevronRight
 } from 'lucide-react';
 import { formatCurrency } from '../../utils/constants';
 import { showAlert } from '../../utils/swal';
@@ -179,10 +180,12 @@ export default function AdminReports() {
             const params = { period };
             if (selectedBranch) params.branch_id = selectedBranch;
 
+            const mlParams = selectedBranch ? { branch_id: selectedBranch } : {};
+
             const [analyticsRes, fcRes, segRes] = await Promise.allSettled([
                 statsService.getEnterpriseAnalytics(params),
-                analyticsService.getForecast(),
-                analyticsService.getCustomerSegmentation()
+                analyticsService.getForecast(mlParams),
+                analyticsService.getCustomerSegmentation(mlParams)
             ]);
 
             if (analyticsRes.status === 'fulfilled' && analyticsRes.value && analyticsRes.value.kpis) {
@@ -993,117 +996,320 @@ export default function AdminReports() {
                        ══════════════════════════════════════════════════════════ */}
                     {activeTab === 'ai_ml' && (
                         <div className="tab-content animate-fadeIn">
-                            <div className="kpi-grid" style={{ marginBottom: '24px' }}>
-                                <div className="kpi-card">
-                                    <div className="kpi-card-header">
-                                        <span className="kpi-label">Ventas Proyectadas (Próximos 30 Días)</span>
-                                        <Sparkles size={18} className="text-primary" />
+                            
+                            {/* Banner Superior de Estado del Modelo ML */}
+                            <div className="ml-status-banner" style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                flexWrap: 'wrap',
+                                gap: '16px',
+                                background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(59, 130, 246, 0.04) 100%)',
+                                border: '1px solid rgba(99, 102, 241, 0.25)',
+                                borderRadius: 'var(--radius-lg)',
+                                padding: '16px 20px',
+                                marginBottom: '24px'
+                            }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                    <div style={{
+                                        width: '42px',
+                                        height: '42px',
+                                        borderRadius: '10px',
+                                        background: 'rgba(99, 102, 241, 0.15)',
+                                        border: '1px solid rgba(99, 102, 241, 0.3)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#818cf8'
+                                    }}>
+                                        <Cpu size={22} />
                                     </div>
-                                    <div className="kpi-value">{formatCurrency(forecastData?.total_predicted_30d || 0)}</div>
-                                    <span className="kpi-subtext">Modelo de regresión lineal (Scikit-Learn)</span>
+                                    <div>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--color-text)' }}>
+                                                Motor Analitico Predictivo
+                                            </h3>
+                                            <span style={{
+                                                fontSize: '11px',
+                                                fontWeight: 700,
+                                                padding: '2px 8px',
+                                                borderRadius: '12px',
+                                                background: 'rgba(16, 185, 129, 0.15)',
+                                                color: '#10b981',
+                                                border: '1px solid rgba(16, 185, 129, 0.3)'
+                                            }}>
+                                                Modelo Activo
+                                            </span>
+                                        </div>
+                                        <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                                            Algoritmos: {forecastData?.model_type || 'Ridge Regression'} &bull; {segmentationData?.algorithm || 'K-Means Clustering'}
+                                        </p>
+                                    </div>
                                 </div>
 
-                                <div className="kpi-card">
-                                    <div className="kpi-card-header">
-                                        <span className="kpi-label">Promedio Diario Estimado</span>
-                                        <Cpu size={18} style={{ color: '#0284c7' }} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'block' }}>Nivel de Confianza</span>
+                                        <strong style={{ fontSize: '14px', color: '#38bdf8' }}>{forecastData?.confidence || 85}%</strong>
                                     </div>
-                                    <div className="kpi-value">{formatCurrency(forecastData?.daily_avg_predicted || 0)}</div>
-                                    <span className="kpi-subtext">Basado en volumen histórico del taller</span>
+                                    <div style={{ height: '24px', width: '1px', background: 'var(--color-border)' }}></div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'block' }}>Datos Historicos</span>
+                                        <strong style={{ fontSize: '14px', color: 'var(--color-text)' }}>{forecastData?.historical_days || 0} dias analizados</strong>
+                                    </div>
+                                    <div style={{ height: '24px', width: '1px', background: 'var(--color-border)' }}></div>
+                                    <div style={{ textAlign: 'right' }}>
+                                        <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', display: 'block' }}>Tendencia Estimada</span>
+                                        <strong style={{
+                                            fontSize: '14px',
+                                            color: forecastData?.trend === 'alcista' ? '#10b981' : forecastData?.trend === 'bajista' ? '#ef4444' : '#60a5fa',
+                                            textTransform: 'capitalize'
+                                        }}>
+                                            {forecastData?.trend || 'Estable'}
+                                        </strong>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Curva predictiva */}
-                            {forecastData?.forecast?.length > 0 && (
-                                <div className="report-card" style={{ marginBottom: '24px' }}>
-                                    <div className="report-card-header">
-                                        <div>
-                                            <h2>Curva Predictiva de Ingresos Diarios</h2>
-                                            <p>Proyección estadística entrenada sobre el comportamiento comercial de tu negocio</p>
-                                        </div>
+                            {/* 4 Cards de Metricas Proyectadas */}
+                            <div className="kpi-grid" style={{ marginBottom: '24px' }}>
+                                <div className="kpi-card">
+                                    <div className="kpi-card-header">
+                                        <span className="kpi-label">Proyeccion (30 Dias)</span>
+                                        <Sparkles size={18} className="text-primary" />
                                     </div>
-                                    <div className="chart-area" style={{ height: 280 }}>
+                                    <div className="kpi-value">{formatCurrency(forecastData?.total_predicted_30d || 0)}</div>
+                                    <span className="kpi-subtext">Facturacion estimada Scikit-Learn</span>
+                                </div>
+
+                                <div className="kpi-card">
+                                    <div className="kpi-card-header">
+                                        <span className="kpi-label">Ritmo Diario Estimado</span>
+                                        <Activity size={18} style={{ color: '#0284c7' }} />
+                                    </div>
+                                    <div className="kpi-value">{formatCurrency(forecastData?.daily_avg_predicted || 0)}</div>
+                                    <span className="kpi-subtext">Ingreso proyectado por jornada</span>
+                                </div>
+
+                                <div className="kpi-card">
+                                    <div className="kpi-card-header">
+                                        <span className="kpi-label">Proyeccion a 7 Dias</span>
+                                        <Zap size={18} style={{ color: '#818cf8' }} />
+                                    </div>
+                                    <div className="kpi-value">
+                                        {formatCurrency(
+                                            forecastData?.forecast?.slice(0, 7).reduce((acc, curr) => acc + (curr.predicted_amount || 0), 0) ||
+                                            ((forecastData?.daily_avg_predicted || 0) * 7)
+                                        )}
+                                    </div>
+                                    <span className="kpi-subtext">Estimacion para la proxima semana</span>
+                                </div>
+
+                                <div className="kpi-card">
+                                    <div className="kpi-card-header">
+                                        <span className="kpi-label">Clientes Caracterizados</span>
+                                        <Users size={18} style={{ color: '#38bdf8' }} />
+                                    </div>
+                                    <div className="kpi-value">{segmentationData?.total_customers || 0}</div>
+                                    <span className="kpi-subtext">Base clasificada por matriz RFM</span>
+                                </div>
+                            </div>
+
+                            {/* Curva predictiva interactiva */}
+                            <div className="report-card" style={{ marginBottom: '24px' }}>
+                                <div className="report-card-header">
+                                    <div>
+                                        <h2>Curva Predictiva de Ingresos Diarios (Proximos 30 Dias)</h2>
+                                        <p>Proyeccion estadistica continua generada por regresion regularizada sobre tus registros reales</p>
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span className="badge-neutral" style={{ fontSize: '11px' }}>
+                                            Rango: {forecastData?.forecast?.[0]?.date || 'D+1'} al {forecastData?.forecast?.[forecastData.forecast.length - 1]?.date || 'D+30'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {forecastData?.forecast?.length > 0 ? (
+                                    <div className="chart-area" style={{ height: 300 }}>
                                         <ResponsiveContainer width="100%" height="100%">
-                                            <AreaChart data={forecastData.forecast}>
+                                            <AreaChart data={forecastData.forecast} margin={{ top: 10, right: 20, left: 10, bottom: 0 }}>
                                                 <defs>
                                                     <linearGradient id="mlForecastGrad" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.45} />
+                                                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.02} />
                                                     </linearGradient>
                                                 </defs>
                                                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" opacity={0.5} />
                                                 <XAxis dataKey="date" stroke="var(--color-text-secondary)" fontSize={11} tickLine={false} />
-                                                <YAxis stroke="var(--color-text-secondary)" fontSize={11} tickLine={false} tickFormatter={v => `$${v}`} />
+                                                <YAxis stroke="var(--color-text-secondary)" fontSize={11} tickLine={false} tickFormatter={v => `$${v >= 1000 ? `${(v/1000).toFixed(0)}k` : v}`} />
                                                 <Tooltip content={<CustomTooltip />} />
-                                                <Area type="monotone" dataKey="predicted_amount" name="Pronóstico Diario" stroke="#6366f1" strokeWidth={2} fill="url(#mlForecastGrad)" />
+                                                <Area type="monotone" dataKey="predicted_amount" name="Pronóstico Diario" stroke="#6366f1" strokeWidth={2.5} fill="url(#mlForecastGrad)" />
                                             </AreaChart>
                                         </ResponsiveContainer>
                                     </div>
+                                ) : (
+                                    <div className="empty-chart" style={{ height: '220px' }}>
+                                        {forecastData?.message || 'Registra operaciones en el sistema para habilitar la curva predictiva.'}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Recomendaciones Accionables del Motor ML */}
+                            <div className="report-card" style={{ marginBottom: '24px' }}>
+                                <div className="report-card-header">
+                                    <div>
+                                        <h2>Recomendaciones Estrategicas Basadas en Datos</h2>
+                                        <p>Conclusiones automaticas para optimizar inventario y retencion comercial</p>
+                                    </div>
                                 </div>
-                            )}
+
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '14px' }}>
+                                    <div style={{
+                                        padding: '14px 16px',
+                                        background: 'var(--color-bg-tertiary)',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: '1px solid var(--color-border)',
+                                        borderLeft: '4px solid #6366f1'
+                                    }}>
+                                        <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--color-text)', marginBottom: '4px' }}>
+                                            Planificacion de Flujo de Caja
+                                        </div>
+                                        <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                                            Con un promedio proyectado de <strong>{formatCurrency(forecastData?.daily_avg_predicted || 0)}/dia</strong>, planifica reposiciones de refacciones garantizando inventario para los 7 dias entrantes.
+                                        </p>
+                                    </div>
+
+                                    <div style={{
+                                        padding: '14px 16px',
+                                        background: 'var(--color-bg-tertiary)',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: '1px solid var(--color-border)',
+                                        borderLeft: '4px solid #38bdf8'
+                                    }}>
+                                        <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--color-text)', marginBottom: '4px' }}>
+                                            Activacion de Clientes Inactivos
+                                        </div>
+                                        <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                                            Se detectaron <strong>{(segmentationData?.segment_summary?.['En Riesgo'] || 0)} clientes en riesgo</strong> y <strong>{(segmentationData?.segment_summary?.['Ocasional/Nuevo'] || 0)} clientes nuevos u ocasionales</strong>. Recomendamos notificarles mantenimientos preventivos.
+                                        </p>
+                                    </div>
+
+                                    <div style={{
+                                        padding: '14px 16px',
+                                        background: 'var(--color-bg-tertiary)',
+                                        borderRadius: 'var(--radius-md)',
+                                        border: '1px solid var(--color-border)',
+                                        borderLeft: '4px solid #10b981'
+                                    }}>
+                                        <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--color-text)', marginBottom: '4px' }}>
+                                            Fidelizacion VIP
+                                        </div>
+                                        <p style={{ margin: 0, fontSize: '12px', color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+                                            Tienes <strong>{(segmentationData?.segment_summary?.['VIP'] || 0)} clientes de alto valor</strong> y <strong>{(segmentationData?.segment_summary?.['Frecuente'] || 0)} frecuentes</strong>. Manten un seguimiento preferencial en sus tickets y entregas prioritarias.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
 
                             {/* Segmentación K-Means RFM Enlistada */}
-                            {segmentationData?.customers?.length > 0 ? (
-                                <div className="report-card">
-                                    <div className="report-card-header">
-                                        <div>
-                                            <h2>Segmentación K-Means de Clientes (RFM)</h2>
-                                            <p>Agrupación inteligente por volumen de compra, recurrencia e inactividad</p>
-                                        </div>
-                                        <span className="badge-neutral" style={{ fontWeight: 700 }}>
-                                            {segmentationData.customers.length} Clientes Analizados
-                                        </span>
+                            <div className="report-card">
+                                <div className="report-card-header">
+                                    <div>
+                                        <h2>Segmentacion de Clientes (Matriz RFM Inteligente)</h2>
+                                        <p>Clasificacion por volumen de compra, recurrencia en mostrador/taller y recencia</p>
                                     </div>
+                                    <span className="badge-neutral" style={{ fontWeight: 700 }}>
+                                        {segmentationData?.total_customers || 0} Clientes Analizados
+                                    </span>
+                                </div>
 
-                                    {/* Resumen de Clusters en lista */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginTop: '4px' }}>
-                                        {['VIP', 'Frecuente', 'En Riesgo', 'Ocasional/Nuevo'].map(segName => {
-                                            const segCustomers = segmentationData.customers.filter(c => c.segment === segName || (segName.includes('Ocasional') && (c.segment === 'Ocasional' || c.segment === 'Nuevo' || c.segment === 'Ocasional/Nuevo')));
-                                            const count = segCustomers.length;
-                                            const totalSpent = segCustomers.reduce((acc, c) => acc + (c.total_spent || 0), 0);
-                                            const avgSpent = count > 0 ? totalSpent / count : 0;
-
-                                            return (
-                                                <div
-                                                    key={segName}
-                                                    onClick={() => setKmeansFilter(kmeansFilter === segName ? '' : segName)}
-                                                    style={{
-                                                        padding: '12px 14px',
-                                                        borderRadius: 'var(--radius-md)',
-                                                        background: kmeansFilter === segName ? 'var(--color-bg-elevated)' : 'var(--color-bg-tertiary)',
-                                                        border: kmeansFilter === segName ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
-                                                        cursor: 'pointer',
-                                                        transition: 'all 0.2s ease'
-                                                    }}
-                                                >
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                                                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text)' }}>{segName}</span>
-                                                        <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-primary)' }}>{count}</span>
-                                                    </div>
-                                                    <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
-                                                        Promedio: <strong>{formatCurrency(avgSpent)}</strong>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Lista Enlistada de Clientes con Paginación */}
-                                    {(() => {
-                                        const filteredList = segmentationData.customers.filter(c =>
-                                            !kmeansFilter ||
-                                            c.segment === kmeansFilter ||
-                                            (kmeansFilter.includes('Ocasional') && (c.segment === 'Ocasional' || c.segment === 'Nuevo' || c.segment === 'Ocasional/Nuevo'))
+                                {/* Resumen de Clusters en lista interactiva */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '10px', marginTop: '4px', marginBottom: '14px' }}>
+                                    {[
+                                        { key: 'VIP', label: 'VIP / Alto Valor', color: '#6366f1' },
+                                        { key: 'Frecuente', label: 'Frecuentes', color: '#0284c7' },
+                                        { key: 'En Riesgo', label: 'En Riesgo (>30d)', color: '#f59e0b' },
+                                        { key: 'Ocasional/Nuevo', label: 'Ocasional / Nuevo', color: '#64748b' }
+                                    ].map(seg => {
+                                        const segCustomers = (segmentationData?.customers || []).filter(c =>
+                                            c.segment === seg.key ||
+                                            (seg.key.includes('Ocasional') && (c.segment === 'Ocasional' || c.segment === 'Nuevo' || c.segment === 'Ocasional/Nuevo'))
                                         );
-                                        const totalPages = Math.ceil(filteredList.length / KMEANS_PAGE_SIZE) || 1;
-                                        const currentPage = Math.min(kmeansPage, totalPages);
-                                        const startIndex = (currentPage - 1) * KMEANS_PAGE_SIZE;
-                                        const paginatedItems = filteredList.slice(startIndex, startIndex + KMEANS_PAGE_SIZE);
+                                        const count = segCustomers.length;
+                                        const totalSpent = segCustomers.reduce((acc, c) => acc + (c.total_spent || 0), 0);
+                                        const avgSpent = count > 0 ? totalSpent / count : 0;
+                                        const isSelected = kmeansFilter === seg.key;
 
                                         return (
-                                            <>
-                                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
-                                                    {paginatedItems.map((c, idx) => (
+                                            <div
+                                                key={seg.key}
+                                                onClick={() => setKmeansFilter(isSelected ? '' : seg.key)}
+                                                style={{
+                                                    padding: '12px 14px',
+                                                    borderRadius: 'var(--radius-md)',
+                                                    background: isSelected ? 'var(--color-bg-elevated)' : 'var(--color-bg-tertiary)',
+                                                    border: isSelected ? `2px solid ${seg.color}` : '1px solid var(--color-border)',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s ease',
+                                                    boxShadow: isSelected ? `0 2px 10px -2px ${seg.color}40` : 'none'
+                                                }}
+                                            >
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                                    <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--color-text)' }}>{seg.label}</span>
+                                                    <span style={{
+                                                        fontSize: '11px',
+                                                        fontWeight: 800,
+                                                        padding: '1px 7px',
+                                                        borderRadius: '10px',
+                                                        background: `${seg.color}20`,
+                                                        color: seg.color
+                                                    }}>
+                                                        {count}
+                                                    </span>
+                                                </div>
+                                                <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                                                    Promedio: <strong>{formatCurrency(avgSpent)}</strong>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Lista Enlistada de Clientes con Paginación */}
+                                {(() => {
+                                    const allCustomers = segmentationData?.customers || [];
+                                    if (allCustomers.length === 0) {
+                                        return (
+                                            <div style={{ padding: '36px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
+                                                No hay clientes registrados en la sucursal seleccionada.
+                                            </div>
+                                        );
+                                    }
+
+                                    const filteredList = allCustomers.filter(c =>
+                                        !kmeansFilter ||
+                                        c.segment === kmeansFilter ||
+                                        (kmeansFilter.includes('Ocasional') && (c.segment === 'Ocasional' || c.segment === 'Nuevo' || c.segment === 'Ocasional/Nuevo'))
+                                    );
+
+                                    const totalPages = Math.ceil(filteredList.length / KMEANS_PAGE_SIZE) || 1;
+                                    const currentPage = Math.min(kmeansPage, totalPages);
+                                    const startIndex = (currentPage - 1) * KMEANS_PAGE_SIZE;
+                                    const paginatedItems = filteredList.slice(startIndex, startIndex + KMEANS_PAGE_SIZE);
+
+                                    const getBadgeStyle = (segment) => {
+                                        if (segment === 'VIP') return { background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)' };
+                                        if (segment === 'Frecuente') return { background: 'rgba(2, 132, 199, 0.15)', color: '#38bdf8', border: '1px solid rgba(2, 132, 199, 0.3)' };
+                                        if (segment === 'En Riesgo') return { background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24', border: '1px solid rgba(245, 158, 11, 0.3)' };
+                                        return { background: 'var(--color-bg-card)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' };
+                                    };
+
+                                    return (
+                                        <>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                                {paginatedItems.map((c, idx) => {
+                                                    const badge = getBadgeStyle(c.segment);
+                                                    return (
                                                         <div
                                                             key={c.customer_id || idx}
                                                             style={{
@@ -1114,13 +1320,14 @@ export default function AdminReports() {
                                                                 background: 'var(--color-bg-tertiary)',
                                                                 borderRadius: 'var(--radius-md)',
                                                                 border: '1px solid var(--color-border)',
-                                                                gap: '12px'
+                                                                gap: '12px',
+                                                                flexWrap: 'wrap'
                                                             }}
                                                         >
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: '220px' }}>
                                                                 <div style={{
-                                                                    width: '36px',
-                                                                    height: '36px',
+                                                                    width: '38px',
+                                                                    height: '38px',
                                                                     borderRadius: '50%',
                                                                     background: 'var(--color-bg-card)',
                                                                     border: '1px solid var(--color-border)',
@@ -1138,7 +1345,7 @@ export default function AdminReports() {
                                                                         {c.customer_name}
                                                                     </div>
                                                                     <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                                                                        {c.total_orders} {c.total_orders === 1 ? 'ticket / compra' : 'tickets / compras'}
+                                                                        {c.total_orders} {c.total_orders === 1 ? 'operacion registrada' : 'operaciones registradas'} &bull; {c.recency_days !== undefined ? (c.recency_days <= 1 ? 'Actividad hoy' : `Hace ${c.recency_days} dias`) : ''}
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -1152,64 +1359,70 @@ export default function AdminReports() {
                                                                         Total Invertido
                                                                     </div>
                                                                 </div>
-                                                                <span className="badge-neutral" style={{ fontWeight: 700, minWidth: '85px', textAlign: 'center' }}>
+                                                                <span style={{
+                                                                    fontSize: '11px',
+                                                                    fontWeight: 700,
+                                                                    padding: '4px 10px',
+                                                                    borderRadius: '6px',
+                                                                    minWidth: '95px',
+                                                                    textAlign: 'center',
+                                                                    ...badge
+                                                                }}>
                                                                     {c.segment}
                                                                 </span>
                                                             </div>
                                                         </div>
-                                                    ))}
-                                                </div>
+                                                    );
+                                                })}
+                                            </div>
 
-                                                {/* Controles de Paginación */}
-                                                {filteredList.length > KMEANS_PAGE_SIZE && (
-                                                    <div style={{
-                                                        display: 'flex',
-                                                        justifyContent: 'space-between',
-                                                        alignItems: 'center',
-                                                        marginTop: '16px',
-                                                        paddingTop: '12px',
-                                                        borderTop: '1px solid var(--color-border)',
-                                                        fontSize: '12px',
-                                                        color: 'var(--color-text-secondary)'
-                                                    }}>
-                                                        <span>
-                                                            Mostrando {startIndex + 1} - {Math.min(startIndex + KMEANS_PAGE_SIZE, filteredList.length)} de {filteredList.length} clientes
+                                            {/* Controles de Paginación */}
+                                            {filteredList.length > KMEANS_PAGE_SIZE && (
+                                                <div style={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    alignItems: 'center',
+                                                    marginTop: '16px',
+                                                    paddingTop: '12px',
+                                                    borderTop: '1px solid var(--color-border)',
+                                                    fontSize: '12px',
+                                                    color: 'var(--color-text-secondary)',
+                                                    flexWrap: 'wrap',
+                                                    gap: '10px'
+                                                }}>
+                                                    <span>
+                                                        Mostrando {startIndex + 1} - {Math.min(startIndex + KMEANS_PAGE_SIZE, filteredList.length)} de {filteredList.length} clientes
+                                                    </span>
+
+                                                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                                        <button
+                                                            className="btn btn-secondary btn-sm"
+                                                            onClick={() => setKmeansPage(prev => Math.max(1, prev - 1))}
+                                                            disabled={currentPage <= 1}
+                                                            style={{ padding: '4px 10px', fontSize: '12px' }}
+                                                        >
+                                                            Anterior
+                                                        </button>
+
+                                                        <span style={{ padding: '0 8px', fontWeight: 600, color: 'var(--color-text)' }}>
+                                                            Pagina {currentPage} de {totalPages}
                                                         </span>
 
-                                                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                                            <button
-                                                                className="btn btn-secondary btn-sm"
-                                                                onClick={() => setKmeansPage(prev => Math.max(1, prev - 1))}
-                                                                disabled={currentPage <= 1}
-                                                                style={{ padding: '4px 10px', fontSize: '12px' }}
-                                                            >
-                                                                Anterior
-                                                            </button>
-
-                                                            <span style={{ padding: '0 8px', fontWeight: 600, color: 'var(--color-text)' }}>
-                                                                Página {currentPage} de {totalPages}
-                                                            </span>
-
-                                                            <button
-                                                                className="btn btn-secondary btn-sm"
-                                                                onClick={() => setKmeansPage(prev => Math.min(totalPages, prev + 1))}
-                                                                disabled={currentPage >= totalPages}
-                                                                style={{ padding: '4px 10px', fontSize: '12px' }}
-                                                            >
-                                                                Siguiente
-                                                            </button>
-                                                        </div>
+                                                        <button
+                                                            className="btn btn-secondary btn-sm"
+                                                            onClick={() => setKmeansPage(prev => Math.min(totalPages, prev + 1))}
+                                                            disabled={currentPage >= totalPages}
+                                                            style={{ padding: '4px 10px', fontSize: '12px' }}
+                                                        >
+                                                            Siguiente
+                                                        </button>
                                                     </div>
-                                                )}
-                                            </>
-                                        );
-                                    })()}
-                                </div>
-                            ) : (
-                                <div className="report-card" style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
-                                    Se requieren al menos 4 clientes con compras o reparaciones para generar el agrupamiento K-Means.
-                                </div>
-                            )}
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
+                            </div>
                         </div>
                     )}
                 </>

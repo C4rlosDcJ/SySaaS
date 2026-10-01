@@ -704,9 +704,18 @@ export const couponService = {
 
 // ML Analytics Service (Scikit-Learn Python Backend)
 export const analyticsService = {
-    getForecast: () => fetchAPI('/analytics/forecast'),
-    getCustomerSegmentation: () => fetchAPI('/analytics/customers-segmentation'),
-    getChartPng: () => fetchAPI('/analytics/chart-png')
+    getForecast: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return fetchAPI(`/analytics/forecast${query ? `?${query}` : ''}`);
+    },
+    getCustomerSegmentation: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return fetchAPI(`/analytics/customers-segmentation${query ? `?${query}` : ''}`);
+    },
+    getChartPng: (params = {}) => {
+        const query = new URLSearchParams(params).toString();
+        return fetchAPI(`/analytics/chart-png${query ? `?${query}` : ''}`);
+    }
 };
 
 // Billing & Subscription Service
