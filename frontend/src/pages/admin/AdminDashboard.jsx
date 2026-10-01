@@ -137,6 +137,10 @@ export default function AdminDashboard() {
     const [loading, setLoading] = useState(true);
     const [currentTime, setCurrentTime] = useState(new Date());
 
+    const [chartType, setChartType] = useState('area'); // 'area' | 'bar'
+    const [chartRange, setChartRange] = useState('12'); // '6' | '12' | 'all'
+    const [chartBreakdown, setChartBreakdown] = useState(false); // desglosar Taller vs Mostrador POS
+
     // Live clock
     useEffect(() => {
         const timer = setInterval(() => {
@@ -168,6 +172,69 @@ export default function AdminDashboard() {
             setLoading(false);
         }
     };
+
+    // Preparar y rellenar siempre los últimos 12 meses continuos de la gráfica
+    const fullMonthlyRevenue = useMemo(() => {
+        const rawMonthly = stats?.monthlyRevenue || [];
+        const map = new Map();
+
+        // Inicializar últimos 12 meses cronológicos completos
+        const now = new Date();
+        for (let i = 11; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const key = `${yyyy}-${mm}`;
+            map.set(key, {
+                month: key,
+                revenue: 0,
+                taller_revenue: 0,
+                pos_revenue: 0,
+                repairs_count: 0
+            });
+        }
+
+        // Sobrescribir con los datos reales que tenga el backend
+        rawMonthly.forEach(item => {
+            if (item.month) {
+                map.set(item.month, {
+                    month: item.month,
+                    revenue: parseFloat(item.revenue || 0),
+                    taller_revenue: parseFloat(item.taller_revenue || 0),
+                    pos_revenue: parseFloat(item.pos_revenue || 0),
+                    repairs_count: parseInt(item.repairs_count || 0, 10)
+                });
+            }
+        });
+
+        const list = Array.from(map.values()).sort((a, b) => a.month.localeCompare(b.month));
+
+        if (chartRange === '6') {
+            return list.slice(-6);
+        }
+        return list;
+    }, [stats?.monthlyRevenue, chartRange]);
+
+    // Resumen acumulado del periodo de la gráfica
+    const chartTotals = useMemo(() => {
+        let totalRev = 0;
+        let totalRep = 0;
+        let totalPos = 0;
+        let totalOrders = 0;
+        fullMonthlyRevenue.forEach(m => {
+            totalRev += m.revenue;
+            totalRep += m.taller_revenue;
+            totalPos += m.pos_revenue;
+            totalOrders += m.repairs_count;
+        });
+        return {
+            totalRev,
+            totalRep,
+            totalPos,
+            totalOrders,
+            avgMonthly: fullMonthlyRevenue.length > 0 ? (totalRev / fullMonthlyRevenue.length) : 0
+        };
+    }, [fullMonthlyRevenue]);
 
     // Calculate percentage comparison for monthly revenue
     const getRevenueChange = () => {
@@ -452,55 +519,195 @@ export default function AdminDashboard() {
             {/* Grid 2 Columnas: Gráfica de Ingresos + Gráfica de Estados de Taller */}
             <div className="dashboard-charts-grid" style={{ marginBottom: '24px' }}>
                 
-                {/* Historial de Ingresos Mensuales */}
+                {/* Historial de Ingresos Mensuales - Moderno e interactivo */}
                 <div className="chart-card" style={{ padding: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
                         <div>
-                            <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--color-text)' }}>
-                                Historial de Facturación Taller
-                            </h3>
-                            <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                                Facturación mensual registrada
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <h3 style={{ margin: 0, fontSize: '15px', fontWeight: 700, color: 'var(--color-text)' }}>
+                                    Historial de Facturación
+                                </h3>
+                                <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '12px', background: 'var(--color-primary-muted)', color: 'var(--color-primary)', fontWeight: 600 }}>
+                                    {fullMonthlyRevenue.length} meses
+                                </span>
+                            </div>
+                            <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: 'var(--color-text-secondary)' }}>
+                                Tendencia cronológica completa de ingresos y volumen
                             </p>
+                        </div>
+
+                        {/* Controles interactivos de la gráfica */}
+                        <div className="chart-header-actions">
+                            {/* Toggle Desglose Taller / POS */}
+                            <button
+                                type="button"
+                                onClick={() => setChartBreakdown(!chartBreakdown)}
+                                className={`chart-btn-tab ${chartBreakdown ? 'active' : ''}`}
+                                style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '5px 10px', background: chartBreakdown ? 'var(--color-primary-muted)' : 'var(--color-bg-card)' }}
+                                title="Separar ingresos de reparaciones vs venta directa"
+                            >
+                                <ArrowRightLeft size={12} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'middle' }} />
+                                Desglose
+                            </button>
+
+                            {/* Selector 6 meses / 12 meses */}
+                            <div className="chart-btn-group">
+                                <button
+                                    type="button"
+                                    className={`chart-btn-tab ${chartRange === '6' ? 'active' : ''}`}
+                                    onClick={() => setChartRange('6')}
+                                >
+                                    6M
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`chart-btn-tab ${chartRange === '12' ? 'active' : ''}`}
+                                    onClick={() => setChartRange('12')}
+                                >
+                                    12M
+                                </button>
+                            </div>
+
+                            {/* Selector Área / Barras */}
+                            <div className="chart-btn-group">
+                                <button
+                                    type="button"
+                                    className={`chart-btn-tab ${chartType === 'area' ? 'active' : ''}`}
+                                    onClick={() => setChartType('area')}
+                                    title="Gráfico de Área Suave"
+                                >
+                                    Área
+                                </button>
+                                <button
+                                    type="button"
+                                    className={`chart-btn-tab ${chartType === 'bar' ? 'active' : ''}`}
+                                    onClick={() => setChartType('bar')}
+                                    title="Gráfico de Barras"
+                                >
+                                    Barras
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Barra de métricas resumen del periodo visualizado */}
+                    <div className="chart-stats-summary">
+                        <div className="chart-summary-item">
+                            <span className="chart-summary-label">Total Periodo</span>
+                            <span className="chart-summary-value" style={{ color: 'var(--cool-teal, #10b981)' }}>
+                                {formatCurrency(chartTotals.totalRev)}
+                            </span>
+                        </div>
+                        <div className="chart-summary-item">
+                            <span className="chart-summary-label">Promedio Mensual</span>
+                            <span className="chart-summary-value">
+                                {formatCurrency(chartTotals.avgMonthly)}
+                            </span>
+                        </div>
+                        <div className="chart-summary-item">
+                            <span className="chart-summary-label">Órdenes Reparadas</span>
+                            <span className="chart-summary-value" style={{ color: 'var(--color-primary)' }}>
+                                {chartTotals.totalOrders} órdenes
+                            </span>
                         </div>
                     </div>
 
                     <div className="chart-container" style={{ height: 260 }}>
-                        {stats?.monthlyRevenue?.length > 0 ? (
+                        {fullMonthlyRevenue.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={stats.monthlyRevenue} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                                    <defs>
-                                        <linearGradient id="adminRevGradient" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
-                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.01} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
-                                    <XAxis
-                                        dataKey="month"
-                                        tickFormatter={formatMonthLabel}
-                                        stroke="var(--color-text-secondary)"
-                                        fontSize={11}
-                                        tickLine={false}
-                                    />
-                                    <YAxis
-                                        stroke="var(--color-text-secondary)"
-                                        fontSize={11}
-                                        tickLine={false}
-                                        tickFormatter={(v) => `$${v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v}`}
-                                    />
-                                    <Tooltip
-                                        formatter={(value) => [formatCurrency(value), 'Ingresos']}
-                                        labelFormatter={formatMonthLabel}
-                                        contentStyle={{
-                                            background: 'var(--color-bg-card)',
-                                            borderColor: 'var(--color-border)',
-                                            color: 'var(--color-text)',
-                                            borderRadius: 'var(--radius-md)'
-                                        }}
-                                    />
-                                    <Area type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} fill="url(#adminRevGradient)" />
-                                </AreaChart>
+                                {chartType === 'area' ? (
+                                    <AreaChart data={fullMonthlyRevenue} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="adminRevGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.35} />
+                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.01} />
+                                            </linearGradient>
+                                            <linearGradient id="adminTallerGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#0284c7" stopOpacity={0.35} />
+                                                <stop offset="95%" stopColor="#0284c7" stopOpacity={0.01} />
+                                            </linearGradient>
+                                            <linearGradient id="adminPosGradient" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#6366f1" stopOpacity={0.35} />
+                                                <stop offset="95%" stopColor="#6366f1" stopOpacity={0.01} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+                                        <XAxis
+                                            dataKey="month"
+                                            tickFormatter={formatMonthLabel}
+                                            stroke="var(--color-text-secondary)"
+                                            fontSize={11}
+                                            tickLine={false}
+                                        />
+                                        <YAxis
+                                            stroke="var(--color-text-secondary)"
+                                            fontSize={11}
+                                            tickLine={false}
+                                            tickFormatter={(v) => `$${v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v}`}
+                                        />
+                                        <Tooltip
+                                            formatter={(value, name) => [
+                                                formatCurrency(value),
+                                                name === 'revenue' ? 'Facturación Total' : name === 'taller_revenue' ? 'Taller' : 'Mostrador POS'
+                                            ]}
+                                            labelFormatter={formatMonthLabel}
+                                            contentStyle={{
+                                                background: 'var(--color-bg-card)',
+                                                borderColor: 'var(--color-border)',
+                                                color: 'var(--color-text)',
+                                                borderRadius: 'var(--radius-md)',
+                                                boxShadow: 'var(--shadow-md)'
+                                            }}
+                                        />
+                                        {chartBreakdown ? (
+                                            <>
+                                                <Area type="monotone" dataKey="taller_revenue" name="taller_revenue" stroke="#0284c7" strokeWidth={2} fill="url(#adminTallerGradient)" />
+                                                <Area type="monotone" dataKey="pos_revenue" name="pos_revenue" stroke="#6366f1" strokeWidth={2} fill="url(#adminPosGradient)" />
+                                            </>
+                                        ) : (
+                                            <Area type="monotone" dataKey="revenue" name="revenue" stroke="#3b82f6" strokeWidth={2.5} fill="url(#adminRevGradient)" activeDot={{ r: 5 }} />
+                                        )}
+                                    </AreaChart>
+                                ) : (
+                                    <BarChart data={fullMonthlyRevenue} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
+                                        <XAxis
+                                            dataKey="month"
+                                            tickFormatter={formatMonthLabel}
+                                            stroke="var(--color-text-secondary)"
+                                            fontSize={11}
+                                            tickLine={false}
+                                        />
+                                        <YAxis
+                                            stroke="var(--color-text-secondary)"
+                                            fontSize={11}
+                                            tickLine={false}
+                                            tickFormatter={(v) => `$${v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v}`}
+                                        />
+                                        <Tooltip
+                                            formatter={(value, name) => [
+                                                formatCurrency(value),
+                                                name === 'revenue' ? 'Facturación Total' : name === 'taller_revenue' ? 'Taller' : 'Mostrador POS'
+                                            ]}
+                                            labelFormatter={formatMonthLabel}
+                                            contentStyle={{
+                                                background: 'var(--color-bg-card)',
+                                                borderColor: 'var(--color-border)',
+                                                color: 'var(--color-text)',
+                                                borderRadius: 'var(--radius-md)',
+                                                boxShadow: 'var(--shadow-md)'
+                                            }}
+                                        />
+                                        {chartBreakdown ? (
+                                            <>
+                                                <Bar dataKey="taller_revenue" name="taller_revenue" fill="#0284c7" radius={[4, 4, 0, 0]} />
+                                                <Bar dataKey="pos_revenue" name="pos_revenue" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                                            </>
+                                        ) : (
+                                            <Bar dataKey="revenue" name="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                        )}
+                                    </BarChart>
+                                )}
                             </ResponsiveContainer>
                         ) : (
                             <div className="chart-empty">Sin historial de ingresos registrado</div>
