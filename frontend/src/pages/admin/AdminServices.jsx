@@ -582,10 +582,10 @@ export default function AdminServices() {
                                             <input type="number" step="0.01" name="base_price" className="input" value={formData.base_price || ''} onChange={handleChange} placeholder="0.00" />
                                         </div>
                                         <div className="input-group">
-                                            <label>Costo de Pieza / Gasto / Refacción ($ MXN)</label>
+                                            <label>Costo de Pieza / Insumo / Gasto ($ MXN)</label>
                                             <input type="number" step="0.01" name="default_parts_cost" className="input" value={formData.default_parts_cost || ''} onChange={handleChange} placeholder="0.00 (opcional)" />
                                             <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', marginTop: '2px' }}>
-                                                Se sumará a gastos de la reparación para calcular ganancia neta.
+                                                Gasto interno. Se descuenta del precio cobrado para calcular la ganancia real.
                                             </span>
                                         </div>
                                     </div>
