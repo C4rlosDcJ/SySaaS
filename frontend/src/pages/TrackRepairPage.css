@@ -1,17 +1,24 @@
 /* =====================================================
-   TrackRepairPage — Styled according to SySaaS System
+   TrackRepairPage — Responsive Design System (SySaaS)
+   Breakpoints:
+     xl:  > 900px   (desktop, full layout)
+     md:  <= 768px  (tablet / large phone)
+     sm:  <= 480px  (small phone)
+     xs:  <= 360px  (compact phone)
    ===================================================== */
 
+/* ================= CONTAINER ================= */
 .track-container {
     max-width: 900px;
     margin: 0 auto;
-    padding: var(--sp-8) var(--sp-4);
+    padding: 2rem 1.5rem;
     min-height: 100vh;
 }
 
+/* ================= HEADER SECTION ================= */
 .track-header-section {
     text-align: center;
-    margin-bottom: var(--sp-8);
+    margin-bottom: 2rem;
 }
 
 .track-header-section h1 {
@@ -21,25 +28,44 @@
     color: var(--color-text);
     letter-spacing: 0.04em;
     text-transform: uppercase;
+    line-height: 1.2;
 }
 
+.track-header-section > p {
+    font-size: var(--font-sm);
+    color: var(--color-text-secondary);
+    margin-top: 0.5rem;
+    line-height: 1.5;
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* ================= SEARCH CARD ================= */
 .track-search-card {
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    padding: var(--sp-4);
+    padding: 1rem;
     max-width: 500px;
-    margin: var(--sp-4) auto 0;
+    margin: 1rem auto 0;
     box-shadow: var(--shadow-md);
 }
 
 .track-search-form {
     display: flex;
-    gap: var(--sp-3);
+    gap: 0.75rem;
+    align-items: stretch;
 }
 
 .track-search-form .search-box {
     flex: 1;
+    min-width: 0;
+}
+
+.track-search-form .btn {
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 /* ================= RESULTS LAYOUT ================= */
@@ -48,7 +74,7 @@
     flex-direction: column;
 }
 
-/* Header summary card overrides */
+/* ================= RESULT HEADER CARD ================= */
 .result-card-header {
     background: var(--color-bg-card);
     backdrop-filter: blur(12px);
@@ -59,6 +85,11 @@
 
 .result-card-header::before {
     display: none;
+}
+
+.result-card-header .flex {
+    flex-wrap: wrap;
+    gap: 0.75rem;
 }
 
 .device-avatar {
@@ -77,12 +108,13 @@
 .status-badge-container {
     display: flex;
     align-items: center;
+    flex-shrink: 0;
 }
 
-/* Timeline Custom Styles */
+/* ================= TIMELINE ================= */
 .timeline-wrapper {
     position: relative;
-    padding: var(--sp-8) 0 var(--sp-4);
+    padding: 2rem 0 1rem;
 }
 
 .timeline-line-background {
@@ -104,8 +136,7 @@
     background: var(--color-primary);
     border-radius: var(--radius-full);
     z-index: 2;
-    transition: width var(--transition-slow) cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: none;
+    transition: width var(--transition-slow, 0.3s ease) cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .timeline-steps {
@@ -119,7 +150,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--sp-3);
+    gap: 0.75rem;
     flex: 1;
 }
 
@@ -158,6 +189,8 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     max-width: 100px;
+    line-height: 1.25;
+    word-break: break-word;
 }
 
 .timeline-step-item.completed .timeline-label {
@@ -168,18 +201,19 @@
     color: var(--color-primary);
 }
 
-/* Info Lists */
+/* ================= INFO LISTS ================= */
 .info-list {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-3);
+    gap: 0.75rem;
 }
 
 .info-item {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    padding-bottom: var(--sp-2);
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
     border-bottom: 1px solid var(--color-border);
 }
 
@@ -190,27 +224,48 @@
 
 .info-label {
     font-size: var(--font-sm);
+    flex-shrink: 0;
 }
 
 .info-value {
     font-size: var(--font-sm);
     color: var(--color-text);
+    text-align: right;
+    word-break: break-word;
+    min-width: 0;
 }
 
 .info-item.total-highlight {
     background: var(--color-bg-elevated);
-    margin: var(--sp-2) calc(-1 * var(--sp-5)) calc(-1 * var(--sp-5));
-    padding: var(--sp-4) var(--sp-5);
+    margin: 0.5rem -1.25rem -1.25rem;
+    padding: 1rem 1.25rem;
     border-radius: 0 0 var(--radius-lg) var(--radius-lg);
     border-top: 1px solid var(--color-border);
+    border-bottom: none;
 }
 
-/* Detail Blocks */
+/* ================= CHECKLIST GRID ================= */
+/* Named class overrides the JSX inline style on mobile */
+.checklist-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+/* ================= NOTES / OBSERVATIONS ================= */
 .notes-block {
     background: var(--color-bg-elevated);
     border-radius: var(--radius-md);
-    padding: var(--sp-3);
+    padding: 0.75rem;
     border-left: 3px solid var(--color-primary);
+}
+
+/* ================= TABLE ================= */
+.table-container {
+    border-radius: var(--radius-md);
+    margin: 0.5rem 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
 }
 
 /* ================= FOOTER ================= */
@@ -229,10 +284,10 @@
 .footer-logo {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: 0.5rem;
     font-size: var(--font-lg);
     font-weight: 800;
-    margin-bottom: var(--sp-3);
+    margin-bottom: 0.75rem;
     color: var(--color-text);
 }
 
@@ -257,14 +312,14 @@
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--color-text-muted);
-    margin-bottom: var(--sp-4);
+    margin-bottom: 1rem;
 }
 
 .footer-col a {
     display: block;
     font-size: var(--font-sm);
     color: var(--color-text-secondary);
-    margin-bottom: var(--sp-2);
+    margin-bottom: 0.5rem;
     transition: color 0.2s ease, transform 0.2s ease;
 }
 
@@ -274,7 +329,7 @@
 }
 
 .footer-bottom {
-    padding-top: var(--sp-6);
+    padding-top: 1.5rem;
     border-top: 1px solid var(--color-border);
     text-align: center;
 }
@@ -285,48 +340,51 @@
     margin: 0;
 }
 
-/* ================= RESPONSIVE ================= */
+/* =====================================================
+   RESPONSIVE — Tablet / Large Phone  (<= 768px)
+   ===================================================== */
 @media (max-width: 768px) {
-    /* Container */
+
     .track-container {
-        padding: var(--sp-3) var(--sp-2.5);
+        padding: 1rem 0.875rem;
     }
 
-    /* Header */
     .track-header-section {
-        margin-bottom: var(--sp-4);
+        margin-bottom: 1rem;
     }
 
     .track-header-section h1 {
-        font-size: 1.15rem;
+        font-size: 1.1rem;
+        letter-spacing: 0.02em;
     }
 
-    .track-header-section p {
-        font-size: 10px;
-        margin-top: 4px;
+    .track-header-section > p {
+        font-size: 11px;
+        margin-top: 0.375rem;
     }
 
-    /* Search bar */
     .track-search-card {
-        padding: var(--sp-2.5);
+        padding: 0.625rem;
         max-width: none;
-        margin-top: var(--sp-3) !important;
+        margin-top: 0.75rem !important;
     }
 
     .track-search-form {
-        gap: var(--sp-2);
+        gap: 0.5rem;
     }
 
-    .track-search-form input {
+    .track-search-form .input {
         font-size: 11px;
         padding: 8px 12px 8px 32px !important;
         height: auto;
     }
 
     .track-search-form .btn {
-        padding: 8px 16px;
+        padding: 8px 14px;
         font-size: 11px;
         height: auto;
+        border-radius: 9999px;
+        flex-shrink: 0;
     }
 
     .track-search-form .search-icon {
@@ -335,28 +393,26 @@
         height: 14px;
     }
 
-    /* Utility flex helpers */
     .flex-col-mobile {
-        flex-direction: column;
+        flex-direction: column !important;
         align-items: flex-start !important;
-        gap: var(--sp-2);
+        gap: 0.5rem !important;
     }
 
     .w-full-mobile {
-        width: 100%;
+        width: 100% !important;
     }
 
-    /* Result header card: device info + status side-by-side */
     .result-card-header .flex {
         flex-wrap: wrap;
-        gap: var(--sp-2);
+        gap: 0.5rem;
     }
 
     .result-card-header .flex-col-mobile {
-        flex-direction: row;
-        align-items: center;
-        gap: var(--sp-2);
+        flex-direction: row !important;
+        align-items: center !important;
         flex-wrap: wrap;
+        gap: 0.5rem !important;
     }
 
     .status-badge-container {
@@ -364,26 +420,36 @@
     }
 
     .status-badge {
-        font-size: 9px;
-        padding: 3px 8px;
+        font-size: 9px !important;
+        padding: 3px 8px !important;
     }
 
-    /* Timeline: compact horizontal scroll instead of tall vertical list */
+    .device-avatar {
+        width: 40px;
+        height: 40px;
+    }
+
+    /* Timeline: horizontal scroll, hidden scrollbar */
     .timeline-wrapper {
-        padding: var(--sp-3) 0 var(--sp-2);
+        padding: 0.75rem 0 0.5rem;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .timeline-wrapper::-webkit-scrollbar {
+        display: none;
     }
 
     .timeline-line-background {
-        top: 26px;
+        top: 24px;
         left: 12px;
         right: 12px;
         height: 2px;
     }
 
     .timeline-line-fill {
-        top: 26px;
+        top: 24px;
         left: 12px;
         height: 2px;
     }
@@ -393,37 +459,40 @@
         justify-content: flex-start;
         align-items: flex-start;
         gap: 0;
-        padding: 0 var(--sp-1);
+        padding: 0 4px;
         min-width: max-content;
     }
 
     .timeline-step-item {
         flex-direction: column;
         align-items: center;
-        gap: var(--sp-1.5);
+        gap: 6px;
         width: 64px;
         flex: 0 0 64px;
     }
 
     .timeline-icon-container {
-        width: 24px;
-        height: 24px;
+        width: 28px;
+        height: 28px;
         border-width: 1.5px;
     }
 
     .timeline-icon-container svg {
-        width: 12px;
-        height: 12px;
+        width: 13px;
+        height: 13px;
+    }
+
+    .timeline-step-item.active .timeline-icon-container {
+        transform: scale(1.05);
     }
 
     .timeline-label {
-        text-align: center;
-        max-width: 64px;
-        font-size: 8.5px;
-        line-height: 1.25;
+        max-width: 60px;
+        font-size: 8px;
+        letter-spacing: 0.03em;
     }
 
-    /* Info list: two-column grid for label+value pairs */
+    /* Info list: 2-col grid */
     .info-list {
         gap: 0;
     }
@@ -431,8 +500,8 @@
     .info-item {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: var(--sp-1);
-        padding: var(--sp-1.5) 0;
+        gap: 0.25rem;
+        padding: 0.375rem 0;
         align-items: start;
         border-bottom: 1px solid var(--color-border);
     }
@@ -447,36 +516,50 @@
         text-align: right;
     }
 
-    /* Total highlight row */
     .info-item.total-highlight {
-        margin: var(--sp-1.5) calc(-1 * var(--sp-3)) calc(-1 * var(--sp-3));
-        padding: var(--sp-2) var(--sp-3);
+        margin: 0.375rem -0.875rem -0.875rem;
+        padding: 0.5rem 0.875rem;
     }
 
-    /* Cards: reduce padding */
+    /* Checklist: single column */
+    .checklist-grid {
+        grid-template-columns: 1fr !important;
+    }
+
     .card {
-        padding: var(--sp-3) var(--sp-3.5);
-        margin-bottom: var(--sp-3) !important;
+        padding: 0.875rem !important;
+        margin-bottom: 0.75rem !important;
     }
 
     .card-title {
         font-size: var(--font-sm) !important;
-        margin-bottom: var(--sp-2) !important;
+        margin-bottom: 0.625rem !important;
     }
 
-    /* Notes block */
     .notes-block {
-        padding: var(--sp-2) var(--sp-2.5);
-        font-size: 10px;
-        margin-bottom: var(--sp-2) !important;
+        padding: 0.5rem 0.625rem;
+        margin-bottom: 0.5rem !important;
     }
 
     .notes-block p {
         font-size: 10px;
-        line-height: 1.4;
+        line-height: 1.45;
     }
 
-    /* Footer */
+    .notes-block .text-xs {
+        font-size: 9px !important;
+    }
+
+    .table th {
+        font-size: 9px;
+        padding: 6px 8px;
+    }
+
+    .table td {
+        padding: 6px 8px;
+        font-size: 10px;
+    }
+
     .footer-content {
         grid-template-columns: 1fr;
         gap: 1.5rem;
@@ -488,35 +571,108 @@
     }
 }
 
-    /* Table optimization for mobile */
-    .table-container {
-        border-radius: var(--radius-md);
-        margin: var(--sp-2) 0;
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .table th, .table td {
-        padding: 6px 8px;
-        font-size: 10px;
-    }
-
-    .table th {
-        font-size: 9px;
-    }
-
+/* =====================================================
+   RESPONSIVE — Small Phone  (<= 480px)
+   ===================================================== */
 @media (max-width: 480px) {
+
     .track-container {
-        padding: var(--sp-2.5) var(--sp-2);
+        padding: 0.75rem 0.625rem;
+    }
+
+    .track-header-section h1 {
+        font-size: 1rem;
     }
 
     .device-avatar {
-        width: 32px;
-        height: 32px;
+        width: 34px;
+        height: 34px;
     }
 
     .device-avatar svg {
         width: 16px;
         height: 16px;
+    }
+
+    /* Stack search form vertically */
+    .track-search-form {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .track-search-form .btn {
+        width: 100%;
+    }
+
+    /* Stack info: label on top, value below */
+    .info-item {
+        grid-template-columns: 1fr;
+        gap: 2px;
+    }
+
+    .info-value {
+        text-align: left;
+        font-weight: 600;
+    }
+
+    .timeline-step-item {
+        width: 56px;
+        flex: 0 0 56px;
+    }
+
+    .timeline-label {
+        max-width: 52px;
+        font-size: 7.5px;
+    }
+
+    .card {
+        padding: 0.75rem !important;
+    }
+
+    .status-badge {
+        font-size: 8px !important;
+        padding: 2px 7px !important;
+    }
+
+    .nothing-badge {
+        font-size: 9px !important;
+    }
+}
+
+/* =====================================================
+   RESPONSIVE — Compact Phone  (<= 360px)
+   ===================================================== */
+@media (max-width: 360px) {
+
+    .track-container {
+        padding: 0.5rem;
+    }
+
+    .track-header-section h1 {
+        font-size: 0.875rem;
+    }
+
+    .timeline-step-item {
+        width: 50px;
+        flex: 0 0 50px;
+    }
+
+    .timeline-icon-container {
+        width: 24px;
+        height: 24px;
+    }
+
+    .timeline-icon-container svg {
+        width: 11px;
+        height: 11px;
+    }
+
+    .timeline-label {
+        font-size: 7px;
+        max-width: 46px;
+    }
+
+    .card {
+        padding: 0.625rem !important;
     }
 }

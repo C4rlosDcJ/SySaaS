@@ -439,35 +439,38 @@ export default function RepairDetailPage() {
             {/* ── Page Header & Progress Bar ── */}
             <header className="page-header detail-header">
                 <div className="detail-header-top">
-                    <div className="flex items-center gap-md">
-                        <button onClick={() => navigate(-1)} className="btn btn-ghost btn-icon">
-                            <ChevronLeft size={20} />
+                    {/* Title row: back button + name + status badge */}
+                    <div className="detail-header-title-row">
+                        <button onClick={() => navigate(-1)} className="btn btn-ghost btn-icon detail-back-btn">
+                            <ChevronLeft size={18} />
                         </button>
-                        <div>
-                            <h1>{repair.brand_name || repair.brand_other} {repair.model}</h1>
+                        <div className="detail-title-block">
+                            <div className="detail-title-with-badge">
+                                <h1>{repair.brand_name || repair.brand_other} {repair.model}</h1>
+                                <span className={`badge big-badge status-${repair.status}`}>
+                                    {STATUS_LABELS[repair.status]}
+                                </span>
+                            </div>
                             <p className="ticket-id">Ticket #{repair.ticket_number}</p>
                         </div>
                     </div>
-                    <div className="detail-header-actions">
-                        {(isAdmin || user?.role === 'technician') && (
-                            <>
-                                <button onClick={handlePrintTicket} className="btn btn-secondary">
-                                    <Printer size={16} /> PDF Orden
-                                </button>
-                                <button onClick={() => { setReceiptType('repair'); setReceiptData(repair); setShowPrintReceipt(true); }} className="btn btn-secondary">
-                                    <Printer size={16} /> Ticket
-                                </button>
-                            </>
-                        )}
-                        {isAdmin && (
-                            <button onClick={handleDeleteOrder} className="btn btn-ghost btn-sm text-error" title="Eliminar orden">
-                                <Trash2 size={16} /> <span className="hide-on-mobile">Eliminar</span>
+
+                    {/* Action buttons row (separate from badge) */}
+                    {(isAdmin || user?.role === 'technician') && (
+                        <div className="detail-header-actions">
+                            <button onClick={handlePrintTicket} className="btn btn-secondary btn-sm">
+                                <Printer size={14} /> PDF Orden
                             </button>
-                        )}
-                        <span className={`badge big-badge status-${repair.status}`}>
-                            {STATUS_LABELS[repair.status]}
-                        </span>
-                    </div>
+                            <button onClick={() => { setReceiptType('repair'); setReceiptData(repair); setShowPrintReceipt(true); }} className="btn btn-secondary btn-sm">
+                                <Printer size={14} /> Ticket
+                            </button>
+                            {isAdmin && (
+                                <button onClick={handleDeleteOrder} className="btn btn-ghost btn-sm text-error" title="Eliminar orden">
+                                    <Trash2 size={14} />
+                                </button>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Progress Bar (Visual) */}
@@ -484,29 +487,33 @@ export default function RepairDetailPage() {
                     <div className="card highlight-card">
                         <div className="card-header"><Edit3 size={18}/> <h3>Actualizar Estado</h3></div>
                         <div className="update-status-row">
-                            <select value={newStatus} onChange={e => setNewStatus(e.target.value)} className="select">
-                                {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                                    <option key={key} value={key}>{label}</option>
-                                ))}
-                            </select>
-                            <input type="text" placeholder="Nota opcional..." value={statusNote} onChange={e => setStatusNote(e.target.value)} className="input flex-1" />
-                            <div className="delivery-input" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span className="text-sm text-muted">Entrega:</span>
-                                <input
-                                    type="datetime-local"
-                                    value={statusEstimatedDelivery}
-                                    onChange={e => setStatusEstimatedDelivery(e.target.value)}
-                                    className="input input-sm"
-                                    style={{ width: '210px' }}
-                                    title="Fecha y hora estimada de entrega"
-                                />
+                            <div className="select-wrapper">
+                                <select value={newStatus} onChange={e => setNewStatus(e.target.value)} className="select">
+                                    {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                                        <option key={key} value={key}>{label}</option>
+                                    ))}
+                                </select>
                             </div>
-                            <div className="warranty-input" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <span className="text-sm text-muted">Garantía (días):</span>
-                                <input type="number" value={warrantyDays} onChange={e => setWarrantyDays(e.target.value)} className="input input-sm w-16 text-center" />
+                            <input type="text" placeholder="Nota opcional..." value={statusNote} onChange={e => setStatusNote(e.target.value)} className="input" />
+                            <div className="update-status-secondary-row">
+                                <div className="delivery-input">
+                                    <span className="text-sm text-muted">Entrega:</span>
+                                    <input
+                                        type="datetime-local"
+                                        value={statusEstimatedDelivery}
+                                        onChange={e => setStatusEstimatedDelivery(e.target.value)}
+                                        className="input input-sm"
+                                        title="Fecha y hora estimada de entrega"
+                                    />
+                                </div>
+                                <div className="warranty-input">
+                                    <span className="text-sm text-muted">Garantía:</span>
+                                    <input type="number" value={warrantyDays} onChange={e => setWarrantyDays(e.target.value)} className="input input-sm" style={{ width: '60px', textAlign: 'center' }} />
+                                    <span className="text-xs text-muted">días</span>
+                                </div>
                             </div>
-                            <button className="btn btn-primary" onClick={handleUpdateStatus} disabled={updatingStatus || (newStatus === repair.status && parseInt(warrantyDays) === parseInt(repair.warranty_days) && statusEstimatedDelivery === (repair.estimated_delivery ? formatDatetimeLocal(repair.estimated_delivery) : '') && !statusNote && !isEditingCosts && !isEditingTechnical)}>
-                                <SaveIcon size={16} /> {updatingStatus ? 'Guardando...' : 'Guardar'}
+                            <button className="btn btn-primary btn-save-status" onClick={handleUpdateStatus} disabled={updatingStatus || (newStatus === repair.status && parseInt(warrantyDays) === parseInt(repair.warranty_days) && statusEstimatedDelivery === (repair.estimated_delivery ? formatDatetimeLocal(repair.estimated_delivery) : '') && !statusNote && !isEditingCosts && !isEditingTechnical)}>
+                                <SaveIcon size={15} /> {updatingStatus ? 'Guardando...' : 'Guardar'}
                             </button>
                         </div>
                     </div>
@@ -747,7 +754,7 @@ export default function RepairDetailPage() {
                             {repair.function_checklist && (
                                 <div className="info-item col-span-full mt-sm">
                                     <label>Checklist Funcional</label>
-                                    <div className="flex gap-sm flex-wrap mt-xs">
+                                    <div className="checklist-badge-row">
                                         {Object.entries(typeof repair.function_checklist === 'string' ? JSON.parse(repair.function_checklist) : repair.function_checklist).map(([key, value]) => (
                                             <div key={key} className={`badge text-xs ${value ? 'bg-success-muted text-success' : 'bg-error-muted text-error'}`}>
                                                 {value ? <CheckCircle2 size={12}/> : <X size={12}/>} <span className="capitalize ml-xs">{key}</span>
