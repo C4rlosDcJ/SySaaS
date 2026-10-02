@@ -443,19 +443,24 @@
         padding: var(--sp-3);
     }
 
-    /* Header */
+    /* Header: stacked, compact */
     .sales-page-header {
         flex-direction: column;
         gap: 0.75rem;
         margin-bottom: 1rem;
     }
 
-    .sales-page-header-left h1 {
-        font-size: 1.15rem;
+    /* Override page-header h1 font-size on mobile */
+    .sales-page-header .sales-page-header-left h1,
+    .sales-history-page .page-header h1 {
+        font-size: 1rem;
+        letter-spacing: 0.02em;
+        flex-wrap: wrap;
     }
 
     .sales-page-header-left p {
         font-size: 11px;
+        margin-top: 3px;
     }
 
     .sales-page-header-actions {
