@@ -286,7 +286,7 @@ export default function SalesHistoryPage() {
         <div className="sales-history-page animate-fadeIn">
             
             {/* Header */}
-            <div className="sales-page-header">
+            <div className="page-header sales-page-header">
                 <div className="sales-page-header-left">
                     <h1 className="page-title">
                         <Receipt size={26} className="text-primary" />
