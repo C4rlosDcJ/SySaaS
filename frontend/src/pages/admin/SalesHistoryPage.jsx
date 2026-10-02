@@ -598,225 +598,195 @@ export default function SalesHistoryPage() {
 
             {/* ═══ Sale Detail Modal ═══ */}
             {showDetail && (
-                <div className="modal-overlay" onClick={() => setShowDetail(false)}>
-                    <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '620px', width: '95%' }}>
+                <div className="modal-overlay sale-detail-overlay" onClick={() => setShowDetail(false)}>
+                    <div className="modal sale-detail-modal" onClick={(e) => e.stopPropagation()}>
                         {loadingDetail ? (
                             <div className="loading-state" style={{ minHeight: 250 }}>
                                 <div className="spinner"></div>
                             </div>
                         ) : selectedSale ? (
                             <>
-                                <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--color-border)', paddingBottom: '14px' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <div style={{ width: '36px', height: '36px', borderRadius: 'var(--radius-md)', background: 'rgba(99,102,241,0.15)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                            <Receipt size={20} />
+                                <div className="sale-detail-header">
+                                    <div className="sale-detail-header-info">
+                                        <div className="sale-detail-icon-wrap">
+                                            <Receipt size={18} />
                                         </div>
-                                        <div>
-                                            <h3 className="modal-title" style={{ margin: 0, fontSize: '18px', fontWeight: 800 }}>
+                                        <div className="sale-detail-title-col">
+                                            <h3 className="sale-detail-folio font-mono">
                                                 {selectedSale.sale_number}
                                             </h3>
-                                            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                                            <span className="sale-detail-date">
                                                 {formatDateTime(selectedSale.created_at)}
                                             </span>
                                         </div>
                                     </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <div className="sale-detail-header-actions">
                                         <button
-                                            className="btn btn-secondary btn-sm"
+                                            type="button"
+                                            className="btn btn-secondary btn-sm sale-detail-ticket-btn"
                                             onClick={() => handlePrintSaleTicket(selectedSale)}
-                                            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                                            title="Imprimir Ticket"
                                         >
-                                            <Printer size={14} /> Imprimir Ticket
+                                            <Printer size={14} />
+                                            <span>Imprimir Ticket</span>
                                         </button>
-                                        <button className="modal-close" onClick={() => setShowDetail(false)}>
-                                            <X size={16} />
+                                        <button 
+                                            type="button"
+                                            className="modal-close sale-detail-close-btn" 
+                                            onClick={() => setShowDetail(false)}
+                                            aria-label="Cerrar"
+                                        >
+                                            <X size={18} />
                                         </button>
                                     </div>
                                 </div>
 
-                                <div style={{ padding: '20px 0' }}>
+                                <div className="sale-detail-body">
                                     
                                     {/* Informative Grid */}
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '14px', background: 'var(--color-bg-tertiary)', padding: '16px', borderRadius: 'var(--radius-md)', marginBottom: '20px' }}>
-                                        <div>
-                                            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>Cliente</span>
-                                            <div style={{ fontSize: '13px', fontWeight: 700, marginTop: '2px', color: 'var(--color-text)' }}>
+                                    <div className="sale-detail-meta-grid">
+                                        <div className="sale-detail-meta-item">
+                                            <span className="sale-detail-meta-label">Cliente</span>
+                                            <div className="sale-detail-meta-value">
                                                 {selectedSale.customer_first_name
                                                     ? `${selectedSale.customer_first_name} ${selectedSale.customer_last_name || ''}`
                                                     : 'Público General'}
                                             </div>
                                         </div>
-                                        <div>
-                                            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>Cajero / Staff</span>
-                                            <div style={{ fontSize: '13px', fontWeight: 600, marginTop: '2px' }}>
+                                        <div className="sale-detail-meta-item">
+                                            <span className="sale-detail-meta-label">Cajero / Staff</span>
+                                            <div className="sale-detail-meta-value">
                                                 {selectedSale.cashier_first_name} {selectedSale.cashier_last_name || ''}
                                             </div>
                                         </div>
-                                        <div>
-                                            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>Método de Pago</span>
-                                            <div style={{ fontSize: '13px', fontWeight: 600, marginTop: '2px' }}>
+                                        <div className="sale-detail-meta-item">
+                                            <span className="sale-detail-meta-label">Método de Pago</span>
+                                            <div className="sale-detail-meta-value">
                                                 {PAYMENT_LABELS[selectedSale.payment_method] || selectedSale.payment_method}
                                             </div>
                                         </div>
-                                        <div>
-                                            <span style={{ fontSize: '11px', color: 'var(--color-text-secondary)', textTransform: 'uppercase', fontWeight: 700 }}>Estado</span>
-                                            <div style={{
-                                                fontSize: '13px',
-                                                fontWeight: 700,
-                                                marginTop: '2px',
-                                                color: selectedSale.status === 'completed' ? '#10b981' : (selectedSale.status === 'refunded' ? '#f59e0b' : (selectedSale.status === 'pending' ? 'var(--cool-amber)' : '#ef4444'))
-                                            }}>
+                                        <div className="sale-detail-meta-item">
+                                            <span className="sale-detail-meta-label">Estado</span>
+                                            <div className={`sale-detail-meta-value status-${selectedSale.status}`}>
                                                 {selectedSale.status === 'completed' ? 'Completada' : (selectedSale.status === 'refunded' ? 'Devuelta' : (selectedSale.status === 'cancelled' ? 'Cancelada' : (selectedSale.status === 'pending' ? 'Pendiente' : selectedSale.status)))}
                                             </div>
                                         </div>
                                     </div>
 
                                     {selectedSale.repair_ticket && (
-                                        <div style={{ padding: '10px 14px', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: 'var(--radius-sm)', marginBottom: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                            <span style={{ fontSize: '12px', color: 'var(--color-text)' }}>
+                                        <div className="sale-detail-repair-banner">
+                                            <span className="sale-detail-repair-text">
                                                 Vinculado a Orden de Taller: <strong>{selectedSale.repair_ticket}</strong>
                                             </span>
                                             {selectedSale.repair_warranty_days && (
-                                                <span style={{ fontSize: '11px', color: '#3b82f6', fontWeight: 600 }}>
+                                                <span className="sale-detail-warranty-tag">
                                                     Garantía: {selectedSale.repair_warranty_days} días
                                                 </span>
                                             )}
                                         </div>
                                     )}
 
-                                    {/* Items Table */}
-                                    <div className="table-container" style={{ border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden', marginBottom: '18px' }}>
-                                        <table className="table" style={{ margin: 0 }}>
-                                            <thead>
-                                                <tr>
-                                                    <th>Descripción</th>
-                                                    <th style={{ textAlign: 'center' }}>Cant.</th>
-                                                    <th style={{ textAlign: 'right' }}>P. Unit</th>
-                                                    <th style={{ textAlign: 'right' }}>Importe</th>
-                                                    <th style={{ textAlign: 'center', width: '120px' }}>Acción</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {selectedSale.items?.map((item, i) => {
-                                                    const isReturned = Boolean(item.is_returned);
-                                                    return (
-                                                        <tr key={i} style={isReturned ? { background: 'rgba(239, 68, 68, 0.04)' } : {}}>
-                                                            <td>
-                                                                <div style={{
-                                                                    fontWeight: 600,
-                                                                    fontSize: '13px',
-                                                                    textDecoration: isReturned ? 'line-through' : 'none',
-                                                                    color: isReturned ? 'var(--color-text-secondary)' : 'var(--color-text)'
-                                                                }}>
-                                                                    {item.description}
+                                    {/* Items List */}
+                                    <div className="sale-detail-items-container">
+                                        <div className="sale-detail-items-header">Artículos de la Venta</div>
+                                        <div className="sale-detail-items-list">
+                                            {selectedSale.items?.map((item, i) => {
+                                                const isReturned = Boolean(item.is_returned);
+                                                return (
+                                                    <div key={i} className={`sale-detail-item-row ${isReturned ? 'is-returned' : ''}`}>
+                                                        <div className="sale-detail-item-main">
+                                                            <div className="sale-detail-item-desc">
+                                                                {item.description}
+                                                            </div>
+                                                            <div className="sale-detail-item-sub">
+                                                                {item.sku && <span className="sale-detail-item-sku">SKU: {item.sku}</span>}
+                                                                <span className="sale-detail-item-calc">
+                                                                    {item.quantity} x {formatCurrency(item.unit_price || item.price)}
+                                                                </span>
+                                                            </div>
+                                                            {isReturned && (
+                                                                <div className="sale-detail-item-return-reason">
+                                                                    Devuelto: {item.return_reason || 'Devolución de cliente'}
+                                                                    {item.returned_at ? ` (${formatDateTime(item.returned_at)})` : ''}
                                                                 </div>
-                                                                {item.sku && <div style={{ fontSize: '10px', color: 'var(--color-text-secondary)' }}>SKU: {item.sku}</div>}
-                                                                {isReturned && (
-                                                                    <div style={{ fontSize: '11px', color: '#ef4444', marginTop: '2px', fontWeight: 500 }}>
-                                                                        Devuelto: {item.return_reason || 'Devolución de cliente'}
-                                                                        {item.returned_at ? ` (${formatDateTime(item.returned_at)})` : ''}
-                                                                    </div>
-                                                                )}
-                                                            </td>
-                                                            <td style={{ textAlign: 'center', fontWeight: 600, opacity: isReturned ? 0.5 : 1 }}>{item.quantity}</td>
-                                                            <td style={{ textAlign: 'right', opacity: isReturned ? 0.5 : 1 }}>{formatCurrency(item.unit_price || item.price)}</td>
-                                                            <td style={{
-                                                                textAlign: 'right',
-                                                                fontWeight: 700,
-                                                                textDecoration: isReturned ? 'line-through' : 'none',
-                                                                color: isReturned ? 'var(--color-text-secondary)' : 'var(--color-text)'
-                                                            }}>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="sale-detail-item-side">
+                                                            <div className="sale-detail-item-total font-mono">
                                                                 {formatCurrency(item.total)}
-                                                            </td>
-                                                            <td style={{ textAlign: 'center' }}>
+                                                            </div>
+                                                            <div className="sale-detail-item-actions">
                                                                 {isReturned ? (
-                                                                    <span style={{
-                                                                        display: 'inline-block',
-                                                                        padding: '2px 8px',
-                                                                        borderRadius: '12px',
-                                                                        fontSize: '11px',
-                                                                        fontWeight: 600,
-                                                                        background: 'rgba(239, 68, 68, 0.12)',
-                                                                        color: '#ef4444'
-                                                                    }}>
+                                                                    <span className="sale-detail-returned-badge">
                                                                         Devuelto
                                                                     </span>
                                                                 ) : selectedSale.status === 'completed' ? (
                                                                     <button
                                                                         type="button"
-                                                                        className="btn btn-secondary btn-sm"
+                                                                        className="btn btn-secondary btn-sm sale-detail-return-btn"
                                                                         onClick={() => handleReturnItem(item)}
                                                                         title="Quitar o devolver este ítem individual"
-                                                                        style={{
-                                                                            padding: '4px 8px',
-                                                                            fontSize: '11px',
-                                                                            display: 'inline-flex',
-                                                                            alignItems: 'center',
-                                                                            gap: '4px',
-                                                                            color: '#ef4444',
-                                                                            borderColor: 'rgba(239, 68, 68, 0.3)'
-                                                                        }}
                                                                     >
-                                                                        <RotateCcw size={12} /> Devolver
+                                                                        <RotateCcw size={12} />
+                                                                        <span>Devolver</span>
                                                                     </button>
-                                                                ) : (
-                                                                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>-</span>
-                                                                )}
-                                                            </td>
-                                                        </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
+                                                                ) : null}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
 
                                     {/* Total Breakdown */}
-                                    <div style={{ background: 'var(--color-bg-tertiary)', padding: '16px 20px', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+                                    <div className="sale-detail-breakdown">
+                                        <div className="sale-detail-breakdown-row">
                                             <span>Subtotal</span>
-                                            <span>{formatCurrency(selectedSale.subtotal)}</span>
+                                            <span className="font-mono">{formatCurrency(selectedSale.subtotal)}</span>
                                         </div>
                                         {parseFloat(selectedSale.discount) > 0 && (
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', color: '#ef4444' }}>
+                                            <div className="sale-detail-breakdown-row is-discount">
                                                 <span>Descuento aplicado</span>
-                                                <span>-{formatCurrency(selectedSale.discount)}</span>
+                                                <span className="font-mono">-{formatCurrency(selectedSale.discount)}</span>
                                             </div>
                                         )}
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '16px', fontWeight: 800, color: 'var(--color-text)', borderTop: '1px solid var(--color-border)', paddingTop: '8px' }}>
+                                        <div className="sale-detail-breakdown-row is-total">
                                             <span>Total Pagado</span>
-                                            <span>{formatCurrency(selectedSale.total)}</span>
+                                            <span className="font-mono">{formatCurrency(selectedSale.total)}</span>
                                         </div>
                                         {selectedSale.payment_method === 'cash' && (
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--color-text-secondary)', borderTop: '1px dashed var(--color-border)', paddingTop: '6px', marginTop: '2px' }}>
-                                                <span>Efectivo Recibido: <strong>{formatCurrency(selectedSale.amount_received || selectedSale.total)}</strong></span>
-                                                <span>Cambio: <strong>{formatCurrency(selectedSale.change_amount || 0)}</strong></span>
+                                            <div className="sale-detail-breakdown-cash">
+                                                <span>Efectivo Recibido: <strong className="font-mono">{formatCurrency(selectedSale.amount_received || selectedSale.total)}</strong></span>
+                                                <span>Cambio: <strong className="font-mono">{formatCurrency(selectedSale.change_amount || 0)}</strong></span>
                                             </div>
                                         )}
                                     </div>
 
                                 </div>
 
-                                <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--color-border)', paddingTop: '14px' }}>
-                                    <div>
+                                <div className="sale-detail-footer">
+                                    <div className="sale-detail-footer-left">
                                         {selectedSale.status === 'completed' && (
                                             <button 
                                                 type="button"
-                                                className="btn btn-danger btn-sm" 
+                                                className="btn btn-danger btn-sm sale-detail-cancel-btn" 
                                                 onClick={() => handleCancelSale(selectedSale.id)}
-                                                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                                             >
-                                                <XCircle size={14} /> Cancelar Transacción
+                                                <XCircle size={14} />
+                                                <span>Cancelar Transacción</span>
                                             </button>
                                         )}
                                     </div>
-                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                    <div className="sale-detail-footer-right">
                                         <button 
                                             type="button"
-                                            className="btn btn-primary btn-sm" 
+                                            className="btn btn-primary btn-sm sale-detail-print-bottom-btn" 
                                             onClick={() => handlePrintSaleTicket(selectedSale)}
-                                            style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
                                         >
-                                            <Printer size={14} /> Imprimir Ticket
+                                            <Printer size={14} />
+                                            <span>Imprimir Ticket</span>
                                         </button>
                                         <button 
                                             type="button"
