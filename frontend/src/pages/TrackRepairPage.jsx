@@ -384,7 +384,7 @@ function TrackRepairPage() {
                                             <h3 className="card-title text-base mb-md flex items-center gap-sm">
                                                 <ListTodo size={18} className="text-primary" /> Inspección de Funciones
                                             </h3>
-                                            <div className="checklist-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                            <div className="checklist-grid">
                                                 {checklistItems.map((item, idx) => (
                                                     <div key={idx} className="flex items-center gap-sm" style={{ fontSize: 'var(--font-sm)' }}>
                                                         <span style={{ color: item.ok ? 'var(--color-success)' : 'var(--color-error)' }}>

@@ -1,6 +1,15 @@
-/* Repair Detail Page */
+/* =====================================================
+   RepairDetailPage — Responsive Design System (SySaaS)
+   Breakpoints:
+     lg:  > 1024px  (desktop, sidebar visible)
+     md:  <= 1024px (tablet, sidebar stacks)
+     sm:  <= 768px  (phone, reduced padding)
+     xs:  <= 480px  (compact phone)
+   ===================================================== */
+
+/* ── Page Shell ── */
 .repair-detail-page {
-    padding: var(--sp-8);
+    padding: 2rem;
     background: var(--color-bg);
     min-height: 100vh;
 }
@@ -10,20 +19,23 @@
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    padding: var(--sp-6) var(--sp-8);
-    margin-bottom: var(--sp-6);
+    padding: 1.5rem 2rem;
+    margin-bottom: 1.5rem;
 }
 
 .detail-header-top {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
 }
 
 .detail-header-top h1 {
     font-size: var(--font-xl);
     font-weight: 700;
-    margin-bottom: var(--sp-1);
+    margin-bottom: 0.25rem;
+    word-break: break-word;
 }
 
 .ticket-id {
@@ -31,26 +43,31 @@
     color: var(--color-text-secondary);
     font-size: var(--font-sm);
     background: var(--color-bg-elevated);
-    padding: 2px var(--sp-2);
+    padding: 2px 0.5rem;
     border-radius: var(--radius-sm);
+    display: inline-block;
 }
 
 .detail-header-actions {
     display: flex;
     align-items: center;
-    gap: var(--sp-4);
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    flex-shrink: 0;
 }
 
 .big-badge {
-    padding: var(--sp-2) var(--sp-4);
+    padding: 0.5rem 1rem;
     font-size: var(--font-sm);
     font-weight: 700;
     border-radius: var(--radius-full);
+    white-space: nowrap;
 }
 
 .status-progress-bar {
     width: 100%;
 }
+
 .progress-track {
     width: 100%;
     height: 6px;
@@ -58,55 +75,156 @@
     border-radius: var(--radius-full);
     overflow: hidden;
 }
+
 .progress-fill {
     height: 100%;
     border-radius: var(--radius-full);
     transition: width 0.6s ease, background-color 0.4s ease;
 }
 
+/* ── Header title row layout ── */
+.detail-header-title-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.detail-back-btn {
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.detail-title-block {
+    flex: 1;
+    min-width: 0;
+}
+
+.detail-title-with-badge {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.detail-title-with-badge h1 {
+    margin: 0;
+}
+
+/* ── Select wrapper (iOS Safari height fix) ── */
+.select-wrapper {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: 44px;
+    overflow: hidden;
+    border-radius: var(--radius-md);
+}
+
+.select-wrapper .select {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    border-radius: var(--radius-md);
+}
+
+/* ── Save status button ── */
+.btn-save-status {
+    width: 100%;
+    justify-content: center;
+}
+
+/* ── Delivery & Warranty inputs ── */
+.delivery-input,
+.warranty-input {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
 /* ── Action Cards ── */
 .detail-action-cards {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
 }
 
 .highlight-card {
     border-color: var(--color-border-strong);
 }
+
 .warning-card {
     border-color: var(--color-border-strong);
+}
+
+/* ── Checklist badges (never break words) ── */
+.checklist-badge-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.checklist-badge-row .badge {
+    white-space: nowrap;
+    flex-shrink: 0;
+    font-size: 11px;
+    padding: 3px 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .update-status-row {
     display: flex;
     align-items: center;
-    gap: var(--sp-4);
-    margin-top: var(--sp-4);
+    gap: 0.75rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
 }
+
+.update-status-row .select {
+    min-width: 160px;
+    flex-shrink: 0;
+}
+
+.update-status-row .flex-1 {
+    min-width: 120px;
+}
+
+.delivery-input,
 .warranty-input {
     display: flex;
     align-items: center;
-    gap: var(--sp-2);
+    gap: 6px;
+    flex-shrink: 0;
 }
 
 /* ── Main Layout ── */
 .detail-layout {
     display: grid;
     grid-template-columns: 1fr 340px;
-    gap: var(--sp-6);
+    gap: 1.5rem;
     align-items: start;
 }
 
 .detail-main-col {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-6);
+    gap: 1.5rem;
+    min-width: 0;
 }
+
 .detail-sidebar-col {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-6);
+    gap: 1.5rem;
+    min-width: 0;
 }
 
 .sticky-card {
@@ -118,37 +236,42 @@
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    padding: var(--sp-6);
+    padding: 1.5rem;
 }
 
 .card-header {
     display: flex;
     align-items: center;
-    gap: var(--sp-3);
-    margin-bottom: var(--sp-4);
-    padding-bottom: var(--sp-4);
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
     border-bottom: 1px solid var(--color-border);
 }
+
 .card-header.spread {
     justify-content: space-between;
 }
+
 .card-header h3 {
     font-size: var(--font-md);
     font-weight: 600;
+    margin: 0;
 }
 
 /* ── Info Grid ── */
 .info-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: var(--sp-4) var(--sp-6);
+    gap: 1rem 1.5rem;
 }
 
 .info-item {
     display: flex;
     flex-direction: column;
     gap: 4px;
+    min-width: 0;
 }
+
 .info-item label {
     font-size: var(--font-xs);
     color: var(--color-text-secondary);
@@ -156,37 +279,43 @@
     letter-spacing: 0.05em;
     font-weight: 600;
 }
-.info-item span, .info-item p {
+
+.info-item span,
+.info-item p {
     font-size: var(--font-sm);
     color: var(--color-text);
+    word-break: break-word;
 }
 
 .divider {
     height: 1px;
     background: var(--color-border);
-    margin: var(--sp-4) 0;
+    margin: 1rem 0;
 }
 
-/* ── Status badges shared ── */
+/* ── Status badges ── */
 .badge {
     display: inline-flex;
     align-items: center;
-    padding: 2px var(--sp-2);
+    padding: 2px 0.5rem;
     border-radius: var(--radius-sm);
     font-weight: 600;
+    font-size: var(--font-xs);
 }
-.bg-error-muted { background: var(--color-bg-elevated); border: 1px solid var(--color-border); }
-.text-error { color: var(--color-error); }
-.bg-success-muted { background: var(--color-bg-elevated); border: 1px solid var(--color-border); }
-.text-success { color: var(--color-success); }
-.bg-bg-elevated { background: var(--color-bg-elevated); }
 
-/* ── Images ── */
+.bg-error-muted   { background: var(--color-bg-elevated); border: 1px solid var(--color-border); }
+.text-error       { color: var(--color-error); }
+.bg-success-muted { background: var(--color-bg-elevated); border: 1px solid var(--color-border); }
+.text-success     { color: var(--color-success); }
+.bg-bg-elevated   { background: var(--color-bg-elevated); }
+
+/* ── Images gallery ── */
 .image-gallery {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: var(--sp-4);
+    gap: 1rem;
 }
+
 .gallery-thumbnail {
     position: relative;
     aspect-ratio: 1;
@@ -195,51 +324,66 @@
     border: 1px solid var(--color-border);
     cursor: pointer;
 }
+
 .gallery-thumbnail img {
-    width: 100%; height: 100%;
+    width: 100%;
+    height: 100%;
     object-fit: cover;
     transition: transform 0.3s;
 }
+
 .gallery-thumbnail:hover img { transform: scale(1.05); }
+
 .delete-btn {
     position: absolute;
-    top: 4px; right: 4px;
-    background: rgba(0,0,0,0.7);
+    top: 4px;
+    right: 4px;
+    background: rgba(0, 0, 0, 0.7);
     color: white;
     border: none;
     border-radius: 50%;
-    width: 24px; height: 24px;
-    display: flex; align-items: center; justify-content: center;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
     opacity: 0;
     transition: opacity 0.2s;
 }
+
 .gallery-thumbnail:hover .delete-btn { opacity: 1; }
 
 /* ── Notes ── */
 .notes-list {
     display: flex;
     flex-direction: column;
-    gap: var(--sp-4);
+    gap: 1rem;
     max-height: 400px;
     overflow-y: auto;
-    padding-right: var(--sp-2);
+    padding-right: 0.5rem;
 }
+
 .note-bubble {
     background: var(--color-bg-elevated);
     border-radius: var(--radius-lg) var(--radius-lg) var(--radius-lg) 0;
-    padding: var(--sp-3) var(--sp-4);
+    padding: 0.75rem 1rem;
     border: 1px solid var(--color-border);
 }
+
 .note-bubble.internal-bubble {
-    background: rgba(245,158,11,0.05);
-    border-color: rgba(245,158,11,0.2);
+    background: rgba(245, 158, 11, 0.05);
+    border-color: rgba(245, 158, 11, 0.2);
 }
+
 .note-bubble-head {
     display: flex;
     justify-content: space-between;
-    margin-bottom: var(--sp-2);
+    margin-bottom: 0.5rem;
+    flex-wrap: wrap;
+    gap: 4px;
 }
+
 .note-bubble p {
     font-size: var(--font-sm);
     color: var(--color-text);
@@ -247,11 +391,12 @@
     white-space: pre-wrap;
 }
 
-/* ── Modern Timeline ── */
+/* ── Timeline ── */
 .modern-timeline {
     position: relative;
     padding-left: 20px;
 }
+
 .modern-timeline::before {
     content: '';
     position: absolute;
@@ -265,8 +410,9 @@
 
 .mtl-item {
     position: relative;
-    padding-bottom: var(--sp-6);
+    padding-bottom: 1.5rem;
 }
+
 .mtl-item:last-child { padding-bottom: 0; }
 
 .mtl-dot {
@@ -290,30 +436,381 @@
     flex-direction: column;
     gap: 2px;
 }
+
 .mtl-content strong {
     font-size: var(--font-sm);
     color: var(--color-text);
 }
+
 .mtl-date {
     font-size: var(--font-xs);
     color: var(--color-text-secondary);
 }
+
 .mtl-notes {
-    margin-top: var(--sp-1);
+    margin-top: 0.25rem;
     font-size: var(--font-xs);
     color: var(--color-text-muted);
 }
 
-/* Responsive */
+/* =====================================================
+   RESPONSIVE — Tablet  (<= 1024px)
+   ===================================================== */
 @media (max-width: 1024px) {
-    .detail-layout { grid-template-columns: 1fr; }
-    .sticky-card { position: static; }
-    .update-status-row { flex-wrap: wrap; }
-    .info-grid { grid-template-columns: 1fr; }
+
+    /* Layout: stack sidebar below main */
+    .detail-layout {
+        grid-template-columns: 1fr;
+    }
+
+    /* Sidebar becomes normal flow */
+    .detail-sidebar-col {
+        order: -1; /* budget/client above on mobile */
+    }
+
+    .sticky-card {
+        position: static;
+    }
+
+    /* Status update row wraps cleanly */
+    .update-status-row {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .update-status-row .select {
+        flex: 1 1 140px;
+    }
+
+    .delivery-input {
+        flex-wrap: wrap;
+    }
+
+    .delivery-input input[type="datetime-local"] {
+        width: 100% !important;
+        max-width: 220px;
+    }
+
+    /* Info grid: 1 column on tablet */
+    .info-grid {
+        grid-template-columns: 1fr 1fr;
+    }
 }
 
+/* =====================================================
+   RESPONSIVE — Phone  (<= 768px)
+   ===================================================== */
 @media (max-width: 768px) {
-    .repair-detail-page { padding: var(--sp-4); }
-    .detail-header { padding: var(--sp-4); }
-    .detail-header-top { flex-direction: column; align-items: flex-start; gap: var(--sp-4); }
+
+    /* Page padding */
+    .repair-detail-page {
+        padding: 0.75rem;
+    }
+
+    /* Header: compact, title + badge in same visual area */
+    .detail-header {
+        padding: 0.875rem 1rem;
+        margin-bottom: 0.875rem;
+    }
+
+    /* Header top: column so title sits above actions row */
+    .detail-header-top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .detail-header-top > .flex {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .detail-header-top h1 {
+        font-size: 1rem;
+        font-weight: 700;
+        line-height: 1.2;
+        letter-spacing: -0.01em;
+    }
+
+    /* Back button: compact on mobile */
+    .detail-header .btn-icon {
+        width: 26px;
+        height: 26px;
+        flex-shrink: 0;
+    }
+
+    .detail-header .btn-icon svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Header title row: tighter gap */
+    .detail-header-top > .flex.gap-md {
+        gap: 0.375rem;
+    }
+
+    /* Ticket ID: single line, truncate if too long */
+    .ticket-id {
+        display: block;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 11px;
+    }
+
+    /* Actions: single horizontal scrollable row — never stack */
+    .detail-header-actions {
+        width: 100%;
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        align-items: center;
+        gap: 0.375rem;
+        padding-bottom: 2px;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .detail-header-actions::-webkit-scrollbar {
+        display: none;
+    }
+
+    .detail-header-actions .btn {
+        font-size: 11px;
+        padding: 5px 10px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .big-badge {
+        font-size: 10px;
+        padding: 4px 10px;
+        white-space: nowrap;
+        flex-shrink: 0;
+        align-self: center;
+    }
+
+    /* Action cards */
+    .detail-action-cards {
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    /* Status update: compact column stack */
+    .update-status-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    /* Select: fix iOS Safari default tall height */
+    .update-status-row .select {
+        width: 100%;
+        height: 44px;
+        appearance: none;
+        -webkit-appearance: none;
+        padding-top: 0;
+        padding-bottom: 0;
+        line-height: 44px;
+    }
+
+    .update-status-row > .input.flex-1,
+    .update-status-row > .input {
+        width: 100%;
+    }
+
+    /* Delivery + Warranty: same row, both fit */
+    .update-status-secondary-row {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        gap: 0.5rem;
+        align-items: center;
+        width: 100%;
+    }
+
+    .delivery-input {
+        flex: 1;
+        min-width: 0;
+        flex-wrap: nowrap;
+    }
+
+    .delivery-input .text-sm {
+        white-space: nowrap;
+        font-size: 11px;
+        flex-shrink: 0;
+    }
+
+    .delivery-input input[type="datetime-local"] {
+        flex: 1;
+        min-width: 0;
+        font-size: 11px;
+    }
+
+    .warranty-input .text-sm {
+        white-space: nowrap;
+        font-size: 11px;
+        flex-shrink: 0;
+    }
+
+    .warranty-input input[type="number"] {
+        width: 52px;
+        text-align: center;
+    }
+
+    /* Guardar: auto width, compact, not full-screen-wide */
+    .update-status-row .btn-primary {
+        align-self: flex-end;
+        width: auto;
+        min-width: 110px;
+        padding: 8px 20px;
+        font-size: 12px;
+        justify-content: center;
+    }
+
+    /* Cards */
+    .card {
+        padding: 1rem;
+    }
+
+    .card-header {
+        gap: 0.5rem;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.75rem;
+    }
+
+    .card-header h3 {
+        font-size: var(--font-sm);
+    }
+
+    /* Info grid: single column */
+    .info-grid {
+        grid-template-columns: 1fr;
+        gap: 0.75rem;
+    }
+
+    .detail-layout {
+        gap: 1rem;
+    }
+
+    .detail-main-col,
+    .detail-sidebar-col {
+        gap: 1rem;
+    }
+
+    /* Image gallery: 3-4 cols on phone */
+    .image-gallery {
+        grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+        gap: 0.5rem;
+    }
+
+    /* Notes */
+    .notes-list {
+        max-height: 300px;
+        gap: 0.75rem;
+    }
+
+    .note-bubble {
+        padding: 0.625rem 0.75rem;
+    }
+
+    .note-bubble p {
+        font-size: 12px;
+    }
+
+    /* Timeline */
+    .mtl-item {
+        padding-bottom: 1rem;
+    }
+
+    .mtl-content strong {
+        font-size: 12px;
+    }
+
+    .mtl-date,
+    .mtl-notes {
+        font-size: 10px;
+    }
+
+    /* Checklist badges: always horizontal, never break */
+    .checklist-badge-row .badge {
+        font-size: 10px;
+        padding: 3px 7px;
+    }
+}
+
+/* =====================================================
+   RESPONSIVE — Small Phone  (<= 480px)
+   ===================================================== */
+@media (max-width: 480px) {
+
+    .repair-detail-page {
+        padding: 0.5rem;
+    }
+
+    .detail-header {
+        padding: 0.75rem;
+    }
+
+    .detail-header-top h1 {
+        font-size: var(--font-md);
+    }
+
+    .detail-header-actions {
+        flex-wrap: wrap;
+    }
+
+    .detail-header-actions .btn {
+        font-size: 10px;
+        padding: 5px 8px;
+    }
+
+    .big-badge {
+        font-size: 9px;
+        padding: 3px 8px;
+    }
+
+    /* Card */
+    .card {
+        padding: 0.75rem;
+    }
+
+    .card-header {
+        flex-wrap: wrap;
+        gap: 0.375rem;
+    }
+
+    /* Info items */
+    .info-item label {
+        font-size: 9px;
+    }
+
+    .info-item span,
+    .info-item p {
+        font-size: 11px;
+    }
+
+    /* Image gallery: 3 compact columns */
+    .image-gallery {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.375rem;
+    }
+
+    /* Notes input area */
+    .notes-list {
+        max-height: 240px;
+    }
+
+    /* Approval / rejection buttons */
+    .flex.gap-md {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .flex.gap-md .btn {
+        width: 100%;
+        justify-content: center;
+    }
 }
