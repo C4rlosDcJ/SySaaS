@@ -12,6 +12,14 @@
     z-index: 95;
 }
 
+.mobile-header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    min-width: 0;
+    flex: 1;
+}
+
 .mobile-logo {
     display: flex;
     align-items: center;
@@ -21,8 +29,18 @@
     font-weight: 800;
     letter-spacing: -0.02em;
     text-transform: var(--company-name-transform, none);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
 }
-.mobile-logo svg { color: var(--color-primary); }
+.mobile-logo svg { color: var(--color-primary); flex-shrink: 0; }
+.mobile-logo .logo-img-mobile { flex-shrink: 0; }
+.mobile-logo .logo-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 
 .menu-toggle-btn {
     display: flex;
@@ -30,6 +48,7 @@
     justify-content: center;
     width: 38px;
     height: 38px;
+    flex-shrink: 0;
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
