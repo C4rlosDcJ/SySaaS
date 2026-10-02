@@ -286,30 +286,28 @@ export default function SalesHistoryPage() {
         <div className="sales-history-page animate-fadeIn">
             
             {/* Header */}
-            <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '24px' }}>
-                <div>
-                    <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, fontSize: '24px', fontWeight: 800 }}>
-                        <Receipt size={28} className="text-primary" /> 
+            <div className="sales-page-header">
+                <div className="sales-page-header-left">
+                    <h1 className="page-title">
+                        <Receipt size={26} className="text-primary" />
                         <span>Historial de Ventas</span>
                     </h1>
-                    <p className="page-subtitle" style={{ margin: '4px 0 0 0', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
-                        Consulta transacciones, reimprime comprobantes térmicos y audita los ingresos de caja.
-                    </p>
+                    <p>Consulta transacciones, reimprime comprobantes térmicos y audita los ingresos de caja.</p>
                 </div>
-                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <div className="sales-page-header-actions">
                     <button className="btn btn-secondary btn-sm" onClick={() => { loadSales(); loadStats(); }} title="Recargar">
                         <RefreshCw size={14} />
                         <span>Actualizar</span>
                     </button>
-                    <button className="btn btn-secondary btn-sm" onClick={handleExportCSV} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <Download size={14} /> 
+                    <button className="btn btn-secondary btn-sm" onClick={handleExportCSV}>
+                        <Download size={14} />
                         <span>Exportar CSV</span>
                     </button>
                 </div>
             </div>
 
             {/* Stats Cards */}
-            <div className="sales-stats" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+            <div className="sales-stats">
                 <div className="sales-stat-card">
                     <div className="sales-stat-icon" style={{ color: 'var(--cool-teal)' }}>
                         <DollarSign size={24} />

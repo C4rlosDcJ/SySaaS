@@ -1,5 +1,10 @@
 /* =====================================================
-   Sales History Page Styles - Clean Minimalist Dark/Light
+   SalesHistoryPage — Responsive Design System (SySaaS)
+   Breakpoints:
+     lg:  > 900px   (desktop, full table)
+     md:  <= 900px  (tablet, table cards)
+     sm:  <= 600px  (phone, compact)
+     xs:  <= 400px  (compact phone)
    ===================================================== */
 
 .sales-history-page {
@@ -7,18 +12,44 @@
     animation: fadeIn 0.25s ease;
 }
 
-@media (max-width: 768px) {
-    .sales-history-page {
-        padding: var(--sp-3);
-    }
+/* ── Page Header ── */
+.sales-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
 }
 
-/* Stats Cards */
+.sales-page-header-left h1 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 800;
+}
+
+.sales-page-header-left p {
+    margin: 4px 0 0;
+    color: var(--color-text-secondary);
+    font-size: 13px;
+}
+
+.sales-page-header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* ── Stats Cards ── */
 .sales-stats {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: var(--sp-4);
-    margin-bottom: var(--sp-5);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
 }
 
 .sales-stat-card {
@@ -29,7 +60,7 @@
     display: flex;
     align-items: center;
     gap: var(--sp-4);
-    transition: border-color 0.2s ease, background-color 0.2s ease;
+    transition: border-color 0.2s ease;
 }
 
 .sales-stat-card:hover {
@@ -37,9 +68,6 @@
 }
 
 .sales-stat-icon {
-    width: auto;
-    height: auto;
-    border-radius: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -69,7 +97,7 @@
     margin-top: 2px;
 }
 
-/* Filter Toolbar */
+/* ── Filter Toolbar ── */
 .sales-filters-card {
     background: var(--color-bg-card);
     border: 1px solid var(--color-border);
@@ -92,7 +120,7 @@
 .sales-search-box {
     position: relative;
     flex: 1;
-    min-width: 240px;
+    min-width: 200px;
 }
 
 .sales-search-box .search-icon {
@@ -117,6 +145,7 @@
     padding: 3px;
     border-radius: var(--radius-md);
     border: 1px solid var(--color-border);
+    flex-shrink: 0;
 }
 
 .preset-pill {
@@ -129,6 +158,7 @@
     background: transparent;
     color: var(--color-text-secondary);
     transition: all 0.15s ease;
+    white-space: nowrap;
 }
 
 .preset-pill:hover {
@@ -158,6 +188,7 @@
     padding: 3px 10px;
     border-radius: var(--radius-md);
     border: 1px solid var(--color-border);
+    flex-shrink: 0;
 }
 
 .sales-date-input {
@@ -176,12 +207,12 @@
 
 .sales-filter-select {
     width: 170px !important;
-    min-width: 150px !important;
+    min-width: 140px !important;
     max-width: 180px !important;
     flex: 0 0 auto !important;
 }
 
-/* Sale Method Pill (Subtle, Clean & Minimal) */
+/* ── Payment Method Pill ── */
 .sale-method-pill {
     display: inline-flex;
     align-items: center;
@@ -196,7 +227,7 @@
     flex-shrink: 0;
 }
 
-/* Status Indicator (Subtle Dot + Text) */
+/* ── Status Indicator ── */
 .sale-status-indicator {
     display: inline-flex;
     align-items: center;
@@ -210,9 +241,7 @@
     box-shadow: none !important;
 }
 
-.sale-status-indicator::before {
-    display: none !important;
-}
+.sale-status-indicator::before { display: none !important; }
 
 .sale-status-indicator .status-dot {
     width: 6px;
@@ -222,49 +251,26 @@
 }
 
 .sale-status-indicator.sale-status-completed,
-.sale-status-indicator.status-completed {
-    color: var(--color-text);
-}
-
+.sale-status-indicator.status-completed { color: var(--color-text); }
 .sale-status-indicator.sale-status-completed .status-dot,
-.sale-status-indicator.status-completed .status-dot {
-    background-color: #22c55e;
-}
+.sale-status-indicator.status-completed .status-dot { background-color: #22c55e; }
 
 .sale-status-indicator.sale-status-cancelled,
-.sale-status-indicator.status-cancelled {
-    color: var(--color-text-muted);
-    text-decoration: line-through;
-}
-
+.sale-status-indicator.status-cancelled { color: var(--color-text-muted); text-decoration: line-through; }
 .sale-status-indicator.sale-status-cancelled .status-dot,
-.sale-status-indicator.status-cancelled .status-dot {
-    background-color: #ef4444;
-}
+.sale-status-indicator.status-cancelled .status-dot { background-color: #ef4444; }
 
 .sale-status-indicator.sale-status-refunded,
-.sale-status-indicator.status-refunded {
-    color: #d97706;
-}
-
+.sale-status-indicator.status-refunded { color: #d97706; }
 .sale-status-indicator.sale-status-refunded .status-dot,
-.sale-status-indicator.status-refunded .status-dot {
-    background-color: #f59e0b;
-}
+.sale-status-indicator.status-refunded .status-dot { background-color: #f59e0b; }
 
 .sale-status-indicator.sale-status-pending,
-.sale-status-indicator.status-pending {
-    color: var(--cool-amber);
-    background: transparent !important;
-    border: none !important;
-}
-
+.sale-status-indicator.status-pending { color: var(--cool-amber); }
 .sale-status-indicator.sale-status-pending .status-dot,
-.sale-status-indicator.status-pending .status-dot {
-    background-color: var(--cool-amber);
-}
+.sale-status-indicator.status-pending .status-dot { background-color: var(--cool-amber); }
 
-/* Table Clean Styling */
+/* ── Table (Desktop) ── */
 .sales-history-page .table th {
     font-weight: 600;
     text-transform: uppercase;
@@ -286,13 +292,304 @@
     background-color: var(--color-bg-hover);
 }
 
+/* ── Animations ── */
 @keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(4px);
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* =====================================================
+   RESPONSIVE — Tablet / Large Phone  (<= 900px)
+   ===================================================== */
+@media (max-width: 900px) {
+
+    .sales-history-page {
+        padding: var(--sp-4);
     }
-    to {
-        opacity: 1;
-        transform: translateY(0);
+
+    /* Stats: 2 columnas */
+    .sales-stats {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .sales-stat-card {
+        padding: 0.875rem 1rem;
+        gap: 0.75rem;
+    }
+
+    .sales-stat-value {
+        font-size: 1.2rem;
+    }
+
+    /* Table → Card list */
+    .table-container {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        overflow: visible;
+        padding: 0 !important;
+    }
+
+    .sales-history-page .table {
+        display: block;
+    }
+
+    .sales-history-page .table thead {
+        display: none;
+    }
+
+    .sales-history-page .table tbody {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .sales-history-page .table tbody tr {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto auto auto;
+        gap: 0.375rem 0.75rem;
+        padding: 1rem;
+        background: var(--color-bg-card);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .sales-history-page .table tbody tr:hover {
+        background: var(--color-bg-card);
+    }
+
+    .sales-history-page .table td {
+        display: flex;
+        padding: 0;
+        border: none;
+        align-items: center;
+        font-size: 12px;
+    }
+
+    /* Row 1: Sale number (col1) | Total (col2, right) */
+    .sales-history-page .table td:nth-child(1) {
+        grid-column: 1;
+        grid-row: 1;
+        font-weight: 700;
+        font-size: 13px;
+    }
+
+    .sales-history-page .table td:nth-child(6) {
+        grid-column: 2;
+        grid-row: 1;
+        justify-content: flex-end;
+        font-weight: 800;
+        font-size: 14px;
+        color: var(--color-text);
+    }
+
+    /* Row 2: Fecha (col1) | Estado (col2) */
+    .sales-history-page .table td:nth-child(2) {
+        grid-column: 1;
+        grid-row: 2;
+        color: var(--color-text-secondary);
+        font-size: 11px;
+    }
+
+    .sales-history-page .table td:nth-child(7) {
+        grid-column: 2;
+        grid-row: 2;
+        justify-content: flex-end;
+    }
+
+    /* Row 3: Cliente full width */
+    .sales-history-page .table td:nth-child(3) {
+        grid-column: 1 / -1;
+        grid-row: 3;
+        background: rgba(255, 255, 255, 0.02);
+        padding: 0.375rem 0.5rem;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+        font-size: 12px;
+    }
+
+    /* Row 4: Cajero + Metodo (col1) | Acciones (col2) */
+    .sales-history-page .table td:nth-child(4) {
+        grid-column: 1;
+        grid-row: 4;
+        color: var(--color-text-secondary);
+        font-size: 11px;
+        gap: 6px;
+    }
+
+    .sales-history-page .table td:nth-child(5) {
+        grid-column: 1;
+        grid-row: 5;
+    }
+
+    .sales-history-page .table td:nth-child(8) {
+        grid-column: 2;
+        grid-row: 4 / 6;
+        justify-content: flex-end;
+        align-items: flex-end;
+    }
+}
+
+/* =====================================================
+   RESPONSIVE — Phone  (<= 600px)
+   ===================================================== */
+@media (max-width: 600px) {
+
+    .sales-history-page {
+        padding: var(--sp-3);
+    }
+
+    /* Header */
+    .sales-page-header {
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .sales-page-header-left h1 {
+        font-size: 1.15rem;
+    }
+
+    .sales-page-header-left p {
+        font-size: 11px;
+    }
+
+    .sales-page-header-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .sales-page-header-actions .btn {
+        font-size: 11px;
+        padding: 5px 10px;
+    }
+
+    /* Stats: 2 col compact */
+    .sales-stats {
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+    }
+
+    .sales-stat-card {
+        padding: 0.75rem;
+        gap: 0.5rem;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .sales-stat-value {
+        font-size: 1.05rem;
+    }
+
+    .sales-stat-count,
+    .sales-stat-label {
+        font-size: 9px;
+    }
+
+    /* Filters: stacked */
+    .sales-filters-card {
+        padding: 12px;
+        gap: 10px;
+    }
+
+    .sales-filters-top {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .sales-search-box {
+        min-width: 0;
+    }
+
+    /* Presets: scroll horizontal */
+    .sales-presets-group {
+        width: 100%;
+        overflow-x: auto;
+        justify-content: flex-start;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .sales-presets-group::-webkit-scrollbar {
+        display: none;
+    }
+
+    .preset-pill {
+        flex-shrink: 0;
+        padding: 4px 10px;
+        font-size: 11px;
+    }
+
+    /* Bottom filters: stack */
+    .sales-filters-bottom {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+        padding-top: 8px;
+    }
+
+    .sales-date-group {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .sales-date-input {
+        flex: 1;
+        width: auto !important;
+        min-width: 0;
+    }
+
+    .sales-filter-select {
+        width: 100% !important;
+        max-width: none !important;
+    }
+
+    /* Cards layout compact */
+    .sales-history-page .table tbody tr {
+        padding: 0.75rem;
+        gap: 0.25rem 0.5rem;
+    }
+
+    .sales-history-page .table td:nth-child(6) {
+        font-size: 13px;
+    }
+
+    /* Acciones: solo iconos */
+    .sales-history-page .table td:nth-child(8) .btn span {
+        display: none;
+    }
+}
+
+/* =====================================================
+   RESPONSIVE — Compact Phone  (<= 400px)
+   ===================================================== */
+@media (max-width: 400px) {
+
+    .sales-history-page {
+        padding: 0.5rem;
+    }
+
+    /* Stats: 1 columna */
+    .sales-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .sales-stat-card {
+        flex-direction: row;
+        align-items: center;
+        padding: 0.625rem 0.75rem;
+    }
+
+    .sales-stat-value {
+        font-size: 1rem;
+    }
+
+    .sales-page-header-left h1 {
+        font-size: 1rem;
     }
 }
