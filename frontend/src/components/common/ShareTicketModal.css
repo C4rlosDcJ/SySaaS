@@ -1,0 +1,522 @@
+/* ShareTicketModal — Estilos elegantes en modo oscuro y claro adaptables al tema */
+
+.share-ticket-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 15, 29, 0.78);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 9999;
+    animation: shareFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes shareFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.share-ticket-modal {
+    background: var(--color-bg-surface, #1e293b);
+    border: 1px solid var(--color-border, #334155);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+    border-radius: 18px;
+    max-width: 860px;
+    width: 100%;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: var(--color-text, #f8fafc);
+}
+
+.share-ticket-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--color-border, #334155);
+    background: var(--color-bg-surface-soft, rgba(30, 41, 59, 0.6));
+}
+
+.share-ticket-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.share-ticket-icon-wrap {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: rgba(79, 70, 229, 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-primary, #6366f1);
+}
+
+.share-ticket-title h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.share-ticket-title p {
+    margin: 2px 0 0;
+    font-size: 0.8rem;
+    color: var(--color-text-muted, #94a3b8);
+}
+
+.btn-close-modal {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted, #94a3b8);
+    padding: 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.btn-close-modal:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text, #f8fafc);
+}
+
+.share-ticket-body {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    gap: 24px;
+    padding: 24px;
+    overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+    .share-ticket-body {
+        grid-template-columns: 1fr;
+        gap: 20px;
+        padding: 16px;
+    }
+}
+
+/* ================= PREVIEW DE LA TARJETA DIGITAL ================= */
+
+.share-ticket-preview-pane {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.ticket-card-wrapper {
+    width: 100%;
+    max-width: 340px;
+    filter: drop-shadow(0 15px 30px rgba(0, 0, 0, 0.35));
+}
+
+.ticket-digital-card {
+    background: #0f172a; /* Slate 900 base para contraste impecable */
+    color: #f8fafc;
+    border-radius: 16px;
+    border: 1px solid #334155;
+    padding: 20px;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+}
+
+.card-top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #1e293b;
+}
+
+.card-business-name {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #ffffff;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+}
+
+.card-business-contact {
+    margin: 3px 0 0;
+    font-size: 0.7rem;
+    color: #94a3b8;
+}
+
+.card-ticket-badge {
+    background: #1e293b;
+    border: 1px solid #475569;
+    border-radius: 8px;
+    padding: 4px 8px;
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+}
+
+.card-badge-label {
+    font-size: 0.58rem;
+    font-weight: 700;
+    color: #818cf8;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.card-badge-number {
+    font-size: 0.82rem;
+    font-weight: 800;
+    font-family: monospace;
+    color: #f8fafc;
+}
+
+.card-status-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 12px 0;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: #1e293b;
+    border-left: 3px solid #6366f1;
+}
+
+.card-status-strip.status-ready {
+    border-left-color: #10b981;
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.card-status-strip.status-delivered {
+    border-left-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.1);
+}
+
+.status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    display: inline-block;
+    margin-right: 6px;
+}
+
+.status-text {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+}
+
+.card-date {
+    font-size: 0.68rem;
+    color: #94a3b8;
+}
+
+.card-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.info-cell {
+    background: #1e293b;
+    padding: 8px 10px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+}
+
+.info-cell.full-width {
+    grid-column: span 2;
+}
+
+.cell-label {
+    font-size: 0.65rem;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    text-transform: uppercase;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+
+.cell-value {
+    font-size: 0.8rem;
+    color: #f1f5f9;
+    word-break: break-word;
+}
+
+.cell-subvalue {
+    margin: 3px 0 0;
+    font-size: 0.7rem;
+    color: #cbd5e1;
+    font-style: italic;
+}
+
+.card-financial-box {
+    background: #141f36;
+    border: 1px solid #233554;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 14px;
+}
+
+.fin-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-bottom: 4px;
+}
+
+.fin-row.advance {
+    color: #38bdf8;
+}
+
+.fin-row.total-highlight {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px dashed #334155;
+    font-size: 0.85rem;
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.fin-val-bold {
+    color: #6366f1;
+    font-size: 0.95rem;
+}
+
+.card-footer-section {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #1e293b;
+}
+
+.card-qr-box {
+    width: 64px;
+    height: 64px;
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.card-qr-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.card-footer-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.warranty-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #10b981;
+}
+
+.qr-hint {
+    margin: 0;
+    font-size: 0.65rem;
+    color: #94a3b8;
+    line-height: 1.2;
+}
+
+.card-domain-hint {
+    margin: 0;
+    font-size: 0.6rem;
+    color: #64748b;
+    font-family: monospace;
+}
+
+.ticket-card-caption {
+    font-size: 0.72rem;
+    color: var(--color-text-muted, #94a3b8);
+    text-align: center;
+    margin-top: 8px;
+}
+
+/* ================= ACCIONES DE COMPARTIR ================= */
+
+.share-ticket-actions-pane {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.section-title {
+    margin: 0 0 4px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--color-text, #f8fafc);
+}
+
+.section-subtitle {
+    margin: 0 0 12px;
+    font-size: 0.78rem;
+    color: var(--color-text-muted, #94a3b8);
+}
+
+.action-buttons-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+@media (max-width: 540px) {
+    .action-buttons-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.btn-action-primary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-action-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.btn-action-primary.wa-btn {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #ffffff;
+}
+
+.btn-action-primary.email-btn {
+    background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+    color: #ffffff;
+}
+
+.btn-label-wrap {
+    display: flex;
+    flex-direction: column;
+}
+
+.btn-label-wrap strong {
+    font-size: 0.88rem;
+    font-weight: 700;
+}
+
+.btn-label-wrap small {
+    font-size: 0.68rem;
+    opacity: 0.88;
+    margin-top: 1px;
+}
+
+.btn-action-secondary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--color-bg-surface-soft, rgba(51, 65, 85, 0.5));
+    border: 1px solid var(--color-border, #475569);
+    color: var(--color-text, #f8fafc);
+    transition: all 0.15s ease;
+}
+
+.btn-action-secondary:hover {
+    background: var(--color-border, #475569);
+    border-color: var(--color-primary, #6366f1);
+}
+
+.btn-action-secondary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.utility-buttons-row {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.btn-utility {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: transparent;
+    border: 1px dashed var(--color-border, #475569);
+    color: var(--color-text-muted, #94a3b8);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: left;
+}
+
+.btn-utility:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--color-text, #f8fafc);
+    border-color: var(--color-primary, #6366f1);
+}
+
+.customer-info-box {
+    background: var(--color-bg-surface-soft, rgba(15, 23, 42, 0.5));
+    border: 1px solid var(--color-border, #334155);
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 0.78rem;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.link-row {
+    padding-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}

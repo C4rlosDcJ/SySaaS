@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import CameraCaptureModal from '../../components/CameraCaptureModal';
 import PatternLockModal from '../../components/PatternLockModal';
+import ShareTicketModal from '../../components/common/ShareTicketModal';
 import './NewRepairPage.css';
 
 export default function NewRepairPage() {
@@ -51,6 +52,8 @@ export default function NewRepairPage() {
     const [serviceSearch, setServiceSearch] = useState('');
     const [showServiceDropdown, setShowServiceDropdown] = useState(false);
     const [showMobileCosts, setShowMobileCosts] = useState(false);
+    const [showShareTicketModal, setShowShareTicketModal] = useState(false);
+    const [createdRepairForShare, setCreatedRepairForShare] = useState(null);
 
     const CHECKLIST_LABELS = {
         power: 'Encendido',
@@ -541,22 +544,20 @@ export default function NewRepairPage() {
             // Clean up object URLs to prevent memory leaks
             imagePreviews.forEach(url => URL.revokeObjectURL(url));
 
-            // Generate and download PDF if requested
-            if (shouldPrint) {
-                try {
-                    const { generateServiceTicket } = await import('../../utils/pdfGenerator');
-                    // We need to fetch the full updated repair with joins (customer name, etc) for the ticket
-                    const fullRepair = await repairService.getById(newRepairId);
-                    await generateServiceTicket(fullRepair, settings);
-                } catch (printError) {
-                    console.error('Error printing ticket:', printError);
-                    alert('Ocurrió un error al intentar generar el recibo PDF.');
-                }
-            }
-
             // Limpiar borrador persistido al completar la orden
             draftStorage.clearDraft('new_repair', tenantId, activeBranchId);
             setHasDraft(false);
+
+            if (shouldPrint) {
+                try {
+                    const fullRepair = await repairService.getById(newRepairId);
+                    setCreatedRepairForShare(fullRepair);
+                    setShowShareTicketModal(true);
+                    return; // Permanece en la pantalla para compartir hasta que el usuario cierre el modal
+                } catch (fetchErr) {
+                    console.error('Error fetching created repair for ticket:', fetchErr);
+                }
+            }
 
             navigate(`/admin/reparaciones/${newRepairId}`);
         } catch (error) {
@@ -1223,8 +1224,8 @@ export default function NewRepairPage() {
                             <button type="submit" className="btn btn-primary w-full" disabled={loading || !acceptedTerms}>
                                 <Save size={18} /> {loading ? 'Procesando...' : 'Crear Orden'}
                             </button>
-                            <button type="button" onClick={(e) => handleSubmit(e, true)} className="btn btn-secondary w-full" disabled={loading || !acceptedTerms} style={{borderColor: 'var(--color-primary-muted)', color: 'var(--color-primary)'}}>
-                                Guardar e Imprimir Recibo
+                            <button type="button" onClick={(e) => handleSubmit(e, true)} className="btn btn-secondary w-full" disabled={loading || !acceptedTerms} style={{borderColor: 'var(--color-primary-muted)', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'}}>
+                                Guardar y Compartir Ticket (WhatsApp / Recibo)
                             </button>
                             <button type="button" onClick={() => navigate(-1)} className="btn btn-ghost w-full">
                                 Cancelar
@@ -1280,6 +1281,19 @@ export default function NewRepairPage() {
                 }}
                 initialPattern={formData.device_password}
             />
+
+            {/* Modal de Compartir Ticket Digital e Impresión */}
+            {showShareTicketModal && createdRepairForShare && (
+                <ShareTicketModal
+                    isOpen={showShareTicketModal}
+                    onClose={() => {
+                        setShowShareTicketModal(false);
+                        navigate(`/admin/reparaciones/${createdRepairForShare.id}`);
+                    }}
+                    repair={createdRepairForShare}
+                    settings={settings}
+                />
+            )}
         </div>
     );
 }

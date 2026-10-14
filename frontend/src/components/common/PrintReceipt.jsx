@@ -1,10 +1,13 @@
-import { Printer, X } from 'lucide-react';
+import { useState } from 'react';
+import { Printer, X, Share2 } from 'lucide-react';
 import { STATUS_LABELS, formatCurrency, formatDate, formatDateTime } from '../../utils/constants';
 import { useTenant } from '../../context/TenantContext';
+import ShareTicketModal from './ShareTicketModal';
 import './PrintReceipt.css';
 
 export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', settings = {} }) {
     const { tenant } = useTenant();
+    const [showShareModal, setShowShareModal] = useState(false);
     if (!isOpen || !data) return null;
 
     const businessName = tenant?.company_name || tenant?.name || settings.business_name || data.tenant_name || data.company_name || 'Mi Empresa';
@@ -83,6 +86,11 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                     <button className="btn-secondary" onClick={onClose}>
                         <X size={16} /> Cerrar
                     </button>
+                    {type === 'repair' && (
+                        <button className="btn-secondary" onClick={() => setShowShareModal(true)} style={{ background: 'rgba(99, 102, 241, 0.15)', color: 'var(--color-primary, #6366f1)', borderColor: 'var(--color-primary, #6366f1)' }}>
+                            <Share2 size={16} /> Compartir Digital (WhatsApp / Imagen)
+                        </button>
+                    )}
                     <button className="btn-primary" onClick={handlePrint}>
                         <Printer size={16} /> Imprimir Ticket
                     </button>
@@ -406,6 +414,15 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                     )}
                 </div>
             </div>
+
+            {showShareModal && (
+                <ShareTicketModal
+                    isOpen={showShareModal}
+                    onClose={() => setShowShareModal(false)}
+                    repair={data}
+                    settings={settings}
+                />
+            )}
         </div>
     );
 }

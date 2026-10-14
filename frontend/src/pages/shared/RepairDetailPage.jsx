@@ -7,13 +7,15 @@ import {
     Wrench, Clock, User, MessageSquare, AlertCircle, CheckCircle2,
     ChevronLeft, Smartphone, CreditCard, ShieldCheck, Send, Plus, X,
     Image as ImageIcon, DollarSign, Save as SaveIcon, ClipboardCheck,
-    Printer, PenTool, Edit3, ShoppingCart, Star, Camera, Trash2
+    Printer, PenTool, Edit3, ShoppingCart, Star, Camera, Trash2,
+    Share2
 } from 'lucide-react';
 import SignatureModal from '../../components/common/SignatureModal';
 import CameraCaptureModal from '../../components/CameraCaptureModal';
 import { generateServiceTicket } from '../../utils/pdfGenerator';
 import PrintReceipt from '../../components/common/PrintReceipt';
 import WhatsAppNotifyModal from '../../components/WhatsAppNotifyModal';
+import ShareTicketModal from '../../components/common/ShareTicketModal';
 import './RepairDetailPage.css';
 
 export default function RepairDetailPage() {
@@ -29,6 +31,7 @@ export default function RepairDetailPage() {
 
     const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
     const [whatsAppTemplateType, setWhatsAppTemplateType] = useState('ready');
+    const [showShareTicketModal, setShowShareTicketModal] = useState(false);
 
     const [newStatus, setNewStatus] = useState('');
     const [statusEstimatedDelivery, setStatusEstimatedDelivery] = useState('');
@@ -458,11 +461,18 @@ export default function RepairDetailPage() {
                     {/* Action buttons row (separate from badge) */}
                     {(isAdmin || user?.role === 'technician') && (
                         <div className="detail-header-actions">
-                            <button onClick={handlePrintTicket} className="btn btn-secondary btn-sm">
+                            <button 
+                                onClick={() => setShowShareTicketModal(true)} 
+                                className="btn btn-primary btn-sm"
+                                title="Compartir comprobante digital por WhatsApp, correo o imagen"
+                            >
+                                <Share2 size={14} /> Compartir Ticket
+                            </button>
+                            <button onClick={handlePrintTicket} className="btn btn-secondary btn-sm" title="Descargar orden en formato PDF A4">
                                 <Printer size={14} /> PDF Orden
                             </button>
-                            <button onClick={() => { setReceiptType('repair'); setReceiptData(repair); setShowPrintReceipt(true); }} className="btn btn-secondary btn-sm">
-                                <Printer size={14} /> Ticket
+                            <button onClick={() => { setReceiptType('repair'); setReceiptData(repair); setShowPrintReceipt(true); }} className="btn btn-secondary btn-sm" title="Ver formato ticket térmico">
+                                <Printer size={14} /> Ticket Térmico
                             </button>
                             {isAdmin && (
                                 <button onClick={handleDeleteOrder} className="btn btn-ghost btn-sm text-error" title="Eliminar orden">
@@ -1090,6 +1100,12 @@ export default function RepairDetailPage() {
 
             <SignatureModal isOpen={showSigModal} onClose={() => setShowSigModal(false)} onSave={handleSignatureSave} title={sigType === 'approval' ? 'Aprobar Cotización' : 'Confirmar Entrega'} description="..." />
             <PrintReceipt isOpen={showPrintReceipt} onClose={() => setShowPrintReceipt(false)} data={receiptData || repair} type={receiptType} settings={settings} />
+            <ShareTicketModal
+                isOpen={showShareTicketModal}
+                onClose={() => setShowShareTicketModal(false)}
+                repair={repair}
+                settings={settings}
+            />
             <WhatsAppNotifyModal
                 isOpen={showWhatsAppModal}
                 onClose={() => setShowWhatsAppModal(false)}
