@@ -86,11 +86,14 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                     <button className="btn-secondary" onClick={onClose}>
                         <X size={16} /> Cerrar
                     </button>
-                    {type === 'repair' && (
-                        <button className="btn-secondary" onClick={() => setShowShareModal(true)} style={{ background: 'rgba(99, 102, 241, 0.15)', color: 'var(--color-primary, #6366f1)', borderColor: 'var(--color-primary, #6366f1)' }}>
-                            <Share2 size={16} /> Compartir Digital (WhatsApp / Imagen)
-                        </button>
-                    )}
+                    <button 
+                        className="btn-secondary" 
+                        onClick={() => setShowShareModal(true)} 
+                        style={{ background: 'var(--color-bg-elevated)', color: 'var(--color-text)', borderColor: 'var(--color-border-strong)' }}
+                        title="Compartir por WhatsApp, correo o descargar imagen PNG"
+                    >
+                        <Share2 size={16} /> Compartir Digital (WhatsApp / Imagen)
+                    </button>
                     <button className="btn-primary" onClick={handlePrint}>
                         <Printer size={16} /> Imprimir Ticket
                     </button>
@@ -419,7 +422,8 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                 <ShareTicketModal
                     isOpen={showShareModal}
                     onClose={() => setShowShareModal(false)}
-                    repair={data}
+                    data={data}
+                    type={type}
                     settings={settings}
                 />
             )}

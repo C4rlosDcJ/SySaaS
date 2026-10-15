@@ -3,13 +3,15 @@ import {
     Receipt, Search, Eye, XCircle, Printer, DollarSign,
     TrendingUp, ShoppingBag, CreditCard, Banknote, ArrowRightLeft,
     Calendar, Download, RefreshCw, Filter, Layers, User,
-    FileText, CheckCircle2, AlertCircle, Clock, X, ChevronLeft, ChevronRight, RotateCcw
+    FileText, CheckCircle2, AlertCircle, Clock, X, ChevronLeft, ChevronRight, RotateCcw,
+    Share2
 } from 'lucide-react';
 import { posService, settingsService } from '../../services/api';
 import { useTenant } from '../../context/TenantContext';
 import { formatCurrency, formatDateTime } from '../../utils/constants';
 import { showAlert, showConfirm } from '../../utils/swal';
 import PrintReceipt from '../../components/common/PrintReceipt';
+import ShareTicketModal from '../../components/common/ShareTicketModal';
 import './SalesHistoryPage.css';
 
 const PAYMENT_LABELS = {
@@ -49,9 +51,11 @@ export default function SalesHistoryPage() {
     const [showDetail, setShowDetail] = useState(false);
     const [loadingDetail, setLoadingDetail] = useState(false);
 
-    // Ticket Print Modal
+    // Ticket Print & Share Modals
     const [showPrintTicket, setShowPrintTicket] = useState(false);
     const [ticketSaleData, setTicketSaleData] = useState(null);
+    const [showShareTicket, setShowShareTicket] = useState(false);
+    const [shareSaleData, setShareSaleData] = useState(null);
 
     const searchTimeout = useRef(null);
 
@@ -623,6 +627,25 @@ export default function SalesHistoryPage() {
                                     <div className="sale-detail-header-actions">
                                         <button
                                             type="button"
+                                            className="btn btn-primary btn-sm"
+                                            onClick={async () => {
+                                                try {
+                                                    const fullSale = await posService.getSaleById(selectedSale.id);
+                                                    setShareSaleData(fullSale);
+                                                    setShowShareTicket(true);
+                                                } catch (err) {
+                                                    console.error(err);
+                                                    setShareSaleData(selectedSale);
+                                                    setShowShareTicket(true);
+                                                }
+                                            }}
+                                            title="Compartir por WhatsApp, correo o imagen"
+                                        >
+                                            <Share2 size={14} />
+                                            <span>Compartir Ticket</span>
+                                        </button>
+                                        <button
+                                            type="button"
                                             className="btn btn-secondary btn-sm sale-detail-ticket-btn"
                                             onClick={() => handlePrintSaleTicket(selectedSale)}
                                             title="Imprimir Ticket"
@@ -812,6 +835,16 @@ export default function SalesHistoryPage() {
                 settings={settings}
             />
 
+            {/* Share Ticket Modal */}
+            {showShareTicket && shareSaleData && (
+                <ShareTicketModal
+                    isOpen={showShareTicket}
+                    onClose={() => setShowShareTicket(false)}
+                    data={shareSaleData}
+                    type="sale"
+                    settings={settings}
+                />
+            )}
         </div>
     );
 }
