@@ -989,33 +989,33 @@ export default function InventoryPage() {
     return (
         <div className="inventory-page">
             {/* Header */}
-            <div className="page-header">
-                <div>
-                    <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="page-header inventory-page-header">
+                <div className="inventory-header-info">
+                    <h1 className="inventory-title">
                         <span>Inventario</span>
                         {isGlobalMatrixView && (
-                            <span style={{ fontSize: '11px', fontWeight: 800, background: 'rgba(59, 130, 246, 0.15)', color: '#3b82f6', border: '1px solid rgba(59, 130, 246, 0.3)', padding: '2px 8px', borderRadius: '12px', textTransform: 'uppercase' }}>
+                            <span className="inventory-global-badge">
                                 Vista Global Empresa
                             </span>
                         )}
                     </h1>
-                    <p className="text-muted">Administra el stock, fotos, catálogo y control multi-sucursal</p>
+                    <p className="text-muted inventory-subtitle">Administra el stock, fotos, catálogo y control multi-sucursal</p>
                 </div>
-                <div className="header-actions">
-                    <button className="btn btn-secondary" onClick={() => handleExportCSV(filtered)} title="Exportar productos a formato CSV">
-                        <Download size={15} /> Exportar CSV
+                <div className="header-actions inventory-header-actions">
+                    <button className="btn btn-secondary inventory-btn-export" onClick={() => handleExportCSV(filtered)} title="Exportar productos a formato CSV">
+                        <Download size={15} /> <span>Exportar CSV</span>
                     </button>
-                    <button className="btn btn-secondary" onClick={() => handlePrintInventory(filtered)} title="Imprimir hoja de inventario para conteo físico">
-                        <Printer size={15} /> Imprimir Hoja
+                    <button className="btn btn-secondary inventory-btn-print" onClick={() => handlePrintInventory(filtered)} title="Imprimir hoja de inventario para conteo físico">
+                        <Printer size={15} /> <span>Imprimir Hoja</span>
                     </button>
-                    <button className="btn btn-secondary" onClick={() => {
+                    <button className="btn btn-secondary inventory-btn-category" onClick={() => {
                         setNewCategoryName('');
                         setShowCategoryCreator(true);
                     }}>
-                        <FolderPlus size={15} /> Crear Categoría
+                        <FolderPlus size={15} /> <span>Crear Categoría</span>
                     </button>
-                    <button className="btn btn-primary" onClick={openNewProduct} id="btn-new-product">
-                        <Plus size={16} /> Nuevo Producto
+                    <button className="btn btn-primary inventory-btn-new" onClick={openNewProduct} id="btn-new-product">
+                        <Plus size={16} /> <span>Nuevo Producto</span>
                     </button>
                 </div>
             </div>
@@ -1224,11 +1224,11 @@ export default function InventoryPage() {
             )}
 
             {/* Products Table */}
-            <div className="table-container">
-                <table className="table">
+            <div className="table-container inventory-table-container">
+                <table className="table inventory-table">
                     <thead>
                         <tr>
-                            <th style={{ width: '38px', textAlign: 'center' }}>
+                            <th className="th-select" style={{ width: '38px', textAlign: 'center' }}>
                                 <input
                                     type="checkbox"
                                     checked={filtered.length > 0 && selectedProductIds.length === filtered.length}
@@ -1236,31 +1236,31 @@ export default function InventoryPage() {
                                     style={{ cursor: 'pointer' }}
                                 />
                             </th>
-                            <th style={{ width: '48px', textAlign: 'center' }}>Foto</th>
-                            <th>SKU</th>
-                            <th>Producto</th>
-                            <th>Categoría</th>
-                            <th>P. Compra</th>
-                            <th>P. Venta</th>
+                            <th className="th-photo" style={{ width: '48px', textAlign: 'center' }}>Foto</th>
+                            <th className="th-sku">SKU</th>
+                            <th className="th-name">Producto</th>
+                            <th className="th-category">Categoría</th>
+                            <th className="th-cost">P. Compra</th>
+                            <th className="th-price">P. Venta</th>
                             
                             {/* Columnas según el modo de vista */}
                             {isGlobalMatrixView ? (
                                 <>
                                     {branches.map(b => (
-                                        <th key={b.id} style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                        <th key={b.id} className="th-branch-stock" style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
                                             {b.name}
                                         </th>
                                     ))}
-                                    <th style={{ textAlign: 'center', fontWeight: 800 }}>Total Empresa</th>
+                                    <th className="th-total-stock" style={{ textAlign: 'center', fontWeight: 800 }}>Total Empresa</th>
                                 </>
                             ) : (
                                 <>
-                                    <th>Stock Local</th>
-                                    <th>En Otras Sucursales</th>
+                                    <th className="th-stock-local">Stock Local</th>
+                                    <th className="th-stock-other">En Otras Sucursales</th>
                                 </>
                             )}
                             
-                            <th style={{ textAlign: 'right' }}>Acciones</th>
+                            <th className="th-actions" style={{ textAlign: 'right' }}>Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1279,12 +1279,9 @@ export default function InventoryPage() {
                                 const isSelected = selectedProductIds.includes(p.id);
                                 return (
                                     <Fragment key={p.id}>
-                                        <tr style={{
-                                            ...(expandedStockProductId === p.id ? { background: 'var(--color-bg-tertiary)' } : {}),
-                                            ...(isSelected ? { background: 'rgba(59, 130, 246, 0.05)' } : {})
-                                        }}>
+                                        <tr className={`inv-product-row ${isSelected ? 'is-selected' : ''} ${expandedStockProductId === p.id ? 'is-expanded' : ''}`}>
                                             {/* Checkbox de selección */}
-                                            <td style={{ textAlign: 'center' }}>
+                                            <td className="td-select" style={{ textAlign: 'center' }}>
                                                 <input
                                                     type="checkbox"
                                                     checked={isSelected}
@@ -1294,12 +1291,12 @@ export default function InventoryPage() {
                                             </td>
 
                                             {/* Foto / Miniatura */}
-                                            <td style={{ textAlign: 'center' }}>
+                                            <td className="td-photo" style={{ textAlign: 'center' }}>
                                                 {p.image_url ? (
                                                     <div 
                                                         className="product-thumbnail-wrapper"
                                                         onClick={() => {
-                                                            setPreviewImageUrl(p.image_url);
+                                                             setPreviewImageUrl(p.image_url);
                                                             setShowImagePreviewModal(true);
                                                         }}
                                                         title="Ver foto ampliada"
@@ -1321,28 +1318,28 @@ export default function InventoryPage() {
                                                 )}
                                             </td>
 
-                                            <td><span className="font-mono" style={{ fontSize: 'var(--font-xs)', fontWeight: 600 }}>{p.sku || 'N/A'}</span></td>
-                                            <td>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                    <span style={{ fontWeight: 700, color: 'var(--color-text)' }}>{p.name}</span>
+                                            <td className="td-sku"><span className="font-mono inv-sku-tag">{p.sku || 'N/A'}</span></td>
+                                            <td className="td-name">
+                                                <div className="inv-product-name-row">
+                                                    <span className="inv-product-name">{p.name}</span>
                                                     {p.is_unique ? (
-                                                        <span style={{ fontSize: '9px', fontWeight: 700, background: 'rgba(255, 255, 255, 0.08)', border: '1px solid var(--color-border-strong)', padding: '2px 6px', borderRadius: '4px', textTransform: 'uppercase', color: 'var(--color-text-secondary)', letterSpacing: '0.02em' }}>Único</span>
+                                                        <span className="inv-unique-tag">Único</span>
                                                     ) : null}
                                                 </div>
-                                                {p.barcode && <span style={{ display: 'block', fontSize: '10px', color: 'var(--color-text-secondary)', fontFamily: 'monospace' }}>{p.barcode}</span>}
+                                                {p.barcode && <span className="inv-barcode-tag font-mono">{p.barcode}</span>}
                                             </td>
-                                            <td>
+                                            <td className="td-category">
                                                 {p.category_name ? (
                                                     <span className="category-badge">
                                                         <span className="category-dot" style={{ background: p.category_color || 'var(--color-primary)' }}></span>
                                                         {p.category_name}
                                                     </span>
                                                 ) : (
-                                                    <span className="text-muted" style={{ fontSize: 'var(--font-xs)' }}>Sin categoría</span>
+                                                    <span className="text-muted inv-no-category">Sin categoría</span>
                                                 )}
                                             </td>
-                                            <td>{formatCurrency(p.purchase_price)}</td>
-                                            <td style={{ fontWeight: 700, color: 'var(--color-text)' }}>{formatCurrency(p.sale_price)}</td>
+                                            <td className="td-cost"><span className="inv-cost-val font-mono">{formatCurrency(p.purchase_price)}</span></td>
+                                            <td className="td-price"><span className="inv-price-val font-mono">{formatCurrency(p.sale_price)}</span></td>
                                             
                                             {/* Desglose Multi-Sede según vista */}
                                             {isGlobalMatrixView ? (
@@ -1351,97 +1348,60 @@ export default function InventoryPage() {
                                                         const bStockObj = (p.branches_stock || []).find(bs => bs.branch_id === b.id);
                                                         const bQty = bStockObj ? bStockObj.stock : 0;
                                                         return (
-                                                            <td key={b.id} style={{ textAlign: 'center' }}>
-                                                                <span style={{
-                                                                    fontWeight: 700,
-                                                                    fontSize: '12px',
-                                                                    color: bQty > 0 ? 'var(--color-text)' : 'var(--color-text-muted)'
-                                                                }}>
+                                                            <td key={b.id} className="td-branch-stock" style={{ textAlign: 'center' }}>
+                                                                <span className={`inv-branch-stock-val font-mono ${bQty > 0 ? '' : 'is-empty'}`}>
                                                                     {bQty}
                                                                 </span>
                                                             </td>
                                                         );
                                                     })}
-                                                    <td style={{ textAlign: 'center' }}>
-                                                        <span style={{
-                                                            fontWeight: 700,
-                                                            fontSize: '13px',
-                                                            color: (p.total_company_stock || 0) > 0 ? 'var(--color-text)' : '#f87171'
-                                                        }}>
-                                                            {p.total_company_stock || 0} <span style={{ fontSize: '11px', fontWeight: 500, color: (p.total_company_stock || 0) > 0 ? 'var(--color-text-secondary)' : 'rgba(248, 113, 113, 0.7)' }}>uds</span>
+                                                    <td className="td-total-stock" style={{ textAlign: 'center' }}>
+                                                        <span className={`inv-total-stock-val font-mono ${(p.total_company_stock || 0) > 0 ? '' : 'is-empty'}`}>
+                                                            {p.total_company_stock || 0} <span className="inv-unit-lbl">uds</span>
                                                         </span>
                                                     </td>
                                                 </>
                                             ) : (
                                                 <>
                                                     {/* Stock Local */}
-                                                    <td>
+                                                    <td className="td-stock-local">
                                                         {p.is_unique ? (
-                                                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                                                <span style={{
-                                                                    width: '6px',
-                                                                    height: '6px',
-                                                                    borderRadius: '50%',
-                                                                    background: p.stock > 0 ? '#10b981' : '#64748b',
-                                                                    display: 'inline-block'
-                                                                }}></span>
-                                                                <span style={{
-                                                                    fontSize: '12.5px',
-                                                                    fontWeight: 600,
-                                                                    color: p.stock > 0 ? 'var(--color-text)' : 'var(--color-text-muted)'
-                                                                }}>
+                                                            <div className="inv-unique-status">
+                                                                <span className={`inv-status-dot ${p.stock > 0 ? 'is-available' : 'is-sold'}`}></span>
+                                                                <span className="inv-status-text">
                                                                     {p.stock > 0 ? 'Disponible' : 'Vendido'}
                                                                 </span>
                                                             </div>
                                                         ) : (
-                                                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '6px' }}>
-                                                                <span style={{
-                                                                    fontWeight: 700,
-                                                                    fontSize: '13px',
-                                                                    color: p.stock === 0 
-                                                                        ? '#f87171' 
-                                                                        : (p.stock <= p.min_stock ? '#fbbf24' : 'var(--color-text)')
-                                                                }}>
-                                                                    {p.stock} <span style={{ fontSize: '11px', fontWeight: 500, color: p.stock === 0 ? 'rgba(248, 113, 113, 0.7)' : 'var(--color-text-secondary)' }}>{p.stock === 1 ? 'ud' : 'uds'}</span>
+                                                            <div className="inv-stock-count-row font-mono">
+                                                                <span className={`inv-stock-qty ${p.stock === 0 ? 'is-zero' : (p.stock <= p.min_stock ? 'is-low' : 'is-ok')}`}>
+                                                                    {p.stock} <span className="inv-unit-lbl">{p.stock === 1 ? 'ud' : 'uds'}</span>
                                                                 </span>
                                                                 {p.min_stock > 0 && (
-                                                                    <span style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>/ mín {p.min_stock}</span>
+                                                                    <span className="inv-stock-min">/ mín {p.min_stock}</span>
                                                                 )}
                                                             </div>
                                                         )}
                                                     </td>
 
                                                     {/* Stock en Otras Sucursales */}
-                                                    <td>
+                                                    <td className="td-stock-other">
                                                         {p.other_branches_total > 0 ? (
                                                             <button
                                                                 type="button"
+                                                                className="inv-other-branches-btn"
                                                                 onClick={() => setExpandedStockProductId(expandedStockProductId === p.id ? null : p.id)}
                                                                 title="Ver desglose por sucursal"
-                                                                style={{
-                                                                    display: 'inline-flex',
-                                                                    alignItems: 'center',
-                                                                    gap: '6px',
-                                                                    padding: '3px 8px',
-                                                                    borderRadius: 'var(--radius-sm)',
-                                                                    fontSize: '12px',
-                                                                    fontWeight: 500,
-                                                                    background: expandedStockProductId === p.id ? 'var(--color-bg-hover)' : 'var(--color-bg-secondary)',
-                                                                    border: '1px solid var(--color-border)',
-                                                                    color: 'var(--color-text)',
-                                                                    cursor: 'pointer',
-                                                                    transition: 'all 0.15s ease'
-                                                                }}
                                                             >
-                                                                <Store size={13} style={{ color: 'var(--color-text-muted)' }} />
+                                                                <Store size={13} className="inv-other-icon" />
                                                                 <span>{p.other_branches_total} {p.other_branches_total === 1 ? 'ud' : 'uds'} en {p.other_branches_stock.filter(b => b.stock > 0).length} {p.other_branches_stock.filter(b => b.stock > 0).length === 1 ? 'sede' : 'sedes'}</span>
                                                                 {expandedStockProductId === p.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
                                                             </button>
                                                         ) : (
-                                                            <span style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                                                            <span className="inv-other-empty">
                                                                 {p.is_unique 
                                                                     ? (p.stock === 0 ? 'Vendido' : 'Solo aquí')
-                                                                    : (p.stock === 0 ? <span style={{ color: '#f87171', fontWeight: 500 }}>Agotado global</span> : 'Solo aquí')}
+                                                                    : (p.stock === 0 ? <span className="text-danger font-medium">Agotado global</span> : 'Solo aquí')}
                                                             </span>
                                                         )}
                                                     </td>
@@ -1449,7 +1409,7 @@ export default function InventoryPage() {
                                             )}
 
                                             {/* Acciones */}
-                                            <td style={{ textAlign: 'right' }}>
+                                            <td className="td-actions" style={{ textAlign: 'right' }}>
                                                 <div className="product-actions">
                                                     {p.other_branches_total > 0 && (
                                                         <button 
@@ -1488,62 +1448,49 @@ export default function InventoryPage() {
 
                                         {/* Sub-fila expandible para desglose de stock por sede */}
                                         {expandedStockProductId === p.id && !isGlobalMatrixView && (
-                                            <tr className="expanded-stock-row" style={{ background: 'var(--color-bg-tertiary)' }}>
-                                                <td colSpan="9" style={{ padding: '14px 20px', borderBottom: '2px solid var(--color-border)', boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.06)' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                            <Store size={16} style={{ color: 'var(--color-text-secondary)' }} />
-                                                            <span style={{ fontWeight: 700, fontSize: '13px', color: 'var(--color-text)' }}>
-                                                                Disponibilidad de "{p.name}" en todas las sucursales:
-                                                            </span>
+                                            <tr className="expanded-stock-row">
+                                                <td colSpan="9" className="expanded-stock-cell">
+                                                    <div className="expanded-stock-header">
+                                                        <div className="expanded-stock-title">
+                                                            <Store size={16} />
+                                                            <span>Disponibilidad de "{p.name}":</span>
                                                         </div>
-                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--color-text-secondary)' }}>
-                                                                Stock Global: <strong>{p.total_company_stock}</strong> unidades
+                                                        <div className="expanded-stock-summary">
+                                                            <span className="expanded-stock-global font-mono">
+                                                                Global: <strong>{p.total_company_stock}</strong> uds
                                                             </span>
                                                             <button 
                                                                 type="button" 
                                                                 className="btn btn-secondary btn-sm" 
                                                                 onClick={() => setExpandedStockProductId(null)}
-                                                                style={{ padding: '2px 10px', fontSize: '11px' }}
                                                             >
-                                                                Cerrar Detalle
+                                                                Cerrar
                                                             </button>
                                                         </div>
                                                     </div>
-                                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '10px' }}>
+                                                    <div className="expanded-stock-grid">
                                                         {(p.branches_stock || []).map(b => (
                                                             <div 
                                                                 key={b.branch_id} 
-                                                                style={{ 
-                                                                    background: 'var(--color-bg-card)', 
-                                                                    border: '1px solid var(--color-border)', 
-                                                                    borderRadius: 'var(--radius-md)', 
-                                                                    padding: '10px 14px', 
-                                                                    display: 'flex', 
-                                                                    justifyContent: 'space-between', 
-                                                                    alignItems: 'center', 
-                                                                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)' 
-                                                                }}
+                                                                className="expanded-branch-card"
                                                             >
-                                                                <div>
-                                                                    <div style={{ fontWeight: 700, fontSize: '13px', color: 'var(--color-text)' }}>
+                                                                <div className="expanded-branch-info">
+                                                                    <div className="expanded-branch-name">
                                                                         {b.branch_name}
                                                                     </div>
-                                                                    <div style={{ fontSize: '11px', color: 'var(--color-text-secondary)' }}>
+                                                                    <div className="expanded-branch-code">
                                                                         {b.branch_code} {b.branch_id === parseInt(activeBranchId || user?.branch_id, 10) ? '(Tu sede actual)' : ''}
                                                                     </div>
                                                                 </div>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                                    <span style={{ fontWeight: 700, fontSize: '13px', color: b.stock > 0 ? 'var(--color-text)' : '#f87171' }}>
-                                                                        {b.stock} <span style={{ fontSize: '11px', fontWeight: 500, color: b.stock > 0 ? 'var(--color-text-secondary)' : 'rgba(248, 113, 113, 0.7)' }}>uds</span>
+                                                                <div className="expanded-branch-actions">
+                                                                    <span className={`expanded-branch-qty font-mono ${b.stock > 0 ? '' : 'is-empty'}`}>
+                                                                        {b.stock} <span className="inv-unit-lbl">uds</span>
                                                                     </span>
                                                                     {b.branch_id !== parseInt(activeBranchId || user?.branch_id, 10) && b.stock > 0 && (
                                                                         <button
                                                                             type="button"
                                                                             className="btn btn-secondary btn-sm"
                                                                             onClick={() => openQuickTransfer(p, String(b.branch_id))}
-                                                                            style={{ padding: '4px 10px', fontSize: '11px', gap: '4px' }}
                                                                             title={`Solicitar traspaso desde ${b.branch_name}`}
                                                                         >
                                                                             <ArrowLeftRight size={12} /> <span>Pedir</span>
@@ -1566,19 +1513,19 @@ export default function InventoryPage() {
 
             {/* Pagination Controls */}
             {totalPages > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 'var(--sp-4)', marginTop: 'var(--sp-4)', marginBottom: 'var(--sp-4)' }}>
+                <div className="inventory-pagination">
                     <button 
-                        className="btn btn-secondary" 
+                        className="btn btn-secondary btn-sm" 
                         disabled={currentPage === 1} 
                         onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                     >
                         Anterior
                     </button>
-                    <span style={{ fontSize: 'var(--font-sm)', color: 'var(--color-text-secondary)', fontWeight: 600 }}>
+                    <span className="inventory-pagination-info">
                         Página {currentPage} de {totalPages} ({filtered.length} productos)
                     </span>
                     <button 
-                        className="btn btn-secondary" 
+                        className="btn btn-secondary btn-sm" 
                         disabled={currentPage === totalPages} 
                         onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                     >
