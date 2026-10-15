@@ -55,7 +55,7 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
                     </div>
                 </div>
             );
-        } catch (e) {
+        } catch {
             return null;
         }
     };

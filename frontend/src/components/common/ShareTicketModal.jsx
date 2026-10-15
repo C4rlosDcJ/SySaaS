@@ -29,6 +29,7 @@ export default function ShareTicketModal({
     const [generatingImage, setGeneratingImage] = useState(false);
     const [copiedLink, setCopiedLink] = useState(false);
     const [copiedSummary, setCopiedSummary] = useState(false);
+    const [mobileTab, setMobileTab] = useState('preview'); // 'preview' | 'actions'
 
     // Unificar ticket data
     const ticketData = data || repair;
@@ -349,9 +350,29 @@ ${contactPhone ? `Tel: ${contactPhone}` : ''}`
                     </button>
                 </div>
 
+                {/* Mobile Tabs Switcher */}
+                <div className="share-ticket-mobile-tabs">
+                    <button
+                        type="button"
+                        className={`share-mobile-tab-btn ${mobileTab === 'preview' ? 'active' : ''}`}
+                        onClick={() => setMobileTab('preview')}
+                    >
+                        <Ticket size={15} />
+                        <span>Ver Ticket</span>
+                    </button>
+                    <button
+                        type="button"
+                        className={`share-mobile-tab-btn ${mobileTab === 'actions' ? 'active' : ''}`}
+                        onClick={() => setMobileTab('actions')}
+                    >
+                        <Share2 size={15} />
+                        <span>Opciones de Envío</span>
+                    </button>
+                </div>
+
                 <div className="share-ticket-body">
                     {/* Panel Izquierdo: Ticket Térmico Oficial Idéntico al de la Plataforma */}
-                    <div className="share-ticket-preview-pane">
+                    <div className={`share-ticket-preview-pane ${mobileTab === 'preview' ? 'mobile-visible' : 'mobile-hidden'}`}>
                         <div className="share-ticket-paper-wrapper">
                             <div className="share-thermal-ticket" ref={cardRef}>
                                 {/* Cabecera del Negocio */}
@@ -689,7 +710,7 @@ ${contactPhone ? `Tel: ${contactPhone}` : ''}`
                     </div>
 
                     {/* Panel Derecho: Acciones de Compartir */}
-                    <div className="share-ticket-actions-pane">
+                    <div className={`share-ticket-actions-pane ${mobileTab === 'actions' ? 'mobile-visible' : 'mobile-hidden'}`}>
                         <div className="share-action-group">
                             <h4 className="share-group-title">Envío Rápido</h4>
                             <p className="share-group-desc">

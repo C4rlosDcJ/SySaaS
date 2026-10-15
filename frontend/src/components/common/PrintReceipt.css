@@ -118,6 +118,36 @@
     color: var(--color-text, #ffffff);
 }
 
+@media (max-width: 520px) {
+    .print-receipt-overlay {
+        padding: 8px;
+    }
+
+    .print-receipt-modal {
+        max-height: 96vh;
+        border-radius: var(--radius-md, 8px);
+    }
+
+    .print-receipt-header {
+        padding: 10px 14px;
+        gap: 8px;
+    }
+
+    .btn-header-action {
+        padding: 6px 9px;
+        font-size: 0.74rem;
+    }
+
+    .receipt-print-area {
+        padding: 16px 8px;
+    }
+
+    .thermal-receipt {
+        padding: 10mm 4mm;
+        font-size: 10px;
+    }
+}
+
 .receipt-print-area {
     flex: 1;
     overflow-y: auto;
