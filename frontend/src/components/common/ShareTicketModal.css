@@ -1,6 +1,6 @@
 /* =====================================================
    ShareTicketModal — Diseño alineado a la plataforma SySaaS
-   Ticket auténtico con estilo Nothing / Minimalist Slate
+   Ticket térmico nítido de alta fidelidad para captura de imagen
    ===================================================== */
 
 .share-ticket-overlay {
@@ -105,7 +105,7 @@
 /* Body: 2 Columnas */
 .share-ticket-body {
     display: grid;
-    grid-template-columns: 360px 1fr;
+    grid-template-columns: 380px 1fr;
     gap: 20px;
     padding: 20px;
     overflow-y: auto;
@@ -128,7 +128,7 @@
     align-items: center;
     max-height: 72vh;
     overflow-y: auto;
-    padding: 12px;
+    padding: 14px 10px;
     background: #111111;
     border-radius: var(--radius-md, 6px);
     border: 1px solid var(--color-border, #1a1a1a);
@@ -136,23 +136,24 @@
 
 .share-ticket-paper-wrapper {
     width: 100%;
-    max-width: 320px;
     display: flex;
     justify-content: center;
     filter: drop-shadow(0 10px 25px rgba(0, 0, 0, 0.6));
 }
 
-/* Formato Exacto de Ticket Térmico de la plataforma */
+/* Formato Exacto de Ticket Térmico con tipografía legible y márgenes balanceados */
 .share-thermal-ticket {
     background: #ffffff !important;
     color: #000000 !important;
-    font-family: 'SF Mono', ui-monospace, 'Cascadia Mono', 'Roboto Mono', Menlo, monospace;
-    font-size: 10.5px;
-    line-height: 1.45;
-    width: 100%;
-    padding: 14px 12px;
+    font-family: 'SF Mono', ui-monospace, 'Cascadia Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    width: 360px;
+    max-width: 100%;
+    padding: 20px 16px;
     box-sizing: border-box;
-    border: 1px solid #e2e8f0;
+    border: 1px solid #d1d5db;
+    letter-spacing: -0.01em;
 }
 
 .share-thermal-ticket * {
@@ -163,11 +164,11 @@
 
 .st-header {
     text-align: center;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 
 .st-business-name {
-    font-size: 16px;
+    font-size: 17px;
     font-weight: 800;
     margin: 0 0 4px;
     letter-spacing: 0.02em;
@@ -175,59 +176,64 @@
 }
 
 .st-doc-title {
-    font-size: 11px;
+    font-size: 11.5px;
     font-weight: 700;
-    margin: 8px 0 6px;
-    padding: 3px 0;
+    margin: 10px 0 8px;
+    padding: 4px 6px;
     background: #000000 !important;
     color: #ffffff !important;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
+    line-height: 1.3;
 }
 
 .st-ticket-num {
-    font-size: 12px !important;
-    margin: 4px 0 2px !important;
+    font-size: 13px !important;
+    margin: 6px 0 3px !important;
+    font-weight: 800;
 }
 
+/* Badges con fondo visible en negro para impresión y texto blanco nítido */
 .st-badges-row {
     display: flex;
     justify-content: center;
-    gap: 4px;
-    margin-top: 6px;
+    gap: 6px;
+    margin-top: 8px;
     flex-wrap: wrap;
 }
 
 .st-badge {
-    background: #000000 !important;
+    background-color: #000000 !important;
     color: #ffffff !important;
     font-weight: 800;
-    font-size: 8.5px;
-    padding: 2px 5px;
+    font-size: 9px;
+    padding: 3px 6px;
     border-radius: 2px;
     text-transform: uppercase;
+    display: inline-block;
+    letter-spacing: 0.02em;
 }
 
 .st-warranty-banner {
     font-weight: bold;
     text-align: center;
-    margin-top: 6px;
-    font-size: 9.5px;
+    margin-top: 8px;
+    font-size: 10px;
     border: 1px solid #000;
-    padding: 3px;
-    background: #f0f0f0 !important;
+    padding: 4px;
+    background-color: #f0f0f0 !important;
 }
 
 /* Divisores */
 .st-divider-double {
     border-top: 3px double #000000;
-    margin: 8px 0;
+    margin: 10px 0;
     width: 100%;
 }
 
 .st-divider-dashed {
     border-top: 1px dashed #000000;
-    margin: 8px 0;
+    margin: 10px 0;
     width: 100%;
 }
 
@@ -236,7 +242,7 @@
 }
 
 .st-section {
-    margin: 6px 0;
+    margin: 8px 0;
 }
 
 .st-sec-title {
@@ -244,78 +250,139 @@
     text-transform: uppercase;
     border-bottom: 1px solid #000;
     padding-bottom: 2px;
-    margin-bottom: 4px;
-    font-size: 9.5px;
+    margin-bottom: 6px;
+    font-size: 10px;
     letter-spacing: 0.05em;
 }
 
 .st-row {
     display: flex;
     justify-content: space-between;
-    margin: 2px 0;
-    font-size: 10px;
+    margin: 3px 0;
+    font-size: 10.5px;
+    gap: 8px;
+}
+
+.st-row span:first-child {
+    flex-shrink: 0;
+}
+
+.st-row span:last-child {
+    text-align: right;
+    word-break: break-word;
 }
 
 .st-problem-box {
-    margin: 4px 0;
-    padding: 4px;
-    background: #f4f4f4 !important;
+    margin: 6px 0;
+    padding: 6px 8px;
+    background-color: #f4f4f4 !important;
+    border-left: 2px solid #000;
     font-style: italic;
-    font-size: 9.5px;
+    font-size: 10px;
+    line-height: 1.4;
 }
 
 .st-observations {
-    margin: 4px 0 0;
-    font-size: 9px;
+    margin: 6px 0 0;
+    font-size: 9.5px;
+    line-height: 1.4;
 }
 
-/* Checklist de ingreso */
+/* Checklist de ingreso con bordes claros y texto sin comprimir */
 .share-ticket-section {
-    margin: 6px 0;
+    margin: 10px 0;
 }
 
 .share-ticket-sec-title {
     font-weight: 700;
     text-transform: uppercase;
-    font-size: 9.5px;
+    font-size: 10px;
     border-bottom: 1px solid #000;
     padding-bottom: 2px;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     letter-spacing: 0.05em;
 }
 
 .share-ticket-checklist-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 3px;
-    font-size: 8.5px;
-    margin-top: 4px;
+    gap: 5px;
+    margin-top: 6px;
 }
 
 .checklist-item {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 6px;
+    border: 1px solid #000000;
+    border-radius: 4px;
+    padding: 3px 6px;
+    font-size: 9px;
+    background: #ffffff;
 }
 
 .check-yes {
-    font-weight: bold;
+    font-weight: 800;
+    font-size: 11px;
 }
 
 .check-no {
-    opacity: 0.6;
+    opacity: 0.7;
+    font-size: 11px;
+}
+
+.checklist-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Lista de Artículos de Venta */
+.st-items-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 8px 0;
+}
+
+.st-item-row {
+    display: flex;
+    flex-direction: column;
+    border-bottom: 1px dotted #ccc;
+    padding-bottom: 4px;
+}
+
+.st-item-main {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10.5px;
+    font-weight: 600;
+    gap: 8px;
+}
+
+.st-item-desc {
+    flex: 1;
+}
+
+.st-item-price {
+    font-weight: 700;
+}
+
+.st-item-meta {
+    font-size: 9px;
+    color: #444;
 }
 
 /* Costos */
 .st-costs {
-    margin: 6px 0;
+    margin: 8px 0;
 }
 
 .st-cost-row {
     display: flex;
     justify-content: space-between;
-    margin: 2px 0;
-    font-size: 10px;
+    margin: 3px 0;
+    font-size: 10.5px;
 }
 
 .st-cost-row.st-discount {
@@ -324,41 +391,41 @@
 
 .st-cost-row.st-total-row {
     font-weight: 800;
-    font-size: 11px;
+    font-size: 12px;
     border-top: 1px dashed #000;
     border-bottom: 1px dashed #000;
-    padding: 3px 0;
-    margin: 4px 0;
+    padding: 4px 0;
+    margin: 6px 0;
 }
 
 .st-cost-row.st-balance-row {
     font-weight: 800;
-    font-size: 11px;
-    padding-top: 2px;
+    font-size: 12px;
+    padding-top: 3px;
 }
 
 /* Firma */
 .st-signature-area {
-    margin-top: 14px;
+    margin-top: 16px;
     text-align: center;
 }
 
 .st-signature-line {
     border-bottom: 1px solid #000;
-    width: 65%;
-    margin: 20px auto 4px;
+    width: 70%;
+    margin: 24px auto 4px;
 }
 
 .st-signature-img {
-    max-height: 38px;
+    max-height: 42px;
     margin: 0 auto;
     display: block;
 }
 
 .st-terms-area {
-    margin-top: 10px;
-    font-size: 8px;
-    line-height: 1.35;
+    margin-top: 12px;
+    font-size: 8.5px;
+    line-height: 1.4;
     text-align: left;
 }
 
@@ -368,46 +435,46 @@
 
 .st-footer-note {
     text-align: center;
-    margin-top: 8px;
-    font-size: 9.5px;
+    margin-top: 10px;
+    font-size: 10px;
 }
 
 .st-barcode-area {
     text-align: center;
-    margin-top: 12px;
+    margin-top: 14px;
     letter-spacing: 2px;
-    font-size: 9px;
+    font-size: 10px;
 }
 
 .st-barcode-num {
-    font-size: 8px;
+    font-size: 8.5px;
     margin: 0;
     letter-spacing: normal;
 }
 
 .st-qr-area {
     text-align: center;
-    margin-top: 12px;
+    margin-top: 14px;
     border-top: 1px dashed #000;
-    padding-top: 8px;
+    padding-top: 10px;
 }
 
 .st-qr-area h4 {
     margin: 0 0 6px;
-    font-size: 9px;
+    font-size: 9.5px;
     letter-spacing: 0.05em;
 }
 
 .st-qr-img {
-    width: 80px;
-    height: 80px;
+    width: 90px;
+    height: 90px;
     margin: 0 auto;
     display: block;
 }
 
 .st-qr-url {
     margin: 4px 0 0;
-    font-size: 7.5px;
+    font-size: 8px;
     word-break: break-all;
 }
 
