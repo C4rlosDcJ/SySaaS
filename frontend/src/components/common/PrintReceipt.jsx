@@ -82,21 +82,45 @@ export default function PrintReceipt({ isOpen, onClose, data, type = 'repair', s
     return (
         <div className="print-receipt-overlay" onClick={onClose}>
             <div className="print-receipt-modal" onClick={(e) => e.stopPropagation()}>
-                <div className="print-receipt-actions">
-                    <button className="btn-secondary" onClick={onClose}>
-                        <X size={16} /> Cerrar
-                    </button>
-                    <button 
-                        className="btn-secondary" 
-                        onClick={() => setShowShareModal(true)} 
-                        style={{ background: 'var(--color-bg-elevated)', color: 'var(--color-text)', borderColor: 'var(--color-border-strong)' }}
-                        title="Compartir por WhatsApp, correo o descargar imagen PNG"
-                    >
-                        <Share2 size={16} /> Compartir Digital (WhatsApp / Imagen)
-                    </button>
-                    <button className="btn-primary" onClick={handlePrint}>
-                        <Printer size={16} /> Imprimir Ticket
-                    </button>
+                <div className="print-receipt-header">
+                    <div className="print-receipt-header-left">
+                        <span className="print-receipt-modal-title">
+                            {type === 'repair' ? 'Ticket de Servicio' : 'Ticket de Venta'}
+                        </span>
+                        <span className="print-receipt-modal-subtitle">
+                            {trackingCode}
+                        </span>
+                    </div>
+
+                    <div className="print-receipt-header-actions">
+                        <button 
+                            type="button"
+                            className="btn-header-action btn-header-share" 
+                            onClick={() => setShowShareModal(true)} 
+                            title="Compartir por WhatsApp, Correo o Imagen"
+                        >
+                            <Share2 size={15} />
+                            <span>Compartir</span>
+                        </button>
+                        <button 
+                            type="button"
+                            className="btn-header-action btn-header-print" 
+                            onClick={handlePrint}
+                            title="Imprimir ticket térmico"
+                        >
+                            <Printer size={15} />
+                            <span>Imprimir</span>
+                        </button>
+                        <button 
+                            type="button"
+                            className="btn-header-close" 
+                            onClick={onClose}
+                            title="Cerrar"
+                            aria-label="Cerrar"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
                 </div>
 
                 <div className="receipt-print-area">

@@ -29,46 +29,93 @@
     animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.print-receipt-actions {
-    display: flex;
-    gap: 12px;
-    padding: 16px;
-    border-bottom: 1px solid var(--color-border);
-    background: var(--color-bg-elevated);
-}
-
-.print-receipt-actions button {
-    flex: 1;
+/* Header del modal de impresión/comprobante */
+.print-receipt-header {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--color-border, #1a1a1a);
+    background: var(--color-bg-elevated, #161616);
+    gap: 12px;
+}
+
+.print-receipt-header-left {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.print-receipt-modal-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--color-text, #ffffff);
+    letter-spacing: -0.01em;
+}
+
+.print-receipt-modal-subtitle {
+    font-size: 0.75rem;
+    font-family: var(--font-mono, monospace);
+    color: var(--color-text-secondary, #888888);
+}
+
+.print-receipt-header-actions {
+    display: flex;
+    align-items: center;
     gap: 8px;
-    padding: 10px;
-    border-radius: 8px;
+    flex-shrink: 0;
+}
+
+.btn-header-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border-radius: var(--radius-md, 6px);
+    font-size: 0.8rem;
     font-weight: 600;
-    font-size: var(--font-sm);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s ease;
     border: 1px solid transparent;
 }
 
-.print-receipt-actions .btn-secondary {
-    background: var(--color-bg-card);
-    border-color: var(--color-border-strong);
-    color: var(--color-text);
+.btn-header-share {
+    background: var(--color-bg-card, #0a0a0a);
+    border-color: var(--color-border-strong, #2c2c2c);
+    color: var(--color-text, #ffffff);
 }
 
-.print-receipt-actions .btn-secondary:hover {
-    background: var(--color-bg-elevated);
+.btn-header-share:hover {
+    background: var(--color-border-strong, #2c2c2c);
+    color: var(--color-text, #ffffff);
 }
 
-.print-receipt-actions .btn-primary {
-    background: var(--color-primary);
-    color: #ffffff;
+.btn-header-print {
+    background: var(--color-primary, #ffffff);
+    color: var(--color-primary-contrast, #000000);
 }
 
-.print-receipt-actions .btn-primary:hover {
-    background: var(--color-primary-dark);
+.btn-header-print:hover {
+    background: var(--color-primary-dark, #e5e5e5);
+}
+
+.btn-header-close {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--color-text-secondary, #888888);
+    padding: 6px;
+    border-radius: var(--radius-md, 6px);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+}
+
+.btn-header-close:hover {
+    background: var(--color-bg-card, #0a0a0a);
+    border-color: var(--color-border, #2a2a2a);
+    color: var(--color-text, #ffffff);
 }
 
 .receipt-print-area {
@@ -359,6 +406,7 @@
         display: block !important;
     }
 
+    .print-receipt-header,
     .print-receipt-actions {
         display: none !important;
     }
