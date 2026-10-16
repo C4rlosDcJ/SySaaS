@@ -13,6 +13,48 @@ const generateTicketNumber = (branchCode = 'REP') => {
     return `${branchCode}-${year}${month}${day}-${random}`;
 };
 
+// Resolver el offset horario (+HH:MM o -HH:MM) del cliente/tenant
+const resolveClientOffset = (req) => {
+    const rawOffset = req?.headers?.['x-timezone-offset'] || req?.query?.tz_offset;
+    if (rawOffset && /^[+-]\d{2}:\d{2}$/.test(rawOffset)) {
+        return rawOffset;
+    }
+    const tz = req?.headers?.['x-timezone'] || req?.tenantCtx?.tenant?.timezone || 'America/Mexico_City';
+    try {
+        const d = new Date();
+        const str = d.toLocaleString('en-US', { timeZone: tz, timeZoneName: 'longOffset' });
+        const match = str.match(/GMT([+-]\d{1,2}):?(\d{2})?/i);
+        if (match) {
+            const sign = match[1].startsWith('-') ? '-' : '+';
+            const hh = String(Math.abs(parseInt(match[1].replace('+', ''), 10))).padStart(2, '0');
+            const mm = match[2] || '00';
+            return `${sign}${hh}:${mm}`;
+        }
+    } catch (e) {}
+    return '-06:00';
+};
+
+// Obtener fecha y hora actual en formato SQL respetando el huso horario local de la sucursal/tenant
+const getLocalSqlDateTime = (req) => {
+    const tz = req?.headers?.['x-timezone'] || req?.tenantCtx?.tenant?.timezone || 'America/Mexico_City';
+    try {
+        const d = new Date();
+        // Formateador ISO en el huso horario local
+        const formatter = new Intl.DateTimeFormat('sv-SE', {
+            timeZone: (tz && !/^[+-]\d{2}:\d{2}$/.test(tz)) ? tz : 'America/Mexico_City',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+        return formatter.format(d).replace('T', ' ');
+    } catch (e) {
+        return new Date().toISOString().slice(0, 19).replace('T', ' ');
+    }
+};
+
 // Normalizar fecha y hora para MySQL DATETIME evitando desfases de huso horario UTC
 const normalizeDateTime = (val) => {
     if (!val) return null;
@@ -321,6 +363,8 @@ exports.create = async (req, res) => {
         // El costo de refaccion (parts_cost) se descuenta de las ganancias internamente
         const total = Math.max(0, (parseFloat(diagnosis_cost) || 0) + (parseFloat(labor_cost) || 0) - (parseFloat(discount) || 0));
 
+        const localNow = getLocalSqlDateTime(req);
+
         const [result] = await db.query(`
       INSERT INTO repairs (
         tenant_id, branch_id, ticket_number, customer_id, device_type_id, brand_id, brand_other, model, color,
@@ -328,8 +372,8 @@ exports.create = async (req, res) => {
         physical_condition, existing_damage, function_checklist, problem_description,
         service_requested, service_id, priority, estimated_delivery, diagnosis_cost,
         labor_cost, parts_cost, discount, total_cost, advance_payment, warranty_days, 
-        warranty_expires, battery_health, screen_status, account_status, technical_observations, technician_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        warranty_expires, battery_health, screen_status, account_status, technical_observations, technician_id, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
             tenantId, branchId, ticketNumber, finalCustomerId, 
             (device_type_id === 'other' || !device_type_id) ? null : device_type_id,
@@ -341,13 +385,13 @@ exports.create = async (req, res) => {
             diagnosis_cost || 0, labor_cost || 0, parts_cost || 0, discount || 0, total,
             advance_payment || 0, finalWarrantyDays, null,
             battery_health || null, screen_status || null, account_status || null,
-            technical_observations || null, technician_id || null
+            technical_observations || null, technician_id || null, localNow
         ]);
 
         // Registrar en historial
         await db.query(
-            'INSERT INTO repair_status_history (repair_id, status, notes, changed_by) VALUES (?, ?, ?, ?)',
-            [result.insertId, 'received', 'Reparación creada', req.user.id]
+            'INSERT INTO repair_status_history (repair_id, status, notes, changed_by, created_at) VALUES (?, ?, ?, ?, ?)',
+            [result.insertId, 'received', 'Reparación creada', req.user.id, localNow]
         );
 
         // Obtener datos del cliente para email
@@ -495,6 +539,35 @@ exports.update = async (req, res) => {
                 .catch(err => console.error('[REPAIRS] Error buscando cliente para reprogramacion:', err.message));
         }
 
+        // Si la llamada general a update() modificó el estado, sincronizar marcas de tiempo e historial
+        if (updates.status && updates.status !== existing[0].status) {
+            const localNow = getLocalSqlDateTime(req);
+            const extraSets = [];
+            const extraParams = [];
+
+            if (updates.status === 'repairing' && !existing[0].started_at) {
+                extraSets.push('started_at = ?');
+                extraParams.push(localNow);
+            } else if (updates.status === 'ready' || updates.status === 'delivered') {
+                extraSets.push('completed_at = ?');
+                extraParams.push(localNow);
+                if (updates.status === 'delivered') {
+                    extraSets.push('delivered_at = ?', 'warranty_expires = DATE_ADD(?, INTERVAL COALESCE(warranty_days, 30) DAY)');
+                    extraParams.push(localNow, localNow);
+                }
+            }
+
+            if (extraSets.length > 0) {
+                extraParams.push(id, tenantId);
+                await db.query(`UPDATE repairs SET ${extraSets.join(', ')} WHERE id = ? AND tenant_id = ?`, extraParams);
+            }
+
+            await db.query(
+                'INSERT INTO repair_status_history (repair_id, status, notes, changed_by, created_at) VALUES (?, ?, ?, ?, ?)',
+                [id, updates.status, 'Estado actualizado desde detalles', req.user.id, localNow]
+            );
+        }
+
         res.json({ message: 'Reparación actualizada exitosamente.' });
     } catch (error) {
         console.error('[REPAIRS] Error al actualizar reparación:', error);
@@ -577,12 +650,17 @@ exports.updateStatus = async (req, res) => {
             }
         }
 
+        const localNow = getLocalSqlDateTime(req);
+
         if (status === 'repairing' && !repair.started_at) {
-            updateQuery += ', started_at = NOW()';
+            updateQuery += ', started_at = ?';
+            updateParams.push(localNow);
         } else if (status === 'ready' || status === 'delivered') {
-            updateQuery += ', completed_at = NOW()';
+            updateQuery += ', completed_at = ?';
+            updateParams.push(localNow);
             if (status === 'delivered') {
-                updateQuery += ', delivered_at = NOW(), warranty_expires = DATE_ADD(NOW(), INTERVAL warranty_days DAY)';
+                updateQuery += ', delivered_at = ?, warranty_expires = DATE_ADD(?, INTERVAL COALESCE(warranty_days, 30) DAY)';
+                updateParams.push(localNow, localNow);
             }
         }
 
@@ -594,8 +672,8 @@ exports.updateStatus = async (req, res) => {
         // Registrar en historial si cambió el estado
         if (status !== repair.status || (req.user.role === 'client' && estimated_delivery)) {
             await db.query(
-                'INSERT INTO repair_status_history (repair_id, status, notes, changed_by) VALUES (?, ?, ?, ?)',
-                [id, status, notes || (estimated_delivery ? 'Fecha de entrega/recolección actualizada' : null), req.user.id]
+                'INSERT INTO repair_status_history (repair_id, status, notes, changed_by, created_at) VALUES (?, ?, ?, ?, ?)',
+                [id, status, notes || (estimated_delivery ? 'Fecha de entrega/recolección actualizada' : null), req.user.id, localNow]
             );
         }
 

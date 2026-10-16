@@ -62,6 +62,13 @@ export default function RepairDetailPage() {
 
     const formatDatetimeLocal = (val) => {
         if (!val) return '';
+        if (typeof val === 'string') {
+            const match = val.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}))?/);
+            if (match) {
+                const [, y, m, d, hh = '00', min = '00'] = match;
+                return `${y}-${m}-${d}T${hh}:${min}`;
+            }
+        }
         const d = new Date(val);
         if (isNaN(d.getTime())) return '';
         const yyyy = d.getFullYear();
