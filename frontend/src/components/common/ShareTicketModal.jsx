@@ -143,12 +143,12 @@ export default function ShareTicketModal({
         }
     };
 
-    // Renderizar la tarjeta como imagen PNG en alta definicion nitida (2.5x escala)
+    // Renderizar la tarjeta como imagen PNG en alta definicion nitida (3x escala)
     const captureTicketCanvas = async () => {
         if (!cardRef.current) return null;
         try {
             return await html2canvas(cardRef.current, {
-                scale: 2.5,
+                scale: 3,
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#ffffff',
@@ -159,12 +159,40 @@ export default function ShareTicketModal({
                     if (el) {
                         el.style.width = '380px';
                         el.style.maxWidth = '380px';
+                        el.style.minWidth = '380px';
                         el.style.boxSizing = 'border-box';
                         el.style.backgroundColor = '#ffffff';
                         el.style.color = '#000000';
                         el.style.display = 'block';
                         el.style.visibility = 'visible';
+                        el.style.overflow = 'visible';
+                        el.style.fontFamily = "'Courier New', Courier, monospace";
+                        el.style.letterSpacing = '0';
                     }
+
+                    // Garantizar que los badges no recorten su contenido
+                    const badges = clonedDoc.querySelectorAll('.st-badge');
+                    badges.forEach((badge) => {
+                        badge.style.overflow = 'visible';
+                        badge.style.display = 'inline-flex';
+                        badge.style.alignItems = 'center';
+                        badge.style.padding = '4px 8px';
+                        badge.style.lineHeight = '1';
+                        badge.style.border = '1.5px solid #000000';
+                        badge.style.borderRadius = '4px';
+                        badge.style.backgroundColor = '#ffffff';
+                        badge.style.color = '#000000';
+                        badge.style.boxSizing = 'border-box';
+                    });
+
+                    // Garantizar que las labels del checklist no se corten
+                    const checkLabels = clonedDoc.querySelectorAll('.st-check-label');
+                    checkLabels.forEach((label) => {
+                        label.style.overflow = 'visible';
+                        label.style.whiteSpace = 'normal';
+                        label.style.wordBreak = 'break-word';
+                        label.style.textOverflow = 'unset';
+                    });
                 }
             });
         } catch (captureErr) {
