@@ -570,31 +570,34 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 14px;
+    padding: 12px 14px;
     border-radius: var(--radius-md, 6px);
-    border: 1px solid transparent;
+    border: 1px solid var(--color-border-strong, #2c2c2c);
     cursor: pointer;
     text-align: left;
     transition: all 0.15s ease;
 }
 
 .btn-share-primary.btn-share-wa {
-    background: #25d366;
+    background: #ffffff;
     color: #000000;
+    border-color: #ffffff;
 }
 
 .btn-share-primary.btn-share-wa:hover {
-    background: #20ba59;
+    background: #e6e6e6;
+    border-color: #e6e6e6;
 }
 
 .btn-share-primary.btn-share-email {
-    background: var(--color-primary-muted, rgba(255, 255, 255, 0.08));
+    background: var(--color-bg-elevated, #161616);
     border-color: var(--color-border-strong, #2c2c2c);
     color: var(--color-text, #ffffff);
 }
 
 .btn-share-primary.btn-share-email:hover {
-    background: var(--color-bg-elevated, #222222);
+    background: #202020;
+    border-color: #444444;
 }
 
 .btn-share-text {

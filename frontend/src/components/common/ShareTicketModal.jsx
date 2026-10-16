@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { 
     X, 
     Share2, 
@@ -9,9 +9,11 @@ import {
     Mail, 
     FileText, 
     Printer,
-    Ticket
+    Ticket,
+    Image as ImageIcon
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
+import QRCode from 'qrcode';
 import { STATUS_LABELS, formatCurrency, formatDate, formatDateTime } from '../../utils/constants';
 import { generateServiceTicket } from '../../utils/pdfGenerator';
 import { buildWhatsAppUrl } from '../../utils/whatsappUtils';
@@ -21,7 +23,7 @@ export default function ShareTicketModal({
     isOpen,
     onClose,
     repair,
-    data, // Soporte genérico para reparación o venta
+    data, // Soporte generico para reparacion o venta
     type = 'repair', // 'repair' | 'pos' | 'sale'
     settings = {}
 }) {
@@ -29,32 +31,65 @@ export default function ShareTicketModal({
     const [generatingImage, setGeneratingImage] = useState(false);
     const [copiedLink, setCopiedLink] = useState(false);
     const [copiedSummary, setCopiedSummary] = useState(false);
+    const [copiedImage, setCopiedImage] = useState(false);
+    const [qrDataUrl, setQrDataUrl] = useState('');
     const [mobileTab, setMobileTab] = useState('preview'); // 'preview' | 'actions'
 
     // Unificar ticket data
     const ticketData = data || repair;
-    if (!isOpen || !ticketData) return null;
 
-    const isSale = type === 'pos' || type === 'sale' || Boolean(ticketData.sale_number && !ticketData.ticket_number);
+    const isSale = type === 'pos' || type === 'sale' || Boolean(ticketData?.sale_number && !ticketData?.ticket_number);
 
-    const businessName = settings.business_name || settings.company_name || ticketData.company_name || ticketData.tenant_name || 'SySaaS';
-    const contactPhone = settings.contact_phone || ticketData.tenant_phone || '';
-    const contactEmail = settings.contact_email || ticketData.tenant_email || '';
-    const contactAddress = settings.business_address || ticketData.tenant_address || 'Dirección de la empresa';
+    const businessName = settings.business_name || settings.company_name || ticketData?.company_name || ticketData?.tenant_name || 'SySaaS';
+    const contactPhone = settings.contact_phone || ticketData?.tenant_phone || '';
+    const contactEmail = settings.contact_email || ticketData?.tenant_email || '';
+    const contactAddress = settings.business_address || ticketData?.tenant_address || 'Direccion de la empresa';
     const defaultWarrantyDays = settings.default_warranty_days || 30;
 
-    const customerName = `${ticketData.customer_first_name || ticketData.first_name || 'Cliente'} ${ticketData.customer_last_name || ticketData.last_name || ''}`.trim();
-    const customerPhone = ticketData.customer_phone || ticketData.phone || '';
-    const customerEmail = ticketData.customer_email || ticketData.email || '';
+    const customerName = `${ticketData?.customer_first_name || ticketData?.first_name || 'Cliente'} ${ticketData?.customer_last_name || ticketData?.last_name || ''}`.trim();
+    const customerPhone = ticketData?.customer_phone || ticketData?.phone || '';
+    const customerEmail = ticketData?.customer_email || ticketData?.email || '';
 
-    const ticketNumber = ticketData.ticket_number || ticketData.sale_number || `#${ticketData.id}`;
-    const trackingCode = ticketData.ticket_number || ticketData.sale_number;
+    const ticketNumber = ticketData?.ticket_number || ticketData?.sale_number || `#${ticketData?.id || ''}`;
+    const trackingCode = ticketData?.ticket_number || ticketData?.sale_number || '';
     const trackingUrl = `${window.location.origin}/rastrear?ticketId=${encodeURIComponent(trackingCode || '')}`;
-    const qrImageUrl = trackingCode ? `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(trackingUrl)}&margin=0` : '';
 
-    // Datos específicos de reparación
+    // Generar QR en formato DataURL local sin peticiones externas para evitar canvas contaminado (tainted canvas)
+    useEffect(() => {
+        if (!isOpen || !trackingCode) {
+            setQrDataUrl('');
+            return;
+        }
+
+        let isMounted = true;
+        QRCode.toDataURL(trackingUrl, {
+            width: 260,
+            margin: 1,
+            color: {
+                dark: '#000000',
+                light: '#ffffff'
+            },
+            errorCorrectionLevel: 'M'
+        })
+            .then(dataUri => {
+                if (isMounted) {
+                    setQrDataUrl(dataUri);
+                }
+            })
+            .catch(err => {
+                console.error('Error generando QR local:', err);
+            });
+
+        return () => {
+            isMounted = false;
+        };
+    }, [isOpen, trackingCode, trackingUrl]);
+
+    if (!isOpen || !ticketData) return null;
+
+    // Datos especificos de reparacion
     const deviceName = `${ticketData.brand_name === 'Otro' ? ticketData.brand_other : (ticketData.brand_name || ticketData.brand || '')} ${ticketData.model || ''}`.trim() || 'Dispositivo';
-    const serviceName = ticketData.service_name || ticketData.service_requested || 'Reparación General';
+    const serviceName = ticketData.service_name || ticketData.service_requested || 'Reparacion General';
     const totalCost = parseFloat(ticketData.total_cost || ticketData.total || 0);
     const diagCost = parseFloat(ticketData.diagnosis_cost || 0);
     const serviceCost = Math.max(0, totalCost - diagCost);
@@ -93,7 +128,7 @@ export default function ShareTicketModal({
                             const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                             return (
                                 <div key={key} className="checklist-item">
-                                    <span className={value ? 'check-yes' : 'check-no'}>{value ? '✓' : '✗'}</span>
+                                    <span className={value ? 'check-yes' : 'check-no'}>{value ? '[x]' : '[ ]'}</span>
                                     <span className="checklist-text">{label}</span>
                                 </div>
                             );
@@ -106,18 +141,16 @@ export default function ShareTicketModal({
         }
     };
 
-    // Renderizar la tarjeta como imagen PNG en alta definición nítida (3x escala)
+    // Renderizar la tarjeta como imagen PNG en alta definicion nitida (3x escala)
     const captureTicketCanvas = async () => {
         if (!cardRef.current) return null;
         return await html2canvas(cardRef.current, {
             scale: 3,
             useCORS: true,
-            allowTaint: true,
+            allowTaint: false,
             backgroundColor: '#ffffff',
             logging: false,
-            imageTimeout: 5000,
             onclone: (clonedDoc) => {
-                // Asegurar que el elemento clonado tenga dimensiones fijas y legibles
                 const el = clonedDoc.querySelector('.share-thermal-ticket');
                 if (el) {
                     el.style.width = '380px';
@@ -129,22 +162,55 @@ export default function ShareTicketModal({
         });
     };
 
+    // Obtener Blob seguro del canvas
+    const getTicketBlob = async () => {
+        const canvas = await captureTicketCanvas();
+        if (!canvas) throw new Error('No se pudo inicializar el canvas');
+        return new Promise((resolve, reject) => {
+            canvas.toBlob((blob) => {
+                if (blob) resolve(blob);
+                else reject(new Error('Fallo al exportar blob de imagen'));
+            }, 'image/png', 1.0);
+        });
+    };
+
     // Descargar imagen PNG directamente
     const handleDownloadImage = async () => {
         try {
             setGeneratingImage(true);
-            const canvas = await captureTicketCanvas();
-            if (!canvas) return;
-            const imgData = canvas.toDataURL('image/png', 1.0);
+            const blob = await getTicketBlob();
+            const blobUrl = URL.createObjectURL(blob);
             const link = document.createElement('a');
-            link.href = imgData;
-            link.download = `Ticket_${ticketNumber}.png`;
+            link.href = blobUrl;
+            link.download = `Ticket_${ticketNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
         } catch (err) {
             console.error('Error al generar imagen de ticket:', err);
-            alert('No se pudo generar la imagen. Intenta con la opción PDF.');
+            alert('No se pudo descargar la imagen directamente. Puedes usar Descargar PDF o Copiar Imagen.');
+        } finally {
+            setGeneratingImage(false);
+        }
+    };
+
+    // Copiar imagen al portapapeles para pegar directo en WhatsApp o emails
+    const handleCopyImage = async () => {
+        try {
+            setGeneratingImage(true);
+            const blob = await getTicketBlob();
+            if (navigator.clipboard && window.ClipboardItem) {
+                const item = new ClipboardItem({ 'image/png': blob });
+                await navigator.clipboard.write([item]);
+                setCopiedImage(true);
+                setTimeout(() => setCopiedImage(false), 2500);
+            } else {
+                handleDownloadImage();
+            }
+        } catch (err) {
+            console.error('Error copiando imagen al portapapeles:', err);
+            handleDownloadImage();
         } finally {
             setGeneratingImage(false);
         }
@@ -154,17 +220,21 @@ export default function ShareTicketModal({
     const handleNativeShare = async () => {
         try {
             setGeneratingImage(true);
-            const canvas = await captureTicketCanvas();
-            if (!canvas) return;
-
-            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
-            const file = new File([blob], `Ticket_${ticketNumber}.png`, { type: 'image/png' });
+            const blob = await getTicketBlob();
+            const fileName = `Ticket_${ticketNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+            const file = new File([blob], fileName, { type: 'image/png' });
 
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
                     files: [file],
                     title: `Ticket ${ticketNumber} - ${businessName}`,
-                    text: `Hola ${customerName}, adjuntamos tu comprobante en ${businessName} (Folio: ${ticketNumber}). Rastreo y detalles: ${trackingUrl}`
+                    text: `${businessName} | Folio: ${ticketNumber} | Enlace de rastreo: ${trackingUrl}`
+                });
+            } else if (navigator.share) {
+                await navigator.share({
+                    title: `Ticket ${ticketNumber} - ${businessName}`,
+                    text: `${businessName} | Folio: ${ticketNumber} | Consulta digital: ${trackingUrl}`,
+                    url: trackingUrl
                 });
             } else {
                 handleDownloadImage();
@@ -179,50 +249,49 @@ export default function ShareTicketModal({
         }
     };
 
-    // Compartir por WhatsApp con texto formateado completo
+    // Compartir por WhatsApp con texto limpio y directo sin emojis
     const handleShareWhatsApp = () => {
         let textMessage = '';
 
         if (isSale) {
             textMessage = 
-`*${businessName.toUpperCase()}* 🧾
+`*${businessName.toUpperCase()}*
 *COMPROBANTE DE COMPRA*
 
-Hola *${customerName || 'Cliente'}*, adjuntamos tu ticket de venta:
-━━━━━━━━━━━━━━━━━
-📌 *Folio de Venta:* ${ticketNumber}
-📅 *Fecha:* ${formatDateTime(ticketData.created_at || new Date())}
-👤 *Atendió:* ${ticketData.cashier_first_name || 'Caja'} ${ticketData.cashier_last_name || ''}
-${ticketData.repair_ticket ? `🔧 *Reparación Asociada:* ${ticketData.repair_ticket}\n` : ''}
-🛒 *Artículos:*
-${ticketData.items?.map(it => `• ${it.quantity}x ${it.description} - ${formatCurrency(it.total)}`).join('\n') || '• Venta mostrador'}
-━━━━━━━━━━━━━━━━━
-💰 *Total Compra:* ${formatCurrency(ticketData.total || 0)}
-💳 *Método de Pago:* ${(ticketData.payment_method || 'efectivo').toUpperCase()}
-━━━━━━━━━━━━━━━━━
-🔍 *Consulta tu ticket digital y garantía aquí:*
+Estimado/a *${customerName || 'Cliente'}*, adjuntamos su comprobante de compra:
+---------------------------------
+*Folio:* ${ticketNumber}
+*Fecha:* ${formatDateTime(ticketData.created_at || new Date())}
+*Atendio:* ${ticketData.cashier_first_name || 'Caja'} ${ticketData.cashier_last_name || ''}
+${ticketData.repair_ticket ? `*Reparacion Asociada:* ${ticketData.repair_ticket}\n` : ''}*Articulos:*
+${ticketData.items?.map(it => `- ${it.quantity}x ${it.description} (${formatCurrency(it.total)})`).join('\n') || '- Venta mostrador'}
+---------------------------------
+*Total Compra:* ${formatCurrency(ticketData.total || 0)}
+*Metodo de Pago:* ${(ticketData.payment_method || 'efectivo').toUpperCase()}
+---------------------------------
+Consulte su ticket digital y detalles de compra en el siguiente enlace:
 ${trackingUrl}
 
-_¡Muchas gracias por su compra!_`;
+Gracias por su compra.`;
         } else {
             textMessage = 
-`*${businessName.toUpperCase()}* 🧾
-*${isDelivered ? 'COMPROBANTE DE ENTREGA Y GARANTÍA' : 'ORDEN DE SERVICIO'}*
+`*${businessName.toUpperCase()}*
+*${isDelivered ? 'COMPROBANTE DE ENTREGA Y GARANTIA' : 'ORDEN DE SERVICIO'}*
 
-Hola *${customerName}*, adjuntamos el detalle de tu ticket:
-━━━━━━━━━━━━━━━━━
-📌 *Folio:* ${ticketNumber}
-📱 *Equipo:* ${deviceName}
-${ticketData.imei || ticketData.serial_number ? `🔢 *IMEI/Serie:* ${ticketData.imei || ticketData.serial_number}\n` : ''}${ticketData.color ? `🎨 *Color:* ${ticketData.color}\n` : ''}🔧 *Servicio:* ${serviceName}
-${ticketData.problem_description ? `⚠️ *Falla:* "${ticketData.problem_description}"\n` : ''}🚦 *Estado:* ${statusLabel}
-💵 *Total:* ${formatCurrency(totalCost)}
-${advancePayment > 0 ? `💰 *Anticipo:* ${formatCurrency(advancePayment)}\n` : ''}💳 *Resta:* ${formatCurrency(balance)}
-🛡️ *Garantía:* ${warrantyDays} días
-━━━━━━━━━━━━━━━━━
-🔍 *Rastrea tu equipo en vivo y consulta tu ticket digital aquí:*
+Estimado/a *${customerName}*, adjuntamos el detalle oficial de su servicio:
+---------------------------------
+*Folio:* ${ticketNumber}
+*Equipo:* ${deviceName}
+${ticketData.imei || ticketData.serial_number ? `*IMEI / Serie:* ${ticketData.imei || ticketData.serial_number}\n` : ''}${ticketData.color ? `*Color:* ${ticketData.color}\n` : ''}*Servicio:* ${serviceName}
+${ticketData.problem_description ? `*Falla Reportada:* "${ticketData.problem_description}"\n` : ''}*Estado:* ${statusLabel}
+*Total Estimado:* ${formatCurrency(totalCost)}
+${advancePayment > 0 ? `*Anticipo Pagado:* ${formatCurrency(advancePayment)}\n` : ''}*Resta por Liquidar:* ${formatCurrency(balance)}
+*Garantia:* ${warrantyDays} dias
+---------------------------------
+Rastree el avance de su equipo y descargue su comprobante digital aqui:
 ${trackingUrl}
 
-_Gracias por tu preferencia._`;
+Gracias por su preferencia.`;
         }
 
         const waUrl = buildWhatsAppUrl(customerPhone, textMessage);
@@ -233,7 +302,7 @@ _Gracias por tu preferencia._`;
         }
     };
 
-    // Compartir por correo con mailto
+    // Compartir por correo con mailto sin emojis
     const handleShareEmail = () => {
         const subject = encodeURIComponent(
             isSale 
@@ -244,21 +313,21 @@ _Gracias por tu preferencia._`;
         let body = '';
         if (isSale) {
             body = encodeURIComponent(
-`Hola ${customerName || 'Cliente'},
+`Estimado/a ${customerName || 'Cliente'},
 
-Te compartimos el comprobante de tu compra en ${businessName}:
+Le compartimos los detalles de su compra en ${businessName}:
 
-• Folio de Compra: ${ticketNumber}
-• Fecha: ${formatDateTime(ticketData.created_at || new Date())}
-• Atendió: ${ticketData.cashier_first_name || 'Caja'} ${ticketData.cashier_last_name || ''}
-${ticketData.repair_ticket ? `• Folio Reparación: ${ticketData.repair_ticket}\n` : ''}
-Artículos:
-${ticketData.items?.map(it => `• ${it.quantity}x ${it.description}: ${formatCurrency(it.total)}`).join('\n') || ''}
+- Folio: ${ticketNumber}
+- Fecha: ${formatDateTime(ticketData.created_at || new Date())}
+- Atendio: ${ticketData.cashier_first_name || 'Caja'} ${ticketData.cashier_last_name || ''}
+${ticketData.repair_ticket ? `- Folio de Reparacion Asociada: ${ticketData.repair_ticket}\n` : ''}
+Articulos:
+${ticketData.items?.map(it => `- ${it.quantity}x ${it.description}: ${formatCurrency(it.total)}`).join('\n') || ''}
 
-Total: ${formatCurrency(ticketData.total || 0)}
+Total Compra: ${formatCurrency(ticketData.total || 0)}
 Forma de Pago: ${(ticketData.payment_method || 'efectivo').toUpperCase()}
 
-Consulta y descarga tu ticket digital aquí:
+Puede consultar su comprobante digital y garantia en el siguiente enlace:
 ${trackingUrl}
 
 Atentamente,
@@ -268,21 +337,21 @@ ${contactPhone ? `Tel: ${contactPhone}` : ''}`
             );
         } else {
             body = encodeURIComponent(
-`Hola ${customerName},
+`Estimado/a ${customerName},
 
-Te compartimos la información completa de tu ticket en ${businessName}:
+Le compartimos el detalle oficial de su orden de servicio en ${businessName}:
 
-• Folio de Ticket: ${ticketNumber}
-• Fecha: ${formatDateTime(ticketData.created_at || new Date())}
-• Equipo: ${deviceName}
-${ticketData.imei || ticketData.serial_number ? `• IMEI/Serie: ${ticketData.imei || ticketData.serial_number}\n` : ''}${ticketData.color ? `• Color: ${ticketData.color}\n` : ''}• Servicio: ${serviceName}
-${ticketData.problem_description ? `• Falla Reportada: ${ticketData.problem_description}\n` : ''}• Estado Actual: ${statusLabel}
-• Total Estimado: ${formatCurrency(totalCost)}
-• Anticipo Pagado: ${formatCurrency(advancePayment)}
-• Resta por Liquidar: ${formatCurrency(balance)}
-• Garantía Aplicable: ${warrantyDays} días
+- Folio: ${ticketNumber}
+- Fecha: ${formatDateTime(ticketData.created_at || new Date())}
+- Equipo: ${deviceName}
+${ticketData.imei || ticketData.serial_number ? `- IMEI / Serie: ${ticketData.imei || ticketData.serial_number}\n` : ''}${ticketData.color ? `- Color: ${ticketData.color}\n` : ''}- Servicio: ${serviceName}
+${ticketData.problem_description ? `- Falla Reportada: ${ticketData.problem_description}\n` : ''}- Estado Actual: ${statusLabel}
+- Total: ${formatCurrency(totalCost)}
+- Anticipo: ${formatCurrency(advancePayment)}
+- Resta por Liquidar: ${formatCurrency(balance)}
+- Garantia: ${warrantyDays} dias
 
-Puedes consultar los avances técnicos y rastrear tu servicio en vivo desde este enlace:
+Puede dar seguimiento en vivo al estatus de su dispositivo aqui:
 ${trackingUrl}
 
 Atentamente,
@@ -297,8 +366,8 @@ ${contactPhone ? `Tel: ${contactPhone}` : ''}`
 
     const handleCopySummary = async () => {
         const summary = isSale
-            ? `${businessName} | Folio: ${ticketNumber} | Total: ${formatCurrency(ticketData.total || 0)} | Rastreo: ${trackingUrl}`
-            : `${businessName} | Ticket: ${ticketNumber} | Equipo: ${deviceName} | Total: ${formatCurrency(totalCost)} | Saldo: ${formatCurrency(balance)} | Rastreo: ${trackingUrl}`;
+            ? `${businessName} | Folio: ${ticketNumber} | Total: ${formatCurrency(ticketData.total || 0)} | Enlace: ${trackingUrl}`
+            : `${businessName} | Folio: ${ticketNumber} | Equipo: ${deviceName} | Total: ${formatCurrency(totalCost)} | Resta: ${formatCurrency(balance)} | Enlace: ${trackingUrl}`;
         try {
             await navigator.clipboard.writeText(summary);
             setCopiedSummary(true);
@@ -697,11 +766,11 @@ ${contactPhone ? `Tel: ${contactPhone}` : ''}`
                                     <p className="st-barcode-num">{ticketNumber}</p>
                                 </div>
 
-                                {/* Código QR de Rastreo */}
-                                {qrImageUrl && (
+                                {/* Codigo QR de Rastreo */}
+                                {qrDataUrl && (
                                     <div className="st-qr-area">
                                         <h4>{isSale ? 'DESCARGAR TICKET DIGITAL' : 'RASTREA TU SERVICIO'}</h4>
-                                        <img src={qrImageUrl} alt="QR Tracking" className="st-qr-img" />
+                                        <img src={qrDataUrl} alt="QR Tracking" className="st-qr-img" />
                                         <p className="st-qr-url">{trackingCode}</p>
                                     </div>
                                 )}
@@ -712,9 +781,9 @@ ${contactPhone ? `Tel: ${contactPhone}` : ''}`
                     {/* Panel Derecho: Acciones de Compartir */}
                     <div className={`share-ticket-actions-pane ${mobileTab === 'actions' ? 'mobile-visible' : 'mobile-hidden'}`}>
                         <div className="share-action-group">
-                            <h4 className="share-group-title">Envío Rápido</h4>
+                            <h4 className="share-group-title">Envio Rapido</h4>
                             <p className="share-group-desc">
-                                Envía este ticket con toda la información directamente al cliente:
+                                Envia el comprobante digital o accede al chat del cliente:
                             </p>
 
                             <div className="share-buttons-stack">
@@ -743,7 +812,7 @@ ${contactPhone ? `Tel: ${contactPhone}` : ''}`
                         </div>
 
                         <div className="share-action-group">
-                            <h4 className="share-group-title">Descargar Comprobante</h4>
+                            <h4 className="share-group-title">Descargar y Compartir Comprobante</h4>
                             <div className="share-buttons-row">
                                 <button 
                                     className="btn-share-action"
@@ -754,14 +823,23 @@ ${contactPhone ? `Tel: ${contactPhone}` : ''}`
                                     <span>{generatingImage ? 'Generando...' : 'Descargar Imagen'}</span>
                                 </button>
 
-                                {typeof navigator !== 'undefined' && navigator.canShare && (
+                                <button 
+                                    className="btn-share-action"
+                                    onClick={handleCopyImage}
+                                    disabled={generatingImage}
+                                >
+                                    {copiedImage ? <Check size={16} /> : <ImageIcon size={16} />}
+                                    <span>{copiedImage ? 'Copiada al portapapeles' : 'Copiar Imagen'}</span>
+                                </button>
+
+                                {typeof navigator !== 'undefined' && navigator.share && (
                                     <button 
                                         className="btn-share-action"
                                         onClick={handleNativeShare}
                                         disabled={generatingImage}
                                     >
                                         <Share2 size={16} />
-                                        <span>Compartir Imagen</span>
+                                        <span>Compartir</span>
                                     </button>
                                 )}
 
@@ -782,16 +860,16 @@ ${contactPhone ? `Tel: ${contactPhone}` : ''}`
                                     className="btn-share-utility"
                                     onClick={handleCopyLink}
                                 >
-                                    {copiedLink ? <Check size={14} className="text-success" /> : <Copy size={14} />}
-                                    <span>{copiedLink ? '¡Enlace de rastreo copiado!' : 'Copiar enlace de rastreo'}</span>
+                                    {copiedLink ? <Check size={14} /> : <Copy size={14} />}
+                                    <span>{copiedLink ? 'Enlace de rastreo copiado' : 'Copiar enlace de rastreo'}</span>
                                 </button>
 
                                 <button 
                                     className="btn-share-utility"
                                     onClick={handleCopySummary}
                                 >
-                                    {copiedSummary ? <Check size={14} className="text-success" /> : <Copy size={14} />}
-                                    <span>{copiedSummary ? '¡Resumen copiado!' : 'Copiar resumen para WhatsApp / Notas'}</span>
+                                    {copiedSummary ? <Check size={14} /> : <Copy size={14} />}
+                                    <span>{copiedSummary ? 'Resumen copiado' : 'Copiar resumen de la orden'}</span>
                                 </button>
                             </div>
                         </div>
