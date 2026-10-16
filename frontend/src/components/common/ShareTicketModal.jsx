@@ -141,37 +141,55 @@ export default function ShareTicketModal({
         }
     };
 
-    // Renderizar la tarjeta como imagen PNG en alta definicion nitida (3x escala)
+    // Renderizar la tarjeta como imagen PNG en alta definicion nitida (2x o 3x escala)
     const captureTicketCanvas = async () => {
         if (!cardRef.current) return null;
-        return await html2canvas(cardRef.current, {
-            scale: 3,
-            useCORS: true,
-            allowTaint: false,
-            backgroundColor: '#ffffff',
-            logging: false,
-            onclone: (clonedDoc) => {
-                const el = clonedDoc.querySelector('.share-thermal-ticket');
-                if (el) {
-                    el.style.width = '380px';
-                    el.style.boxSizing = 'border-box';
-                    el.style.backgroundColor = '#ffffff';
-                    el.style.color = '#000000';
+        try {
+            return await html2canvas(cardRef.current, {
+                scale: 2.5,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff',
+                logging: false,
+                imageTimeout: 8000,
+                onclone: (clonedDoc) => {
+                    const el = clonedDoc.querySelector('.share-thermal-ticket');
+                    if (el) {
+                        el.style.width = '380px';
+                        el.style.maxWidth = '380px';
+                        el.style.boxSizing = 'border-box';
+                        el.style.backgroundColor = '#ffffff';
+                        el.style.color = '#000000';
+                        el.style.display = 'block';
+                        el.style.visibility = 'visible';
+                    }
                 }
-            }
-        });
+            });
+        } catch (captureErr) {
+            console.error('html2canvas capture error:', captureErr);
+            throw captureErr;
+        }
     };
 
-    // Obtener Blob seguro del canvas
+    // Obtener Blob seguro del canvas con fallback a dataURL to Blob
     const getTicketBlob = async () => {
         const canvas = await captureTicketCanvas();
         if (!canvas) throw new Error('No se pudo inicializar el canvas');
-        return new Promise((resolve, reject) => {
-            canvas.toBlob((blob) => {
-                if (blob) resolve(blob);
-                else reject(new Error('Fallo al exportar blob de imagen'));
-            }, 'image/png', 1.0);
-        });
+
+        // Intento 1: canvas.toBlob directo
+        try {
+            const blob = await new Promise((resolve) => {
+                canvas.toBlob((b) => resolve(b), 'image/png', 1.0);
+            });
+            if (blob) return blob;
+        } catch (blobErr) {
+            console.warn('canvas.toBlob fallo, intentando toDataURL fallback:', blobErr);
+        }
+
+        // Intento 2: canvas.toDataURL con conversion manual a Blob
+        const dataUrl = canvas.toDataURL('image/png', 1.0);
+        const res = await fetch(dataUrl);
+        return await res.blob();
     };
 
     // Descargar imagen PNG directamente
@@ -186,10 +204,26 @@ export default function ShareTicketModal({
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 1500);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
         } catch (err) {
             console.error('Error al generar imagen de ticket:', err);
-            alert('No se pudo descargar la imagen directamente. Puedes usar Descargar PDF o Copiar Imagen.');
+            // Ultimo recurso de descarga directa mediante dataURL si getTicketBlob fallo
+            try {
+                const canvas = await captureTicketCanvas();
+                if (canvas) {
+                    const dataUrl = canvas.toDataURL('image/png');
+                    const link = document.createElement('a');
+                    link.href = dataUrl;
+                    link.download = `Ticket_${ticketNumber.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    return;
+                }
+            } catch (fallbackErr) {
+                console.error('Fallback descarga fallido:', fallbackErr);
+            }
+            alert('No se pudo descargar la imagen en este navegador. Puedes imprimir o descargar el comprobante en PDF.');
         } finally {
             setGeneratingImage(false);
         }
@@ -200,14 +234,23 @@ export default function ShareTicketModal({
         try {
             setGeneratingImage(true);
             const blob = await getTicketBlob();
-            if (navigator.clipboard && window.ClipboardItem) {
-                const item = new ClipboardItem({ 'image/png': blob });
-                await navigator.clipboard.write([item]);
-                setCopiedImage(true);
-                setTimeout(() => setCopiedImage(false), 2500);
-            } else {
-                handleDownloadImage();
+            
+            // Verificacion de compatibilidad con ClipboardItem para imagenes
+            if (navigator.clipboard && typeof window.ClipboardItem !== 'undefined') {
+                try {
+                    const item = new ClipboardItem({ [blob.type || 'image/png']: blob });
+                    await navigator.clipboard.write([item]);
+                    setCopiedImage(true);
+                    setTimeout(() => setCopiedImage(false), 2500);
+                    return;
+                } catch (clipErr) {
+                    console.warn('Error en clipboard.write con imagen, probando descarga:', clipErr);
+                }
             }
+
+            // Si el portapapeles no admite imagenes en este contexto/navegador, descargamos la imagen automaticamente
+            await handleDownloadImage();
+            alert('Tu navegador no permite copiar imagenes directamente al portapapeles. Se ha descargado la imagen a tu dispositivo para que puedas adjuntarla.');
         } catch (err) {
             console.error('Error copiando imagen al portapapeles:', err);
             handleDownloadImage();
