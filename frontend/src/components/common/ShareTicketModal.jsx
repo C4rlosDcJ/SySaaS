@@ -121,17 +121,17 @@ export default function ShareTicketModal({
             const entries = Object.entries(parsed);
             if (entries.length === 0) return null;
             return (
-                <div className="share-ticket-section">
-                    <p className="share-ticket-sec-title text-center">[ CHECKLIST DE INGRESO ]</p>
-                    <div className="share-ticket-checklist-grid">
+                <div className="st-checklist-section">
+                    <p className="st-sec-title text-center">[ CHECKLIST DE INGRESO ]</p>
+                    <div className="st-checklist-grid">
                         {entries.map(([key, value]) => {
                             const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                             return (
-                                <div key={key} className="checklist-item">
-                                    <span className={`check-badge ${value ? 'yes' : 'no'}`}>
-                                        {value ? 'SI' : 'NO'}
+                                <div key={key} className="st-check-row">
+                                    <span className={`st-check-indicator ${value ? 'is-checked' : 'is-unchecked'}`}>
+                                        {value ? '[X]' : '[ ]'}
                                     </span>
-                                    <span className="checklist-text">{label}</span>
+                                    <span className="st-check-label">{label}</span>
                                 </div>
                             );
                         })}
@@ -165,11 +165,6 @@ export default function ShareTicketModal({
                         el.style.display = 'block';
                         el.style.visibility = 'visible';
                     }
-                    // Forzar que los textos invertidos mantengan su fondo negro y letra blanca en el canvas
-                    clonedDoc.querySelectorAll('.st-doc-title, .st-badge, .check-badge.yes').forEach(node => {
-                        node.style.backgroundColor = '#000000';
-                        node.style.color = '#ffffff';
-                    });
                 }
             });
         } catch (captureErr) {
