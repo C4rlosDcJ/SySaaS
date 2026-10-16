@@ -13,6 +13,19 @@ const generateTicketNumber = (branchCode = 'REP') => {
     return `${branchCode}-${year}${month}${day}-${random}`;
 };
 
+// Normalizar fecha y hora para MySQL DATETIME evitando desfases de huso horario UTC
+const normalizeDateTime = (val) => {
+    if (!val) return null;
+    if (typeof val === 'string') {
+        const match = val.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
+        if (match) {
+            const [, y, m, d, hh = '00', mm = '00', ss = '00'] = match;
+            return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+        }
+    }
+    return val;
+};
+
 // Obtener todas las reparaciones (SaaS Scoped)
 exports.getAll = async (req, res) => {
     try {
@@ -324,7 +337,7 @@ exports.create = async (req, res) => {
             brand_other || null,
             model, color, storage_capacity, serial_number, imei, device_password, accessories_received,
             physical_condition, existing_damage, JSON.stringify(function_checklist), problem_description,
-            service_requested, service_id || null, priority || 'normal', estimated_delivery || null,
+            service_requested, service_id || null, priority || 'normal', normalizeDateTime(estimated_delivery),
             diagnosis_cost || 0, labor_cost || 0, parts_cost || 0, discount || 0, total,
             advance_payment || 0, finalWarrantyDays, null,
             battery_health || null, screen_status || null, account_status || null,
@@ -421,6 +434,8 @@ exports.update = async (req, res) => {
                     val = JSON.stringify(val);
                 } else if ((field === 'brand_id' || field === 'device_type_id') && val === 'other') {
                     val = null;
+                } else if (field === 'estimated_delivery') {
+                    val = normalizeDateTime(val);
                 }
                 values.push(val);
             }
@@ -549,7 +564,7 @@ exports.updateStatus = async (req, res) => {
 
         if (estimated_delivery) {
             updateQuery += ', estimated_delivery = ?';
-            updateParams.push(estimated_delivery);
+            updateParams.push(normalizeDateTime(estimated_delivery));
         }
 
         if (req.body.signature) {
@@ -797,7 +812,7 @@ exports.claimWarranty = async (req, res) => {
             `Garantía de: ${original.service_requested || 'Reparación General'}`,
             original.service_id,
             priority || 'normal',
-            estimated_delivery || null,
+            normalizeDateTime(estimated_delivery),
             original.warranty_days || 30,
             original.id,
             technical_observations || null

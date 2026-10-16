@@ -210,6 +210,9 @@ Para la generación de tickets imprimibles y la exportación de comprobantes dig
    - Márgenes y Cajas: Todos los nodos internos deben tener `box-sizing: border-box`.
    - Separadores: Líneas discontinuas nítidas `border-top: 1px dashed #000000`.
    - Badges sobre ticket térmico: Fondo negro `#000000` con texto blanco `#ffffff` para garantizar legibilidad al imprimir o digitalizar.
+4. **Formato de Fechas y Horas en Comprobantes**:
+   - Usar estrictamente la utilidad centralizada `formatDateTime` de `utils/constants.js`.
+   - Evitar `new Date(val).toLocaleString()` directo en componentes de tickets para impedir que el huso horario local desplace la fecha u hora original registrada en la orden.
 
 ---
 
