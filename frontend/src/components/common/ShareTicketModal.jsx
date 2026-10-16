@@ -128,7 +128,9 @@ export default function ShareTicketModal({
                             const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                             return (
                                 <div key={key} className="checklist-item">
-                                    <span className={value ? 'check-yes' : 'check-no'}>{value ? '[x]' : '[ ]'}</span>
+                                    <span className={`check-badge ${value ? 'yes' : 'no'}`}>
+                                        {value ? 'SI' : 'NO'}
+                                    </span>
                                     <span className="checklist-text">{label}</span>
                                 </div>
                             );
@@ -141,7 +143,7 @@ export default function ShareTicketModal({
         }
     };
 
-    // Renderizar la tarjeta como imagen PNG en alta definicion nitida (2x o 3x escala)
+    // Renderizar la tarjeta como imagen PNG en alta definicion nitida (2.5x escala)
     const captureTicketCanvas = async () => {
         if (!cardRef.current) return null;
         try {
@@ -163,6 +165,11 @@ export default function ShareTicketModal({
                         el.style.display = 'block';
                         el.style.visibility = 'visible';
                     }
+                    // Forzar que los textos invertidos mantengan su fondo negro y letra blanca en el canvas
+                    clonedDoc.querySelectorAll('.st-doc-title, .st-badge, .check-badge.yes').forEach(node => {
+                        node.style.backgroundColor = '#000000';
+                        node.style.color = '#ffffff';
+                    });
                 }
             });
         } catch (captureErr) {
