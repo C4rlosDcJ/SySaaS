@@ -153,9 +153,20 @@
         grid-template-columns: 1fr;
         gap: 16px;
         padding: 14px;
+        position: relative;
     }
 
-    .share-ticket-preview-pane.mobile-hidden,
+    .share-ticket-preview-pane.mobile-hidden {
+        position: absolute !important;
+        left: -9999px !important;
+        top: 0 !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        height: 1px !important;
+        overflow: hidden !important;
+        display: flex !important;
+    }
+
     .share-ticket-actions-pane.mobile-hidden {
         display: none !important;
     }
@@ -164,6 +175,10 @@
     .share-ticket-actions-pane.mobile-visible {
         display: flex !important;
         width: 100%;
+        position: static !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        height: auto !important;
     }
 }
 
